@@ -2,6 +2,8 @@ import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface MatchEntry {
   id: string;
@@ -20,7 +22,7 @@ export interface MatchEntry {
 @Component({
   selector: 'app-three-way-match',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Accounts payable" title="3-Way Match Verification" subtitle="Automated reconciliation of Purchase Orders, Goods Receipt Notes (GRN/QC), and Supplier Invoices before payment sign-off.">
       <div class="heading-actions">
@@ -50,17 +52,14 @@ export interface MatchEntry {
       </div>
     </section>
 
-    <!-- Add Match Panel -->
+    <!-- Add Reconciliation Form Panel -->
     @if (showAddMatch) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #16855b;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Log 3-Way Match Verification</h2>
-            <p>Perform automated or manual 3-way check against ERP Purchase Order and GRN.</p>
-          </div>
+          <h2>Perform Invoice Reconciliation</h2>
         </div>
 
-        <div class="form-grid">
+        <div class="form-grid four-col">
           <label>Invoice Reference # *<input [(ngModel)]="newEntry.invoiceId" placeholder="e.g. INV-00249" /></label>
           <label>Purchase Order # *<input [(ngModel)]="newEntry.poId" placeholder="e.g. PO-002349" /></label>
           <label>ERP GRN Reference # *<input [(ngModel)]="newEntry.grnId" placeholder="e.g. GRN-99812" /></label>
@@ -68,11 +67,7 @@ export interface MatchEntry {
           <label>PO Contract Amount ($) *<input type="number" [(ngModel)]="newEntry.poAmount" (ngModelChange)="calcVariance()" placeholder="18600" /></label>
           <label>Invoiced Amount ($) *<input type="number" [(ngModel)]="newEntry.invoiceAmount" (ngModelChange)="calcVariance()" placeholder="18600" /></label>
           <label>Quality Inspection (QC)
-            <select [(ngModel)]="newEntry.qcStatus" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Passed">Passed</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
-            </select>
+            <app-custom-select [(ngModel)]="newEntry.qcStatus" [options]="qcOptions" />
           </label>
           <label>Calculated Variance ($)<input type="number" [value]="newEntry.variance" readonly style="background: #f1f5f9;" /></label>
         </div>
@@ -85,47 +80,41 @@ export interface MatchEntry {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search matching queue by Invoice, PO, GRN or Supplier..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search matching queue by Invoice, PO, GRN or Supplier..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="matchFilter"
-      >
-        <option value="">All Match Results</option>
-        <option value="Matched">Matched (0 Variance)</option>
-        <option value="Mismatch">Price / Qty Mismatch</option>
-        <option value="Pending">Pending Check</option>
-      </select>
+        [options]="matchFilterOptions"
+        minWidth="190px"
+      />
     </div>
 
     <!-- Live Matching Queue Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Reconciliation Queue (PO ↔ GRN ↔ Invoice)</h2>
-          <p>Verify quantities, unit rates, tax amounts and inspection certificates.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
-        <table>
+        <table class="reconciliation-table">
           <thead>
             <tr>
-              <th>Invoice #</th>
-              <th>PO #</th>
-              <th>GRN #</th>
-              <th>Supplier</th>
-              <th>PO Value</th>
-              <th>Invoice Value</th>
-              <th>Variance</th>
-              <th>QC</th>
-              <th>3-Way Match</th>
-              <th>Approval</th>
-              <th>Actions</th>
+              <th style="min-width: 105px;">Invoice #</th>
+              <th style="min-width: 95px;">PO #</th>
+              <th style="min-width: 95px;">GRN #</th>
+              <th style="min-width: 180px;">Supplier</th>
+              <th style="min-width: 95px;">PO Value</th>
+              <th style="min-width: 95px;">Invoice Value</th>
+              <th style="min-width: 85px;">Variance</th>
+              <th style="min-width: 80px;">QC</th>
+              <th style="min-width: 105px;">3-Way Match</th>
+              <th style="min-width: 95px;">Approval</th>
+              <th style="min-width: 210px; text-align: left;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -134,7 +123,7 @@ export interface MatchEntry {
                 <td><span class="mono">{{ m.invoiceId }}</span></td>
                 <td><input [(ngModel)]="m.poId" style="width: 90px; font-family: monospace;" /></td>
                 <td><input [(ngModel)]="m.grnId" style="width: 85px; font-family: monospace;" /></td>
-                <td><input [(ngModel)]="m.vendor" style="font-weight: 600;" /></td>
+                <td><input [(ngModel)]="m.vendor" style="min-width: 170px; width: 100%; font-weight: 600;" /></td>
                 <td><input type="number" [(ngModel)]="m.poAmount" (ngModelChange)="recalcRow(m)" style="width: 80px;" /></td>
                 <td><input type="number" [(ngModel)]="m.invoiceAmount" (ngModelChange)="recalcRow(m)" style="width: 80px;" /></td>
                 <td>
@@ -151,17 +140,50 @@ export interface MatchEntry {
                 <td>
                   <app-status [text]="m.approvalStatus" [good]="m.approvalStatus==='Approved'" [warn]="m.approvalStatus==='Pending'" [bad]="m.approvalStatus==='On Hold'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    @if (m.approvalStatus === 'Pending' && m.matchStatus === 'Matched') {
-                      <button class="btn small" (click)="approveMatch(m)">Approve</button>
-                    }
+                <td style="white-space: nowrap;">
+                  <div class="row-actions">
                     @if (m.matchStatus === 'Mismatch') {
-                      <button class="btn small secondary" (click)="overrideMismatch(m)">Override</button>
+                      <button class="btn-action btn-action-reject" (click)="overrideMismatch(m)" title="Override discrepancy">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span>Override</span>
+                      </button>
+                    } @else if (m.approvalStatus === 'Approved') {
+                      <button class="btn-action btn-action-approved" (click)="toggleApproval(m)" title="Approved (Click to Revoke Approval)">
+                        <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <span class="text-approved">Approved</span>
+                        <span class="text-revoke">Revoke</span>
+                      </button>
+                    } @else {
+                      <button class="btn-action btn-action-approve" (click)="toggleApproval(m)" title="Approve 3-way match">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Approve</span>
+                      </button>
                     }
-                    <button class="btn small ghost" (click)="saveMatch(m)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteMatch(m.id)">✕</button>
+
+                    <button class="btn-action btn-action-save" (click)="saveMatch(m)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteMatch(m.id)" title="Delete match record">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
+                </td>
+              </tr>
+            }
+
+            @if (filteredQueue().length === 0) {
+              <tr>
+                <td colspan="11" style="text-align: center; padding: 36px 16px; color: var(--muted, #64748b);">
+                  No reconciliation records match your search query.
                 </td>
               </tr>
             }
@@ -169,7 +191,51 @@ export interface MatchEntry {
         </table>
       </div>
     </article>
-  `
+  `,
+  styles: [`
+    .reconciliation-table {
+      width: 100%;
+      min-width: 1260px;
+      border-collapse: separate;
+      border-spacing: 0;
+
+      thead th {
+        background: var(--role-accent, #1769e0);
+        color: #ffffff;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 11px 12px;
+        border: none;
+        white-space: nowrap;
+
+        &:first-child {
+          border-top-left-radius: var(--radius-sm, 6px);
+        }
+        &:last-child {
+          border-top-right-radius: var(--radius-sm, 6px);
+        }
+      }
+
+      tbody tr:hover {
+        background: rgba(23, 105, 224, 0.04);
+      }
+
+      tbody td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--line, #e2e8f0);
+      }
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-start;
+    }
+  `]
 })
 export class ThreeWayMatchComponent {
   readonly state = inject(PortalStateService);
@@ -178,6 +244,15 @@ export class ThreeWayMatchComponent {
   showAddMatch = false;
   searchQuery = '';
   matchFilter = '';
+
+  readonly matchFilterOptions = [
+    { value: '', label: 'All Match Results' },
+    { value: 'Matched', label: 'Matched (0 Variance)' },
+    { value: 'Mismatch', label: 'Price / Qty Mismatch' },
+    { value: 'Pending', label: 'Pending Check' }
+  ];
+
+  readonly qcOptions = ['Passed', 'Pending', 'Rejected'];
 
   newEntry: MatchEntry = {
     id: 'MTC-005',
@@ -200,18 +275,27 @@ export class ThreeWayMatchComponent {
     { id: 'MTC-004', invoiceId: 'INV-00242', poId: 'PO-002280', grnId: 'GRN-99710', vendor: 'Perfect Industrial', poAmount: 43800, invoiceAmount: 43800, variance: 0, qcStatus: 'Passed', matchStatus: 'Matched', approvalStatus: 'Approved' }
   ];
 
-  filteredQueue = computed(() => {
+  filteredQueue(): MatchEntry[] {
     const q = this.searchQuery.trim().toLowerCase();
     const mf = this.matchFilter;
     return this.matchQueue.filter(m => {
-      const matchQ = !q || m.invoiceId.toLowerCase().includes(q) || m.poId.toLowerCase().includes(q) || m.vendor.toLowerCase().includes(q) || m.grnId.toLowerCase().includes(q);
+      const matchQ = !q ||
+        (m.invoiceId || '').toLowerCase().includes(q) ||
+        (m.poId || '').toLowerCase().includes(q) ||
+        (m.vendor || '').toLowerCase().includes(q) ||
+        (m.grnId || '').toLowerCase().includes(q);
       const matchM = !mf || m.matchStatus === mf;
       return matchQ && matchM;
     });
-  });
+  }
 
-  matchedCount = computed(() => this.matchQueue.filter(m => m.matchStatus === 'Matched').length);
-  mismatchCount = computed(() => this.matchQueue.filter(m => m.matchStatus === 'Mismatch').length);
+  matchedCount(): number {
+    return this.matchQueue.filter(m => m.matchStatus === 'Matched').length;
+  }
+
+  mismatchCount(): number {
+    return this.matchQueue.filter(m => m.matchStatus === 'Mismatch').length;
+  }
 
   calcVariance(): void {
     this.newEntry.variance = (this.newEntry.invoiceAmount || 0) - (this.newEntry.poAmount || 0);
@@ -251,9 +335,18 @@ export class ThreeWayMatchComponent {
     };
   }
 
+  toggleApproval(m: MatchEntry): void {
+    if (m.approvalStatus === 'Approved') {
+      m.approvalStatus = 'Pending';
+      this.state.notify(`Approval revoked for match ${m.invoiceId}. Status reverted to Pending.`);
+    } else {
+      m.approvalStatus = 'Approved';
+      this.state.notify(`3-Way match approved for ${m.invoiceId}. Invoice ready for disbursement.`);
+    }
+  }
+
   approveMatch(m: MatchEntry): void {
-    m.approvalStatus = 'Approved';
-    this.state.notify(`3-Way match approved for ${m.invoiceId}. Invoice ready for disbursement.`);
+    this.toggleApproval(m);
   }
 
   overrideMismatch(m: MatchEntry): void {

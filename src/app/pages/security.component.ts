@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface SecurityPolicy {
   id: string;
@@ -15,7 +16,7 @@ export interface SecurityPolicy {
 @Component({
   selector: 'app-security',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Cybersecurity & Governance" title="Information Security & Access Controls" subtitle="Manage two-factor authentication (2FA), banking data encryption, session token policies and perimeter brute-force safeguards.">
       <div class="heading-actions">
@@ -28,12 +29,9 @@ export interface SecurityPolicy {
 
     <!-- Add Security Policy Form -->
     @if (showAddPolicy) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Provision Security Control / Policy</h2>
-            <p>Declare cryptographic requirements, authentication factors and enforcement target.</p>
-          </div>
+          <h2>Provision Security Control / Policy</h2>
         </div>
 
         <div class="form-grid">
@@ -41,11 +39,7 @@ export interface SecurityPolicy {
           <label>Cryptographic Standard / Protocol *<input [(ngModel)]="newPolicy.standard" placeholder="e.g. CIDR Block / VPN Tunnel" /></label>
           <label>Enforcement Target Scope *<input [(ngModel)]="newPolicy.scope" placeholder="e.g. All Internal Administrator Logins" /></label>
           <label>Enforcement State
-            <select [(ngModel)]="newPolicy.status" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Enforced">Enforced (Strict Blocking)</option>
-              <option value="Active">Active (Standard)</option>
-              <option value="Monitoring">Monitoring (Audit Only)</option>
-            </select>
+            <app-custom-select [(ngModel)]="newPolicy.status" [options]="policyStatusOptions" />
           </label>
         </div>
 
@@ -58,13 +52,6 @@ export interface SecurityPolicy {
 
     <!-- Live Security Controls Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Active Platform Security Protocols</h2>
-          <p>Continuous cryptographic protection and identity assurance</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -87,11 +74,26 @@ export interface SecurityPolicy {
                 <td>
                   <app-status [text]="p.status" [good]="p.status==='Enforced' || p.status==='Active'" [warn]="p.status==='Monitoring'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small" (click)="verifyKey(p)">Audit</button>
-                    <button class="btn small ghost" (click)="savePolicy(p)">Save</button>
-                    <button class="btn small danger-btn" (click)="deletePolicy(p.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-view" (click)="verifyKey(p)" title="Audit policy">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      <span>Audit</span>
+                    </button>
+                    <button class="btn-action btn-action-save" (click)="savePolicy(p)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deletePolicy(p.id)" title="Delete policy">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -106,6 +108,8 @@ export class SecurityComponent {
   readonly state = inject(PortalStateService);
 
   showAddPolicy = false;
+
+  readonly policyStatusOptions = ['Enforced', 'Active', 'Monitoring'];
 
   newPolicy: SecurityPolicy = {
     id: 'SEC-005',

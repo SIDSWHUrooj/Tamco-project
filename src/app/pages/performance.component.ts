@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface ScorecardItem {
   id: string;
@@ -18,7 +20,7 @@ export interface ScorecardItem {
 @Component({
   selector: 'app-performance',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Vendor Evaluation" title="Supplier Performance & Scorecards" subtitle="Track delivery punctuality, quality acceptance rates, commercial competitiveness and RFQ responsiveness KPIs.">
       <div class="heading-actions">
@@ -30,44 +32,52 @@ export interface ScorecardItem {
     </app-page-heading>
 
     <!-- Stats Overview -->
-    <section class="stats-grid compact">
-      <div class="stat-card">
-        <span>Evaluated Vendors</span>
-        <strong>{{ scorecards.length }}</strong>
-        <small>Active vendor scorecards</small>
-      </div>
-      <div class="stat-card">
-        <span>Average On-Time Arrival</span>
-        <strong style="color: #16855b;">{{ avgOnTime() }}%</strong>
-        <small>Delivery punctuality index</small>
-      </div>
-      <div class="stat-card">
-        <span>Average QC Pass Rate</span>
-        <strong style="color: #1769e0;">{{ avgQc() }}%</strong>
-        <small>Material quality compliance</small>
-      </div>
+    <section class="dash-kpis three">
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">Active Scorecards</span>
+          <span class="kpi-icon-badge blue">
+            <app-icon name="vendors" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value">{{ scorecards.length }}</strong>
+        <small>Audited supplier partners</small>
+      </article>
+
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">On-Time Arrival Rate</span>
+          <span class="kpi-icon-badge emerald">
+            <app-icon name="deliveries" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value" style="color: #059669;">{{ avgOnTime() }}%</strong>
+        <small>Fleet delivery punctuality index</small>
+      </article>
+
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">QC Inspection Pass Rate</span>
+          <span class="kpi-icon-badge purple">
+            <app-icon name="approval-matrix" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value" style="color: #7c3aed;">{{ avgQc() }}%</strong>
+        <small>Quality & compliance conformance</small>
+      </article>
     </section>
 
     <!-- Add Evaluation Form -->
     @if (showAddScorecard) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Record Vendor Performance Evaluation</h2>
-            <p>Input audit scores across delivery, quality inspection, pricing and technical response.</p>
-          </div>
+          <h2>Record Vendor Performance Evaluation</h2>
         </div>
 
         <div class="form-grid">
           <label>Supplier Legal Name *<input [(ngModel)]="newCard.vendor" placeholder="e.g. Al-Hasan Engineering Works" /></label>
           <label>Primary Category *
-            <select [(ngModel)]="newCard.category" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Electrical">Electrical</option>
-              <option value="Mechanical">Mechanical</option>
-              <option value="Safety Equipment">Safety Equipment</option>
-              <option value="Raw Materials">Raw Materials</option>
-              <option value="IT & Hardware">IT & Hardware</option>
-            </select>
+            <app-custom-select [(ngModel)]="newCard.category" [options]="categoryOptions" />
           </label>
           <label>On-Time Delivery Rate (%) *<input type="number" [(ngModel)]="newCard.onTime" placeholder="92" /></label>
           <label>Quality / QC Pass Rate (%) *<input type="number" [(ngModel)]="newCard.qcPass" placeholder="96" /></label>
@@ -83,32 +93,26 @@ export interface ScorecardItem {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search vendor scorecards by supplier or category..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search vendor scorecards by supplier or category..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="tierFilter"
-      >
-        <option value="">All Tiers</option>
-        <option value="Tier 1 (Preferred)">Tier 1 (Preferred)</option>
-        <option value="Tier 2 (Qualified)">Tier 2 (Qualified)</option>
-        <option value="Tier 3 (Under Review)">Tier 3 (Under Review)</option>
-      </select>
+        [options]="tierOptions"
+        minWidth="180px"
+      />
     </div>
 
     <!-- Live Scorecards Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Supplier Performance & Quality Index</h2>
-          <p>Multi-factor rating scorecard with automated classification</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -137,10 +141,22 @@ export interface ScorecardItem {
                 <td>
                   <app-status [text]="s.tier" [good]="s.tier.includes('Tier 1')" [warn]="s.tier.includes('Tier 2')" [bad]="s.tier.includes('Tier 3')" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveScorecard(s)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteScorecard(s.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveScorecard(s)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteScorecard(s.id)" title="Delete scorecard">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -157,6 +173,21 @@ export class PerformanceComponent {
   showAddScorecard = false;
   searchQuery = '';
   tierFilter = '';
+
+  readonly tierOptions = [
+    { value: '', label: 'All Tiers' },
+    { value: 'Tier 1 (Preferred)', label: 'Tier 1 (Preferred)' },
+    { value: 'Tier 2 (Qualified)', label: 'Tier 2 (Qualified)' },
+    { value: 'Tier 3 (Under Review)', label: 'Tier 3 (Under Review)' }
+  ];
+
+  readonly categoryOptions = [
+    'Electrical',
+    'Mechanical',
+    'Safety Equipment',
+    'Raw Materials',
+    'IT & Hardware'
+  ];
 
   newCard: ScorecardItem = {
     id: 'SC-005',
@@ -177,25 +208,25 @@ export class PerformanceComponent {
     { id: 'SC-004', vendor: 'Perfect Industrial', category: 'Raw Materials', onTime: 90, qcPass: 95, priceScore: 89, responseTime: 12, overallRating: 4.5, tier: 'Tier 1 (Preferred)' }
   ];
 
-  filteredScorecards = computed(() => {
+  filteredScorecards(): ScorecardItem[] {
     const q = this.searchQuery.trim().toLowerCase();
     const tf = this.tierFilter;
     return this.scorecards.filter(s => {
-      const matchQ = !q || s.vendor.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+      const matchQ = !q || (s.vendor || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q) || (s.tier || '').toLowerCase().includes(q) || (s.id || '').toLowerCase().includes(q);
       const matchT = !tf || s.tier === tf;
       return matchQ && matchT;
     });
-  });
+  }
 
-  avgOnTime = computed(() => {
+  avgOnTime(): number {
     if (!this.scorecards.length) return 0;
     return Math.round(this.scorecards.reduce((a, b) => a + (b.onTime || 0), 0) / this.scorecards.length);
-  });
+  }
 
-  avgQc = computed(() => {
+  avgQc(): number {
     if (!this.scorecards.length) return 0;
     return Math.round(this.scorecards.reduce((a, b) => a + (b.qcPass || 0), 0) / this.scorecards.length);
-  });
+  }
 
   recalcRating(s: ScorecardItem): void {
     const score = ((s.onTime || 0) * 0.4 + (s.qcPass || 0) * 0.4 + (s.priceScore || 0) * 0.2) / 20;

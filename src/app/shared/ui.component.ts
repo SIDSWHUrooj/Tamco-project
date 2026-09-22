@@ -24,7 +24,12 @@ export class StatCardComponent {
   standalone: true,
   template: `
     <div class="page-heading">
-      <div><p class="eyebrow">{{ eyebrow }}</p><h1>{{ title }}</h1><p>{{ subtitle }}</p></div>
+      <div>
+        @if (eyebrow) {
+          <p class="eyebrow">{{ eyebrow }}</p>
+        }
+        <h1>{{ title }}</h1>
+      </div>
       <ng-content />
     </div>
   `

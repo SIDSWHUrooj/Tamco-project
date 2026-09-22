@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface WorkflowPipeline {
   id: string;
@@ -16,7 +17,7 @@ export interface WorkflowPipeline {
 @Component({
   selector: 'app-workflows',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Automation & Process" title="Workflow Setup & Pipelines" subtitle="Configure and monitor automated paperless approval chains, service level agreements (SLAs), and verification milestones.">
       <div class="heading-actions">
@@ -29,39 +30,23 @@ export interface WorkflowPipeline {
 
     <!-- Add Workflow Form -->
     @if (showAddWorkflow) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Configure Approval & Verification Pipeline</h2>
-            <p>Define event trigger, sequential sign-off stages and maximum SLA thresholds.</p>
-          </div>
+          <h2>Configure Approval & Verification Pipeline</h2>
         </div>
 
         <div class="form-grid">
           <label>Workflow Title *<input [(ngModel)]="newWorkflow.name" placeholder="e.g. High-Value PO Approval Flow" /></label>
           <label>Trigger Event *
-            <select [(ngModel)]="newWorkflow.triggerEvent" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Vendor Profile Submitted">Vendor Profile Submitted</option>
-              <option value="RFQ Sourcing Concluded">RFQ Sourcing Concluded</option>
-              <option value="Purchase Order Released">Purchase Order Released</option>
-              <option value="Invoice Uploaded & Matched">Invoice Uploaded & Matched</option>
-            </select>
+            <app-custom-select [(ngModel)]="newWorkflow.triggerEvent" [options]="triggerOptions" />
           </label>
           <label>Sequential Stages & Approvers *<input [(ngModel)]="newWorkflow.stages" placeholder="e.g. Buyer → Manager → Head of Procurement" /></label>
           <label>Max SLA (Hours) *<input type="number" [(ngModel)]="newWorkflow.slaHours" placeholder="48" /></label>
           <label>Priority
-            <select [(ngModel)]="newWorkflow.priority" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Normal">Normal</option>
-            </select>
+            <app-custom-select [(ngModel)]="newWorkflow.priority" [options]="priorityOptions" />
           </label>
           <label>Initial State
-            <select [(ngModel)]="newWorkflow.status" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Active">Active</option>
-              <option value="Draft">Draft</option>
-              <option value="Inactive">Inactive</option>
-            </select>
+            <app-custom-select [(ngModel)]="newWorkflow.status" [options]="statusOptions" />
           </label>
         </div>
 
@@ -74,13 +59,6 @@ export interface WorkflowPipeline {
 
     <!-- Live Workflows Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Configured Workflow Pipelines</h2>
-          <p>Real-time execution rules for enterprise procurement lifecycle</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -107,13 +85,37 @@ export interface WorkflowPipeline {
                 <td>
                   <app-status [text]="w.status" [good]="w.status==='Active'" [warn]="w.status==='Draft'" [bad]="w.status==='Inactive'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small" (click)="toggleActive(w)">
-                      {{ w.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button
+                      class="btn-action"
+                      [class.btn-action-reject]="w.status === 'Active'"
+                      [class.btn-action-approve]="w.status !== 'Active'"
+                      (click)="toggleActive(w)"
+                      style="min-width: 90px; justify-content: center;"
+                    >
+                      @if (w.status === 'Active') {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        <span>Deactivate</span>
+                      } @else {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Activate</span>
+                      }
                     </button>
-                    <button class="btn small ghost" (click)="saveWorkflow(w)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteWorkflow(w.id)">✕</button>
+                    <button class="btn-action btn-action-save" (click)="saveWorkflow(w)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteWorkflow(w.id)" title="Delete workflow">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -128,6 +130,15 @@ export class WorkflowsComponent {
   readonly state = inject(PortalStateService);
 
   showAddWorkflow = false;
+
+  readonly triggerOptions = [
+    'Vendor Profile Submitted',
+    'RFQ Sourcing Concluded',
+    'Purchase Order Released',
+    'Invoice Uploaded & Matched'
+  ];
+  readonly priorityOptions = ['Critical', 'High', 'Normal'];
+  readonly statusOptions = ['Active', 'Draft', 'Inactive'];
 
   newWorkflow: WorkflowPipeline = {
     id: 'WF-005',

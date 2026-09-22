@@ -2,11 +2,306 @@ import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
+import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 
 @Component({
   selector: 'app-rfq-page',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
+  styles: [`
+    .rfq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .rfq-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      border-left: 4px solid var(--green, #16a34a);
+      padding: 14px 16px;
+      background: #ffffff;
+      border-radius: var(--radius-md, 10px);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+
+      &.status-evaluation {
+        border-left-color: var(--amber, #d97706);
+      }
+
+      &.status-closed {
+        border-left-color: #94a3b8;
+      }
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+    }
+
+    .rfq-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .rfq-head-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .rfq-code-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--role-accent, #2563eb);
+      background: var(--role-soft, #eff6ff);
+      border: 1px solid var(--role-border, #bfdbfe);
+      padding: 2px 7px;
+      border-radius: 5px;
+    }
+
+    .category-pill {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .rfq-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text, #0f172a);
+      margin: 0 0 10px;
+      line-height: 1.3;
+    }
+
+    .rfq-specs-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      background: #f8fafc;
+      border: 1px solid var(--line, #e2e8f0);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .spec-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .spec-lbl {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted, #64748b);
+    }
+
+    .spec-val {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text, #0f172a);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 480px) {
+      .rfq-specs-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+    }
+
+    /* COMMERCIAL BID BOX (Matching User Specification) */
+    .vendor-bid-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      box-shadow: 0 1px 2px rgba(22, 163, 74, 0.04);
+    }
+
+    .bid-box-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .bid-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #1e293b;
+    }
+
+    .bid-header-icon {
+      color: #15803d;
+      flex-shrink: 0;
+    }
+
+    .commercial-bid-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #1e293b;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .bid-submitted-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      letter-spacing: -0.01em;
+    }
+
+    .bid-fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .bid-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .bid-field-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .bid-input-container {
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      height: 32px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+      &:focus-within {
+        border-color: #16a34a;
+        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15);
+      }
+    }
+
+    .bid-affix {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      user-select: none;
+      pointer-events: none;
+
+      &.prefix {
+        padding-left: 9px;
+        padding-right: 2px;
+      }
+
+      &.suffix {
+        padding-right: 9px;
+        padding-left: 2px;
+        font-size: 11px;
+      }
+    }
+
+    .bid-input {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      border: none !important;
+      outline: none !important;
+      background: transparent !important;
+      padding: 0 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #0f172a;
+      box-shadow: none !important;
+
+      &::placeholder {
+        color: #94a3b8;
+        font-weight: 400;
+      }
+
+      &::-webkit-outer-spin-button,
+      &::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
+
+    .bid-submit-btn {
+      width: 100%;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(22, 163, 74, 0.2);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #15803d;
+        box-shadow: 0 3px 8px rgba(22, 163, 74, 0.25);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+
+      svg {
+        flex-shrink: 0;
+      }
+    }
+
+    .procurement-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line, #e2e8f0);
+    }
+  `],
   template: `
     <app-page-heading
       eyebrow="Sourcing & e-Bidding"
@@ -14,58 +309,85 @@ import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
       [subtitle]="role()==='vendor' ? 'View and bid on qualified RFQs matching your approved categories. Submit prices and lead times.' : 'Publish tenders, invite verified suppliers, review competitive quotations and award contracts.'">
       <div class="heading-actions">
         @if (role() !== 'vendor') {
-          <button class="btn" (click)="showNewRfqForm = !showNewRfqForm">
-            {{ showNewRfqForm ? '✕ Close Form' : '+ Publish New RFQ' }}
+          <button class="btn" (click)="showNewRfqForm = !showNewRfqForm" style="display: inline-flex; align-items: center; gap: 6px;">
+            @if (showNewRfqForm) {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              <span>Close Form</span>
+            } @else {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span>Publish New RFQ</span>
+            }
           </button>
         }
-        <button class="btn secondary" (click)="exportRfqs()">Export RFQ Log</button>
+        <button class="btn secondary" (click)="exportRfqs()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Export RFQ Log</span>
+        </button>
       </div>
     </app-page-heading>
 
     <!-- Stats Overview -->
-    <section class="stats-grid compact">
-      <div class="stat-card">
-        <span>Total RFQs</span>
-        <strong>{{ rfqsList.length }}</strong>
-        <small>Total sourcing events</small>
-      </div>
-      <div class="stat-card">
-        <span>Active / Open</span>
-        <strong style="color: #16855b;">{{ activeCount() }}</strong>
-        <small>Accepting supplier bids</small>
-      </div>
-      <div class="stat-card">
-        <span>Pending Evaluation</span>
-        <strong style="color: #b56b05;">{{ evaluatingCount() }}</strong>
-        <small>Under commercial review</small>
-      </div>
+    <section class="dash-kpis three">
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">Total RFQs</span>
+          <span class="kpi-icon-badge blue">
+            <app-icon name="rfqs" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value">{{ rfqsList.length }}</strong>
+        <small>Total published tender events</small>
+      </article>
+
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">Active / Open</span>
+          <span class="kpi-icon-badge emerald">
+            <app-icon name="bidding" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value" style="color: #059669;">{{ activeCount() }}</strong>
+        <small>Accepting competitive supplier bids</small>
+      </article>
+
+      <article class="dash-kpi">
+        <div class="kpi-top-row">
+          <span class="kpi-label">Pending Evaluation</span>
+          <span class="kpi-icon-badge amber">
+            <app-icon name="bid-comparison" [size]="16" />
+          </span>
+        </div>
+        <strong class="kpi-value" style="color: #d97706;">{{ evaluatingCount() }}</strong>
+        <small>Under commercial & technical audit</small>
+      </article>
     </section>
 
     <!-- Publish New RFQ Panel (Procurement / Admin) -->
     @if (showNewRfqForm && role() !== 'vendor') {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Publish New Request for Quotation (RFQ)</h2>
-            <p>Define tender details, category scope, estimated budget and closing deadline.</p>
-          </div>
+          <h2>Publish New Request for Quotation (RFQ)</h2>
         </div>
 
         <div class="form-grid">
           <label>RFQ Reference # *<input [(ngModel)]="newRfq.id" placeholder="e.g. RFQ-2026-089" /></label>
           <label>RFQ Title / Description *<input [(ngModel)]="newRfq.title" placeholder="e.g. 11kV Gas-Insulated Switchgear Supply" /></label>
           <label>Purchasing Category *
-            <select [(ngModel)]="newRfq.category" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Electrical">Electrical</option>
-              <option value="Mechanical">Mechanical</option>
-              <option value="Safety Equipment">Safety Equipment</option>
-              <option value="Raw Materials">Raw Materials</option>
-              <option value="IT & Hardware">IT & Hardware</option>
-            </select>
+            <app-custom-select [(ngModel)]="newRfq.category" [options]="categoryOptions" />
           </label>
           <label>Estimated Budget ($) *<input type="number" [(ngModel)]="newRfq.budget" placeholder="50000" /></label>
           <label>Required Delivery / Days *<input type="number" [(ngModel)]="newRfq.deliveryDays" placeholder="7" /></label>
-          <label>Submission Deadline *<input type="date" [(ngModel)]="newRfq.deadline" /></label>
+          <label>Submission Deadline *
+            <app-custom-date-picker [(ngModel)]="newRfq.deadline" />
+          </label>
           <label class="span-2">Technical Specification Details<input [(ngModel)]="newRfq.specs" placeholder="Detailed engineering requirements..." /></label>
         </div>
 
@@ -77,22 +399,22 @@ import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search RFQs by title, code or category..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search RFQs by title, code or category..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="categoryFilter"
-      >
-        <option value="">All Categories</option>
-        <option value="Electrical">Electrical</option>
-        <option value="Mechanical">Mechanical</option>
-        <option value="Safety Equipment">Safety Equipment</option>
-        <option value="Raw Materials">Raw Materials</option>
-      </select>
+        [options]="filterCategoryOptions"
+        minWidth="180px"
+      />
     </div>
 
     <!-- RFQs List -->
@@ -106,47 +428,124 @@ import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
         </article>
       }
       @for (rfq of filteredRfqs(); track rfq.id) {
-        <article class="panel rfq-card">
-          <div class="panel-title">
-            <div>
-              <span class="mono">{{ rfq.id }}</span>
-              <app-status [text]="rfq.status" [good]="rfq.status==='Open'" [warn]="rfq.status==='Under Evaluation'" [bad]="rfq.status==='Closed'" />
+        <article class="panel rfq-card" [class.status-evaluation]="rfq.status === 'Under Evaluation'" [class.status-closed]="rfq.status === 'Closed'">
+          <!-- Top Row: RFQ ID + Category on left, Status badge on top right -->
+          <div class="rfq-card-head">
+            <div class="rfq-head-left">
+              <span class="rfq-code-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                {{ rfq.id }}
+              </span>
+              <span class="category-pill">{{ rfq.category }}</span>
             </div>
+            <app-status [text]="rfq.status" [good]="rfq.status==='Open'" [warn]="rfq.status==='Under Evaluation'" [bad]="rfq.status==='Closed'" />
           </div>
 
-          <div class="form-grid" style="margin-top: 8px;">
-            <label>RFQ Title<input [(ngModel)]="rfq.title" /></label>
-            <label>Category<input [(ngModel)]="rfq.category" /></label>
-            <label>Budget ($)<input type="number" [(ngModel)]="rfq.budget" /></label>
-            <label>Deadline<input type="date" [(ngModel)]="rfq.deadline" /></label>
-            <label>Delivery (Days)<input type="number" [(ngModel)]="rfq.deliveryDays" /></label>
-            <label>Bids Submitted<input type="number" [(ngModel)]="rfq.bidsCount" /></label>
+          <!-- Clean RFQ Title -->
+          <h3 class="rfq-card-title">{{ rfq.title }}</h3>
+
+          <!-- Compact 4-cell Specs Grid (Minimal vertical footprint) -->
+          <div class="rfq-specs-grid">
+            <div class="spec-cell">
+              <span class="spec-lbl">Budget</span>
+              <span class="spec-val" style="color: #059669; font-weight: 700;">&#36;{{ rfq.budget }}</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-lbl">Deadline</span>
+              <span class="spec-val">{{ rfq.deadline }}</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-lbl">Lead Time</span>
+              <span class="spec-val">{{ rfq.deliveryDays }} Days</span>
+            </div>
+            <div class="spec-cell">
+              <span class="spec-lbl">Bids</span>
+              <span class="spec-val">{{ rfq.bidsCount }} Submitted</span>
+            </div>
           </div>
 
           @if (role() === 'vendor') {
-            <!-- Vendor Quotation Submission Box -->
-            <div class="vendor-bid-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 10px;">
-              <h4 style="margin: 0 0 8px; font-size: 11px; color: #17263c;">Submit Your Commercial Bid</h4>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <label style="font-size: 10.5px; font-weight: 600;">Quoted Price ($) *
-                  <input type="number" [(ngModel)]="rfq.myBidPrice" placeholder="Enter quote ($)" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 11px;" />
-                </label>
-                <label style="font-size: 10.5px; font-weight: 600;">Committed Lead Time (Days) *
-                  <input type="number" [(ngModel)]="rfq.myBidDays" placeholder="Days" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 11px;" />
-                </label>
+            <!-- Vendor Commercial Bid Box (Matching User Specification) -->
+            <div class="vendor-bid-box">
+              <div class="bid-box-header">
+                <div class="bid-title-group">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="bid-header-icon">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                    <path d="m15 5 4 4"/>
+                  </svg>
+                  <span class="commercial-bid-title">COMMERCIAL BID</span>
+                </div>
+                <span class="bid-submitted-badge">✓ Bid Submitted</span>
               </div>
-              <div class="toolbar" style="margin-top: 8px;">
-                <button class="btn small" (click)="submitBid(rfq)">Submit Official Quotation</button>
+
+              <div class="bid-fields-grid">
+                <div class="bid-field-group">
+                  <label class="bid-field-label">Quoted Price ($) *</label>
+                  <div class="bid-input-container">
+                    <span class="bid-affix prefix">$</span>
+                    <input
+                      type="number"
+                      [(ngModel)]="rfq.myBidPrice"
+                      placeholder="0"
+                      class="bid-input"
+                    />
+                  </div>
+                </div>
+
+                <div class="bid-field-group">
+                  <label class="bid-field-label">Committed Lead Time *</label>
+                  <div class="bid-input-container">
+                    <input
+                      type="number"
+                      [(ngModel)]="rfq.myBidDays"
+                      placeholder="0"
+                      class="bid-input"
+                      style="padding-left: 12px;"
+                    />
+                    <span class="bid-affix suffix">Days</span>
+                  </div>
+                </div>
               </div>
+
+              <button class="bid-submit-btn" (click)="submitBid(rfq)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                  <path d="m15 5 4 4"/>
+                </svg>
+                <span>Update Quotation</span>
+              </button>
             </div>
           } @else {
             <!-- Procurement Controls -->
-            <div class="toolbar" style="margin-top: 10px; justify-content: space-between;">
+            <div class="procurement-actions">
               <div style="display: flex; gap: 6px;">
-                <button class="btn small" (click)="evaluateRfq(rfq)">Evaluate Bids</button>
-                <button class="btn small ghost" (click)="saveRfq(rfq)">Save</button>
+                @if (rfq.status === 'Open') {
+                  <button class="btn-action btn-action-execute" (click)="evaluateRfq(rfq)" title="Evaluate Bids">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 11 12 14 22 4"/>
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                    <span>Evaluate Bids</span>
+                  </button>
+                }
+                <button class="btn-action btn-action-save" (click)="saveRfq(rfq)" title="Save changes">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                  </svg>
+                  <span>Save</span>
+                </button>
               </div>
-              <button class="btn small danger-btn" (click)="deleteRfq(rfq.id)">Delete</button>
+              <button class="btn-action btn-action-delete" (click)="deleteRfq(rfq.id)" title="Delete RFQ">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
             </div>
           }
         </article>
@@ -161,6 +560,22 @@ export class RfqPageComponent {
   showNewRfqForm = false;
   searchQuery = '';
   categoryFilter = '';
+
+  readonly filterCategoryOptions = [
+    { value: '', label: 'All Categories' },
+    { value: 'Electrical', label: 'Electrical' },
+    { value: 'Mechanical', label: 'Mechanical' },
+    { value: 'Safety Equipment', label: 'Safety Equipment' },
+    { value: 'Raw Materials', label: 'Raw Materials' }
+  ];
+
+  readonly categoryOptions = [
+    'Electrical',
+    'Mechanical',
+    'Safety Equipment',
+    'Raw Materials',
+    'IT & Hardware'
+  ];
 
   newRfq: any = {
     id: 'RFQ-2026-062',
@@ -181,18 +596,26 @@ export class RfqPageComponent {
     { id: 'RFQ-2026-058', title: 'Raw Materials — Copper Cable', category: 'Raw Materials', budget: 31500, deliveryDays: 12, deadline: '2026-08-15', specs: 'XLPE 4-core 120mm² copper, 2 km drums.', status: 'Closed', bidsCount: 6, myBidPrice: 30800, myBidDays: 11 }
   ];
 
-  filteredRfqs = computed(() => {
+  filteredRfqs(): any[] {
     const q = this.searchQuery.trim().toLowerCase();
     const cat = this.categoryFilter;
     return this.rfqsList.filter(r => {
-      const matchQuery = !q || r.title.toLowerCase().includes(q) || r.id.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+      const matchQuery = !q ||
+        (r.title || '').toLowerCase().includes(q) ||
+        (r.id || '').toLowerCase().includes(q) ||
+        (r.category || '').toLowerCase().includes(q);
       const matchCat = !cat || r.category === cat;
       return matchQuery && matchCat;
     });
-  });
+  }
 
-  activeCount = computed(() => this.rfqsList.filter(r => r.status === 'Open').length);
-  evaluatingCount = computed(() => this.rfqsList.filter(r => r.status === 'Under Evaluation').length);
+  activeCount(): number {
+    return this.rfqsList.filter(r => r.status === 'Open').length;
+  }
+
+  evaluatingCount(): number {
+    return this.rfqsList.filter(r => r.status === 'Under Evaluation').length;
+  }
 
   createRfq(): void {
     if (!this.newRfq.id || !this.newRfq.title) {

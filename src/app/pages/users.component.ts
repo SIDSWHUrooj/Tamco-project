@@ -2,6 +2,8 @@ import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface UserAccount {
   id: string;
@@ -17,7 +19,7 @@ export interface UserAccount {
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Identity & Access" title="User Management Directory" subtitle="Manage internal team members, procurement approvers, and supplier business partner accounts.">
       <div class="heading-actions">
@@ -49,34 +51,21 @@ export interface UserAccount {
 
     <!-- Add User Form Panel -->
     @if (showAddUser) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Invite New Portal User</h2>
-            <p>Provision access permissions, organization membership and authentication role.</p>
-          </div>
+          <h2>Invite New Portal User</h2>
         </div>
 
         <div class="form-grid">
           <label>Full Legal Name *<input [(ngModel)]="newUser.name" placeholder="e.g. Tariq Mansoor" /></label>
           <label>Official Email Address *<input type="email" [(ngModel)]="newUser.email" placeholder="e.g. tariq@company.com" /></label>
           <label>Portal Role Assignment *
-            <select [(ngModel)]="newUser.role" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Procurement Manager">Procurement Manager</option>
-              <option value="Finance Officer">Finance Officer</option>
-              <option value="Vendor Admin">Vendor Admin</option>
-              <option value="Executive Approver">Executive Approver</option>
-              <option value="System Administrator">System Administrator</option>
-            </select>
+            <app-custom-select [(ngModel)]="newUser.role" [options]="roleAssignmentOptions" />
           </label>
           <label>Company / Organization *<input [(ngModel)]="newUser.organization" placeholder="e.g. TAMCO ME Ltd. / ABC Supplies" /></label>
           <label>Department<input [(ngModel)]="newUser.department" placeholder="e.g. Supply Chain / Accounts Payable" /></label>
           <label>Initial Account Status
-            <select [(ngModel)]="newUser.status" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Active">Active</option>
-              <option value="Pending Invite">Pending Invite</option>
-              <option value="Locked">Locked</option>
-            </select>
+            <app-custom-select [(ngModel)]="newUser.status" [options]="statusOptions" />
           </label>
         </div>
 
@@ -88,33 +77,26 @@ export interface UserAccount {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search users by name, email, organization or role..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search users by name, email, organization or role..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="roleFilter"
-      >
-        <option value="">All Roles</option>
-        <option value="Vendor Admin">Vendor Admin</option>
-        <option value="Procurement Manager">Procurement Manager</option>
-        <option value="Finance Officer">Finance Officer</option>
-        <option value="System Administrator">System Administrator</option>
-      </select>
+        [options]="filterRoleOptions"
+        minWidth="170px"
+      />
     </div>
 
     <!-- Live Users Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>System Users & Identity Management</h2>
-          <p>Maintain user permissions, passwords and account active status</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -135,13 +117,7 @@ export interface UserAccount {
                 <td><input [(ngModel)]="u.name" style="font-weight: 600;" /></td>
                 <td><input [(ngModel)]="u.email" /></td>
                 <td>
-                  <select [(ngModel)]="u.role" style="border: 1px solid #dbe3ed; border-radius: 6px; padding: 4px;">
-                    <option value="Vendor Admin">Vendor Admin</option>
-                    <option value="Procurement Manager">Procurement Manager</option>
-                    <option value="Finance Officer">Finance Officer</option>
-                    <option value="Executive Approver">Executive Approver</option>
-                    <option value="System Administrator">System Administrator</option>
-                  </select>
+                  <app-custom-select [(ngModel)]="u.role" [options]="roleAssignmentOptions" minWidth="150px" />
                 </td>
                 <td><input [(ngModel)]="u.organization" /></td>
                 <td><input [(ngModel)]="u.department" style="width: 110px;" /></td>
@@ -149,13 +125,37 @@ export interface UserAccount {
                   <app-status [text]="u.status" [good]="u.status==='Active'" [warn]="u.status==='Pending Invite'" [bad]="u.status==='Locked'" />
                 </td>
                 <td><small style="color: #64748b;">{{ u.lastLogin }}</small></td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small" (click)="toggleLock(u)">
-                      {{ u.status === 'Locked' ? 'Unlock' : 'Lock' }}
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button
+                      class="btn-action"
+                      [class.btn-action-reject]="u.status !== 'Locked'"
+                      [class.btn-action-approve]="u.status === 'Locked'"
+                      (click)="toggleLock(u)"
+                      style="min-width: 80px; justify-content: center;"
+                    >
+                      @if (u.status === 'Locked') {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                        <span>Unlock</span>
+                      } @else {
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Lock</span>
+                      }
                     </button>
-                    <button class="btn small ghost" (click)="saveUser(u)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteUser(u.id)">✕</button>
+                    <button class="btn-action btn-action-save" (click)="saveUser(u)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteUser(u.id)" title="Delete user">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -172,6 +172,28 @@ export class UsersComponent {
   showAddUser = false;
   searchQuery = '';
   roleFilter = '';
+
+  readonly filterRoleOptions = [
+    { value: '', label: 'All Roles' },
+    { value: 'Vendor Admin', label: 'Vendor Admin' },
+    { value: 'Procurement Manager', label: 'Procurement Manager' },
+    { value: 'Finance Officer', label: 'Finance Officer' },
+    { value: 'System Administrator', label: 'System Administrator' }
+  ];
+
+  readonly roleAssignmentOptions = [
+    'Procurement Manager',
+    'Finance Officer',
+    'Vendor Admin',
+    'Executive Approver',
+    'System Administrator'
+  ];
+
+  readonly statusOptions = [
+    'Active',
+    'Pending Invite',
+    'Locked'
+  ];
 
   newUser: UserAccount = {
     id: 'USR-005',
@@ -191,18 +213,28 @@ export class UsersComponent {
     { id: 'USR-004', name: 'Admin Master', email: 'admin@company.com', role: 'System Administrator', organization: 'TAMCO ME Ltd.', department: 'IT Enterprise Core', status: 'Active', lastLogin: 'Just now' }
   ];
 
-  filteredUsers = computed(() => {
+  filteredUsers(): UserAccount[] {
     const q = this.searchQuery.trim().toLowerCase();
     const rf = this.roleFilter;
     return this.usersList.filter(u => {
-      const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.organization.toLowerCase().includes(q);
+      const matchQ = !q ||
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.organization || '').toLowerCase().includes(q) ||
+        (u.role || '').toLowerCase().includes(q) ||
+        (u.department || '').toLowerCase().includes(q);
       const matchR = !rf || u.role === rf;
       return matchQ && matchR;
     });
-  });
+  }
 
-  activeCount = computed(() => this.usersList.filter(u => u.status === 'Active').length);
-  pendingCount = computed(() => this.usersList.filter(u => u.status !== 'Active').length);
+  activeCount(): number {
+    return this.usersList.filter(u => u.status === 'Active').length;
+  }
+
+  pendingCount(): number {
+    return this.usersList.filter(u => u.status !== 'Active').length;
+  }
 
   addUser(): void {
     if (!this.newUser.name || !this.newUser.email) {

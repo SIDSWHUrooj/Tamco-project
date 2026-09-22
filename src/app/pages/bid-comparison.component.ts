@@ -45,12 +45,9 @@ export interface BidderItem {
 
     <!-- Add Bidder Form Panel -->
     @if (showAddBidder) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Add Supplier Commercial Offer</h2>
-            <p>Enter quoted price, promised lead time, quality score and technical compliance.</p>
-          </div>
+          <h2>Add Supplier Commercial Offer</h2>
         </div>
 
         <div class="form-grid">
@@ -62,9 +59,21 @@ export interface BidderItem {
           <label>Warranty Period (Months)<input type="number" [(ngModel)]="newBidder.warrantyMonths" placeholder="12" /></label>
         </div>
 
-        <div class="toolbar" style="margin-top: 16px;">
-          <button class="btn secondary" (click)="resetBidderForm()">Reset</button>
-          <button class="btn" (click)="addBidder()">Add to Comparison</button>
+        <div class="toolbar" style="display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px;">
+          <button class="btn secondary" (click)="resetBidderForm()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+            <span>Reset</span>
+          </button>
+          <button class="btn" (click)="addBidder()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>Add to Comparison</span>
+          </button>
         </div>
       </article>
     }
@@ -80,13 +89,6 @@ export interface BidderItem {
 
     <!-- Comparative Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Evaluation & Ranking Matrix ({{ selectedRfqId }})</h2>
-          <p>Real-time weighted score calculation with automated recommendation badge.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -113,14 +115,26 @@ export interface BidderItem {
                 <td><input [(ngModel)]="b.location" style="width: 90px;" /></td>
                 <td><input type="number" [(ngModel)]="b.historyScore" style="width: 60px;" /> %</td>
                 <td><input type="number" [(ngModel)]="b.warrantyMonths" style="width: 55px;" /> mo</td>
-                <td><strong style="color: #1769e0; font-size: 13px;">{{ score(b) }} / 100</strong></td>
+                <td><strong style="color: var(--role-accent, #2563eb); font-size: 13px;">{{ score(b) }} / 100</strong></td>
                 <td>
                   <app-status [text]="idx===0 ? '🏆 Recommended' : 'Review'" [good]="idx===0" [warn]="idx!==0" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 6px;">
-                    <button class="btn small ghost" (click)="saveBidder(b)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteBidder(b.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveBidder(b)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteBidder(b.id)" title="Delete bidder">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -128,8 +142,13 @@ export interface BidderItem {
           </tbody>
         </table>
       </div>
-      <div class="toolbar" style="margin-top: 14px;">
-        <button class="btn" (click)="awardBid()">Award Purchase Order to #1 Ranked Supplier</button>
+      <div class="toolbar" style="display: flex; justify-content: flex-end; margin-top: 14px;">
+        <button class="btn" (click)="awardBid()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span>Award Purchase Order to #1 Ranked Supplier</span>
+        </button>
       </div>
     </article>
   `

@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface BankRecord {
   id: string;
@@ -19,7 +21,7 @@ export interface BankRecord {
 @Component({
   selector: 'app-bank-verification',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Finance control" title="Bank Account Verification" subtitle="Validate banking instruments, IBAN ownership, and corporate account titles prior to vendor payment authorization.">
       <div class="heading-actions">
@@ -51,22 +53,19 @@ export interface BankRecord {
 
     <!-- Add New Bank Form Panel -->
     @if (showAddForm) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #7048d7;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Register Bank Account Evidence</h2>
-            <p>Enter IBAN details, beneficiary account title and bank information.</p>
-          </div>
+          <h2>Register Bank Account Evidence</h2>
         </div>
 
-        <div class="form-grid">
+        <div class="form-grid four-col">
           <label>Vendor Code *<input [(ngModel)]="newRecord.vendorId" placeholder="e.g. VEN-10024" /></label>
           <label>Company Legal Name *<input [(ngModel)]="newRecord.vendorName" placeholder="Enter vendor legal name" /></label>
           <label>Bank Name *<input [(ngModel)]="newRecord.bankName" placeholder="e.g. Habib Bank Limited (HBL)" /></label>
           <label>IBAN (International Bank Account Number) *<input [(ngModel)]="newRecord.iban" placeholder="PK00 HABB 0000 1234 5678 9012" /></label>
           <label>Beneficiary Account Title *<input [(ngModel)]="newRecord.accountTitle" placeholder="Account title" /></label>
           <label>Branch Code / City<input [(ngModel)]="newRecord.branchCode" placeholder="e.g. Main Branch 0001 · Karachi" /></label>
-          <label class="span-2">Verification Notes / Reference<input [(ngModel)]="newRecord.notes" placeholder="Notes or bank certificate reference" /></label>
+          <label class="span-4">Verification Notes / Reference<input [(ngModel)]="newRecord.notes" placeholder="Notes or bank certificate reference" /></label>
         </div>
 
         <div class="toolbar" style="margin-top: 16px;">
@@ -76,45 +75,39 @@ export interface BankRecord {
       </article>
     }
 
-    <!-- Search & Filter -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search by vendor, bank name, or IBAN..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <!-- Search & Filter Bar -->
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search by vendor, bank name, or IBAN..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="statusFilter"
-      >
-        <option value="">All Statuses</option>
-        <option value="Pending">Pending</option>
-        <option value="Approved">Approved</option>
-        <option value="Rejected">Rejected</option>
-      </select>
+        [options]="statusFilterOptions"
+        minWidth="160px"
+      />
     </div>
 
     <!-- Live Bank Verification Queue Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Banking Instruments Queue</h2>
-          <p>Review account titles against corporate certificates before releasing electronic fund transfers.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
-        <table>
+        <table class="bank-table">
           <thead>
             <tr>
-              <th>Vendor ID</th>
-              <th>Vendor Name</th>
-              <th>Bank Name</th>
-              <th>IBAN Number</th>
-              <th>Account Title</th>
-              <th>Branch</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th style="min-width: 105px;">Vendor ID</th>
+              <th style="min-width: 170px;">Vendor Name</th>
+              <th style="min-width: 150px;">Bank Name</th>
+              <th style="min-width: 190px;">IBAN Number</th>
+              <th style="min-width: 170px;">Account Title</th>
+              <th style="min-width: 150px;">Branch</th>
+              <th style="min-width: 100px;">Status</th>
+              <th style="min-width: 210px; text-align: left;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -136,14 +129,47 @@ export interface BankRecord {
                 <td>
                   <app-status [text]="rec.verificationStatus" [good]="rec.verificationStatus==='Approved'" [warn]="rec.verificationStatus==='Pending'" [bad]="rec.verificationStatus==='Rejected'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
+                <td style="white-space: nowrap;">
+                  <div class="row-actions">
                     @if (rec.verificationStatus === 'Pending') {
-                      <button class="btn small" (click)="setStatus(rec, 'Approved')">Approve</button>
-                      <button class="btn small danger-btn" (click)="setStatus(rec, 'Rejected')">Reject</button>
+                      <button class="btn-action btn-action-approve" (click)="setStatus(rec, 'Approved')" title="Approve banking details">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Approve</span>
+                      </button>
+                      <button class="btn-action btn-action-reject" (click)="setStatus(rec, 'Rejected')" title="Reject banking details">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span>Reject</span>
+                      </button>
+                    } @else if (rec.verificationStatus === 'Approved') {
+                      <button class="btn-action btn-action-approved" (click)="toggleStatus(rec)" title="Approved (Click to Revoke Approval)">
+                        <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <span class="text-approved">Approved</span>
+                        <span class="text-revoke">Revoke</span>
+                      </button>
+                    } @else if (rec.verificationStatus === 'Rejected') {
+                      <button class="btn-action btn-action-rejected" (click)="toggleStatus(rec)" title="Rejected (Click to Re-open)">
+                        <svg class="icon-rejected" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <svg class="icon-reopen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                        <span class="text-rejected">Rejected</span>
+                        <span class="text-reopen">Re-open</span>
+                      </button>
                     }
-                    <button class="btn small ghost" (click)="updateRecord(rec)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteRecord(rec.id)">✕</button>
+
+                    <button class="btn-action btn-action-save" (click)="updateRecord(rec)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteRecord(rec.id)" title="Delete bank record">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -152,7 +178,51 @@ export interface BankRecord {
         </table>
       </div>
     </article>
-  `
+  `,
+  styles: [`
+    .bank-table {
+      width: 100%;
+      min-width: 1100px;
+      border-collapse: separate;
+      border-spacing: 0;
+
+      thead th {
+        background: var(--role-accent, #7048d7);
+        color: #ffffff;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 11px 12px;
+        border: none;
+        white-space: nowrap;
+
+        &:first-child {
+          border-top-left-radius: var(--radius-sm, 6px);
+        }
+        &:last-child {
+          border-top-right-radius: var(--radius-sm, 6px);
+        }
+      }
+
+      tbody tr:hover {
+        background: rgba(112, 72, 215, 0.04);
+      }
+
+      tbody td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--line, #e2e8f0);
+      }
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-start;
+    }
+  `]
 })
 export class BankVerificationComponent {
   readonly state = inject(PortalStateService);
@@ -160,6 +230,13 @@ export class BankVerificationComponent {
   showAddForm = true;
   searchQuery = '';
   statusFilter = '';
+
+  readonly statusFilterOptions = [
+    { value: '', label: 'All Statuses' },
+    { value: 'Pending', label: 'Pending' },
+    { value: 'Approved', label: 'Approved' },
+    { value: 'Rejected', label: 'Rejected' }
+  ];
 
   newRecord: BankRecord = {
     id: 'BNK-2026-015',
@@ -181,18 +258,18 @@ export class BankVerificationComponent {
     { id: 'BNK-2026-014', vendorId: 'VEN-10027', vendorName: 'Tech Solutions', bankName: 'HBL', iban: 'PK21 HABB 0000 6677 8899 0011', accountTitle: 'Tech Solutions (Pvt) Ltd.', branchCode: 'Blue Area · 0155', verificationStatus: 'Rejected', verifiedDate: '15 May 2026', notes: 'Account title does not match NTN' }
   ];
 
-  filteredRecords = computed(() => {
+  filteredRecords(): BankRecord[] {
     const q = this.searchQuery.trim().toLowerCase();
     const st = this.statusFilter;
     return this.bankRecords.filter(r => {
-      const matchQuery = !q || r.vendorName.toLowerCase().includes(q) || r.vendorId.toLowerCase().includes(q) || r.iban.toLowerCase().includes(q) || r.bankName.toLowerCase().includes(q);
+      const matchQuery = !q || (r.vendorName || '').toLowerCase().includes(q) || (r.vendorId || '').toLowerCase().includes(q) || (r.iban || '').toLowerCase().includes(q) || (r.bankName || '').toLowerCase().includes(q) || (r.accountTitle || '').toLowerCase().includes(q) || (r.branchCode || '').toLowerCase().includes(q);
       const matchStatus = !st || r.verificationStatus === st;
       return matchQuery && matchStatus;
     });
-  });
+  }
 
-  pendingCount = computed(() => this.bankRecords.filter(r => r.verificationStatus === 'Pending').length);
-  verifiedCount = computed(() => this.bankRecords.filter(r => r.verificationStatus === 'Approved').length);
+  pendingCount(): number { return this.bankRecords.filter(r => r.verificationStatus === 'Pending').length; }
+  verifiedCount(): number { return this.bankRecords.filter(r => r.verificationStatus === 'Approved').length; }
 
   addRecord(): void {
     if (!this.newRecord.vendorId || !this.newRecord.iban || !this.newRecord.bankName) {
@@ -227,6 +304,15 @@ export class BankVerificationComponent {
       this.state.notify(`Bank verification approved for ${rec.vendorName || rec.vendorId}.`);
     } else {
       this.state.notify(`Bank verification rejected for ${rec.vendorName || rec.vendorId}.`);
+    }
+  }
+
+  toggleStatus(rec: BankRecord): void {
+    if (rec.verificationStatus === 'Approved' || rec.verificationStatus === 'Rejected') {
+      rec.verificationStatus = 'Pending';
+      this.state.notify(`Bank verification status reverted to Pending for ${rec.vendorName || rec.vendorId}.`);
+    } else {
+      this.setStatus(rec, 'Approved');
     }
   }
 

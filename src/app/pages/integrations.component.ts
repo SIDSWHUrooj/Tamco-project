@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface IntegrationConnector {
   id: string;
@@ -16,9 +17,9 @@ export interface IntegrationConnector {
 @Component({
   selector: 'app-integrations',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, CustomSelectComponent],
   template: `
-    <app-page-heading eyebrow="System Architecture" title="ERP & Enterprise Integrations" subtitle="Configure RESTful APIs, webhooks, and background connectors for SAP/Oracle ERP, automated GRN syncing and banking gateways.">
+    <app-page-heading eyebrow="System Architecture" title="ERP & Enterprise Integrations">
       <div class="heading-actions">
         <button class="btn" (click)="showAddConnector = !showAddConnector">
           {{ showAddConnector ? '✕ Close Form' : '+ Add API Connector' }}
@@ -29,32 +30,19 @@ export interface IntegrationConnector {
 
     <!-- Add Connector Form -->
     @if (showAddConnector) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Register New Enterprise API Connector</h2>
-            <p>Define API gateway endpoint, authorization standard and background polling schedule.</p>
-          </div>
+          <h2>Register New Enterprise API Connector</h2>
         </div>
 
         <div class="form-grid">
           <label>Service / Connector Name *<input [(ngModel)]="newConnector.name" placeholder="e.g. Oracle ERP General Ledger Gateway" /></label>
           <label>Target API Endpoint URL *<input [(ngModel)]="newConnector.endpoint" placeholder="https://api.erp.tamco.example/v1/gl" /></label>
           <label>Authentication Standard
-            <select [(ngModel)]="newConnector.protocol" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="REST API (OAuth 2.0 Bearer)">REST API (OAuth 2.0 Bearer)</option>
-              <option value="Mutual TLS (mTLS x509)">Mutual TLS (mTLS x509)</option>
-              <option value="HMAC Stamped Webhook">HMAC Stamped Webhook</option>
-              <option value="ISO 20022 Host-to-Host">ISO 20022 Host-to-Host</option>
-            </select>
+            <app-custom-select [(ngModel)]="newConnector.protocol" [options]="protocolOptions" />
           </label>
           <label>Sync Interval
-            <select [(ngModel)]="newConnector.syncInterval" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Real-time Webhook">Real-time Webhook</option>
-              <option value="Every 5 Minutes">Every 5 Minutes</option>
-              <option value="Hourly Batch">Hourly Batch</option>
-              <option value="Daily Midnight Run">Daily Midnight Run</option>
-            </select>
+            <app-custom-select [(ngModel)]="newConnector.syncInterval" [options]="syncIntervalOptions" />
           </label>
         </div>
 
@@ -67,13 +55,6 @@ export interface IntegrationConnector {
 
     <!-- Live Connectors Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Configured Enterprise Connectors</h2>
-          <p>Real-time telemetry, service latency, and sync history</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -90,20 +71,34 @@ export interface IntegrationConnector {
           <tbody>
             @for (c of connectors; track c.id) {
               <tr>
-                <td><input [(ngModel)]="c.name" style="font-weight: 600; min-width: 180px;" /></td>
-                <td><input [(ngModel)]="c.endpoint" style="font-family: monospace; font-size: 11px; min-width: 230px;" /></td>
-                <td><input [(ngModel)]="c.protocol" style="width: 140px;" /></td>
-                <td><input [(ngModel)]="c.syncInterval" style="width: 120px;" /></td>
+                <td><input [(ngModel)]="c.name" style="font-weight: 600; min-width: 220px;" /></td>
+                <td><input [(ngModel)]="c.endpoint" style="font-family: monospace; font-size: 12px; min-width: 260px;" /></td>
+                <td><input [(ngModel)]="c.protocol" style="min-width: 170px;" /></td>
+                <td><input [(ngModel)]="c.syncInterval" style="width: 130px;" /></td>
                 <td><small style="color: #64748b;">{{ c.lastSync }}</small></td>
                 <td>
                   <app-status [text]="c.health" [good]="c.health==='Healthy'" [warn]="c.health==='Degraded'" [bad]="c.health==='Offline'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small" (click)="syncNow(c)">Sync</button>
-                    <button class="btn small ghost" (click)="ping(c)">Ping</button>
-                    <button class="btn small ghost" (click)="saveConnector(c)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteConnector(c.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-view" (click)="ping(c)" title="Ping connector">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                      <span>Ping</span>
+                    </button>
+                    <button class="btn-action btn-action-save" (click)="saveConnector(c)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteConnector(c.id)" title="Delete connector">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -118,6 +113,20 @@ export class IntegrationsComponent {
   readonly state = inject(PortalStateService);
 
   showAddConnector = false;
+
+  readonly protocolOptions = [
+    'REST API (OAuth 2.0 Bearer)',
+    'Mutual TLS (mTLS x509)',
+    'HMAC Stamped Webhook',
+    'ISO 20022 Host-to-Host'
+  ];
+
+  readonly syncIntervalOptions = [
+    'Real-time Webhook',
+    'Every 5 Minutes',
+    'Hourly Batch',
+    'Daily Midnight Run'
+  ];
 
   newConnector: IntegrationConnector = {
     id: 'INT-005',

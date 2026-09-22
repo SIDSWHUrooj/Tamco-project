@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface AuditEvent {
   id: string;
@@ -16,7 +18,7 @@ export interface AuditEvent {
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Compliance & Security" title="Immutable Audit Logs & Event Trail" subtitle="Trace digital timestamps, sensitive financial field modifications, user role assignments, and authorization events.">
       <div class="heading-actions">
@@ -29,31 +31,19 @@ export interface AuditEvent {
 
     <!-- Record Manual Audit Note Form -->
     @if (showAddEvent) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Record Compliance / Manual Audit Entry</h2>
-            <p>Attach tamper-evident supervisor note or internal investigation observation.</p>
-          </div>
+          <h2>Record Compliance / Manual Audit Entry</h2>
         </div>
 
         <div class="form-grid">
           <label>Event Description / Action *<input [(ngModel)]="newEvent.action" placeholder="e.g. Annual vendor bank confirmation completed" /></label>
           <label>Auditor / Operator Email *<input [(ngModel)]="newEvent.user" placeholder="e.g. internal.auditor@company.com" /></label>
           <label>System Module *
-            <select [(ngModel)]="newEvent.module" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Finance & Banking">Finance & Banking</option>
-              <option value="Procurement Sourcing">Procurement Sourcing</option>
-              <option value="Identity & Security">Identity & Security</option>
-              <option value="System Master">System Master</option>
-            </select>
+            <app-custom-select [(ngModel)]="newEvent.module" [options]="moduleOptions" />
           </label>
           <label>Severity Level
-            <select [(ngModel)]="newEvent.severity" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Info">Info (Standard Event)</option>
-              <option value="Warning">Warning (Review Needed)</option>
-              <option value="Critical">Critical (Security / Financial)</option>
-            </select>
+            <app-custom-select [(ngModel)]="newEvent.severity" [options]="severityOptions" />
           </label>
           <label class="span-2">Source IP / Device Info<input [(ngModel)]="newEvent.ipAddress" placeholder="192.168.1.100 (Internal LAN)" /></label>
         </div>
@@ -66,33 +56,26 @@ export interface AuditEvent {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search audit logs by action, user email, module or IP..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search audit logs by action, user email, module or IP..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="moduleFilter"
-      >
-        <option value="">All Modules</option>
-        <option value="Finance & Banking">Finance & Banking</option>
-        <option value="Procurement">Procurement</option>
-        <option value="User Management">User Management</option>
-        <option value="Invoicing">Invoicing</option>
-      </select>
+        [options]="filterModuleOptions"
+        minWidth="170px"
+      />
     </div>
 
     <!-- Live Audit Trail Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>System Audit Trail & Security Events</h2>
-          <p>Cryptographically hashed activity log with actor attribution</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -117,10 +100,22 @@ export interface AuditEvent {
                 <td>
                   <app-status [text]="evt.severity" [good]="evt.severity==='Info'" [warn]="evt.severity==='Warning'" [bad]="evt.severity==='Critical'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveEvent(evt)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteEvent(evt.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveEvent(evt)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteEvent(evt.id)" title="Delete audit record">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -137,6 +132,16 @@ export class AuditLogsComponent {
   showAddEvent = false;
   searchQuery = '';
   moduleFilter = '';
+
+  readonly filterModuleOptions = [
+    { value: '', label: 'All Modules' },
+    { value: 'Finance & Banking', label: 'Finance & Banking' },
+    { value: 'Procurement', label: 'Procurement' },
+    { value: 'User Management', label: 'User Management' },
+    { value: 'Invoicing', label: 'Invoicing' }
+  ];
+  readonly moduleOptions = ['Finance & Banking', 'Procurement', 'User Management', 'Invoicing', 'Identity & Security', 'System Master'];
+  readonly severityOptions = ['Info', 'Warning', 'Critical'];
 
   newEvent: AuditEvent = {
     id: 'EVT-005',
@@ -155,15 +160,15 @@ export class AuditLogsComponent {
     { id: 'EVT-004', timestamp: '2026-08-24 09:02:51', user: 'ali@abcsupplies.example', action: 'Invoice #INV-00245 uploaded ($18,600)', module: 'Invoicing', ipAddress: '182.185.12.9', severity: 'Info' }
   ];
 
-  filteredEvents = computed(() => {
+  filteredEvents(): AuditEvent[] {
     const q = this.searchQuery.trim().toLowerCase();
     const mf = this.moduleFilter;
     return this.events.filter(e => {
-      const matchQ = !q || e.action.toLowerCase().includes(q) || e.user.toLowerCase().includes(q) || e.module.toLowerCase().includes(q);
-      const matchM = !mf || e.module.includes(mf);
+      const matchQ = !q || (e.action || '').toLowerCase().includes(q) || (e.user || '').toLowerCase().includes(q) || (e.module || '').toLowerCase().includes(q) || (e.ipAddress || '').toLowerCase().includes(q) || (e.id || '').toLowerCase().includes(q) || (e.timestamp || '').toLowerCase().includes(q);
+      const matchM = !mf || (e.module || '').includes(mf);
       return matchQ && matchM;
     });
-  });
+  }
 
   addEvent(): void {
     if (!this.newEvent.action) {

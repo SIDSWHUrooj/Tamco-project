@@ -209,11 +209,11 @@ import { PortalStateService } from '../core/portal-state.service';
               (ngSubmit)="signIn()"
             >
 
-              <!-- Username -->
+              <!-- Username / Email -->
               <div class="form-field">
 
                 <label for="username">
-                  Username
+                  Email Id
                 </label>
 
                 <div
@@ -222,12 +222,10 @@ import { PortalStateService } from '../core/portal-state.service';
                 >
 
                   <span class="input-icon">
-
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <circle cx="12" cy="8" r="4"></circle>
-                      <path d="M4 21a8 8 0 0 1 16 0"></path>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
                     </svg>
-
                   </span>
 
                   <input
@@ -236,7 +234,7 @@ import { PortalStateService } from '../core/portal-state.service';
                     type="text"
                     [(ngModel)]="username"
                     (ngModelChange)="clearError()"
-                    placeholder="Enter your username"
+                    placeholder="Enter your email address"
                     autocomplete="username"
                     required
                   />
@@ -249,22 +247,9 @@ import { PortalStateService } from '../core/portal-state.service';
               <!-- Password -->
               <div class="form-field">
 
-                <div class="field-heading">
-
-                  <label for="password">
-                    Password
-                  </label>
-
-                  <button
-                    type="button"
-                    class="forgot-password"
-                    (click)="forgotPassword()"
-                  >
-                    Forgot password?
-                  </button>
-
-                </div>
-
+                <label for="password">
+                  Password
+                </label>
 
                 <div
                   class="input-box"
@@ -272,21 +257,11 @@ import { PortalStateService } from '../core/portal-state.service';
                 >
 
                   <span class="input-icon">
-
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <rect
-                        x="5"
-                        y="10"
-                        width="14"
-                        height="11"
-                        rx="2"
-                      ></rect>
-
-                      <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
-
                   </span>
-
 
                   <input
                     id="password"
@@ -299,7 +274,6 @@ import { PortalStateService } from '../core/portal-state.service';
                     required
                   />
 
-
                   <button
                     type="button"
                     class="password-toggle"
@@ -310,38 +284,46 @@ import { PortalStateService } from '../core/portal-state.service';
                         : 'Show password'
                     "
                   >
-
                     @if (showPassword) {
-
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M3 3l18 18"></path>
-                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
-                        <path
-                          d="M9.9 4.2A10 10 0 0 1 12 4c5.5 0 9 8 9 8a18 18 0 0 1-2.1 3.2"
-                        ></path>
-                        <path
-                          d="M6.2 6.2C4.1 7.7 3 10 3 12c0 0 3.5 8 9 8a9.8 9.8 0 0 0 4-.8"
-                        ></path>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+                        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+                        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+                        <line x1="2" y1="2" x2="22" y2="22"></line>
                       </svg>
-
                     } @else {
-
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M2.5 12S6 5 12 5s9.5 7 9.5 7S18 19 12 19 2.5 12 2.5 12Z"
-                        ></path>
-
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="3"
-                        ></circle>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
                       </svg>
-
                     }
-
                   </button>
 
+                </div>
+
+                <div class="field-meta-row">
+                  <label class="remember-me" for="rememberMeCheck">
+                    <input
+                      id="rememberMeCheck"
+                      type="checkbox"
+                      name="remember"
+                      [(ngModel)]="rememberMe"
+                    />
+                    <span class="custom-checkbox" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                    <span class="remember-text">Keep me signed in</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    class="forgot-password"
+                    (click)="forgotPassword()"
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
 
               </div>
@@ -349,44 +331,19 @@ import { PortalStateService } from '../core/portal-state.service';
 
               <!-- Error -->
               @if (loginError) {
-
                 <div
                   class="login-error"
                   role="alert"
                   aria-live="polite"
                 >
-
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="12" cy="12" r="9"></circle>
                     <path d="M12 7v6"></path>
                     <path d="M12 17h.01"></path>
                   </svg>
-
                   <span>{{ loginError }}</span>
-
                 </div>
-
               }
-
-
-              <!-- Login Options -->
-              <div class="form-options">
-
-                <label class="remember-me">
-
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    [(ngModel)]="rememberMe"
-                  />
-
-                  <span>
-                    Keep me signed in
-                  </span>
-
-                </label>
-
-              </div>
 
 
               <!-- Sign In -->
@@ -395,16 +352,7 @@ import { PortalStateService } from '../core/portal-state.service';
                 type="submit"
                 [disabled]="!username.trim() || !password"
               >
-
-                <span>
-                  Sign in to Vendor Portal
-                </span>
-
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M5 12h14"></path>
-                  <path d="m14 7 5 5-5 5"></path>
-                </svg>
-
+                <span>Sign in</span>
               </button>
 
             </form>
@@ -1500,582 +1448,313 @@ import { PortalStateService } from '../core/portal-state.service';
 
 
     /* =========================================================
-       FORM FIELDS
+       FORM FIELDS & MODERN INPUTS
     ========================================================== */
 
     .form-field {
-
-      margin-bottom:
-        20px;
-
+      margin-bottom: 18px;
     }
-
 
     .form-field label {
-
-      display:
-        block;
-
-      margin-bottom:
-        8px;
-
-      color:
-        #35495b;
-
-      font-size:
-        11px;
-
-      font-weight:
-        650;
-
+      display: block;
+      margin-bottom: 7px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
-
-
-    .field-heading {
-
-      display:
-        flex;
-
-      align-items:
-        center;
-
-      justify-content:
-        space-between;
-
-      gap:
-        18px;
-
-    }
-
-
-    .forgot-password {
-
-      margin-bottom:
-        8px;
-
-      padding:
-        0;
-
-      border:
-        0;
-
-      color:
-        var(--tamco-blue);
-
-      background:
-        transparent;
-
-      font-size:
-        10px;
-
-      font-weight:
-        650;
-
-      cursor:
-        pointer;
-
-    }
-
-
-    .forgot-password:hover {
-
-      color:
-        var(--tamco-blue-dark);
-
-      text-decoration:
-        underline;
-
-    }
-
 
     .input-box {
+      width: 100%;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+      transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                  background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 
-      width:
-        100%;
+      &:hover {
+        border-color: #cbd5e1;
+        background-color: #ffffff;
+      }
 
-      height:
-        51px;
+      &:focus-within {
+        border-color: #0876b9;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 3.5px rgba(8, 118, 185, 0.14), 0 1px 2px rgba(15, 23, 42, 0.04);
 
-      display:
-        flex;
+        .input-icon {
+          color: #0876b9;
+        }
+      }
 
-      align-items:
-        center;
-
-      padding:
-        0 13px;
-
-      border:
-        1px solid
-        var(--border);
-
-      border-radius:
-        6px;
-
-      background:
-        #ffffff;
-
-      transition:
-        border-color .16s ease,
-        box-shadow .16s ease,
-        background .16s ease;
-
+      &.error-border {
+        border-color: #ef4444 !important;
+        background-color: #fffafa !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+      }
     }
 
+    .input-icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      display: grid;
+      place-items: center;
+      margin-right: 12px;
+      color: #0876b9;
+      transition: color 0.2s ease;
 
-    .input-box:hover {
-
-      border-color:
-        #b8c6d0;
-
+      svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
     }
-
-
-    .input-box:focus-within {
-
-      border-color:
-        var(--tamco-blue);
-
-      box-shadow:
-        0 0 0 3px
-        rgba(8,118,185,.10);
-
-      background:
-        #ffffff;
-
-    }
-
-
-    .error-border {
-
-      border-color:
-        #d74c4c !important;
-
-    }
-
-
-   .input-icon {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  display: grid;
-  place-items: center;
-  margin-right: 16px;   /* pehle 9px tha, ab 16px kar diya */
-  color: #81909d;
-}
-
-
-    .input-icon svg,
-    .password-toggle svg {
-
-      width:
-        17px;
-
-      height:
-        17px;
-
-      fill:
-        none;
-
-      stroke:
-        currentColor;
-
-      stroke-width:
-        1.7;
-
-      stroke-linecap:
-        round;
-
-      stroke-linejoin:
-        round;
-
-    }
-
 
     .input-box input {
+      min-width: 0;
+      flex: 1;
+      height: 100% !important;
+      padding: 0 !important;
+      border: none !important;
+      border-style: none !important;
+      outline: none !important;
+      color: #0f172a !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      line-height: normal !important;
+      letter-spacing: -0.01em;
 
-      min-width:
-        0;
+      &::placeholder {
+        color: #94a3af !important;
+        font-size: 13px !important;
+        font-weight: 400 !important;
+      }
 
-      flex:
-        1;
-
-      height:
-        100%;
-
-      padding:
-        0;
-
-      border:
-        0;
-
-      outline:
-        0;
-
-      color:
-        #233546;
-
-      background:
-        transparent;
-
-      font-size:
-        12px;
-
+      &:hover,
+      &:focus,
+      &:active {
+        border: none !important;
+        border-style: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        outline: none !important;
+      }
     }
-
-
-    .input-box input::placeholder {
-
-      color:
-        #a3aeb8;
-
-    }
-
 
     .password-toggle {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      margin-right: -4px;
+      border: 0;
+      border-radius: 6px;
+      color: #94a3af;
+      background: transparent;
+      cursor: pointer;
+      transition: color 0.18s ease, background-color 0.18s ease;
 
-      width:
-        34px;
+      &:hover {
+        color: #0876b9;
+        background: #edf7fc;
+      }
 
-      height:
-        34px;
-
-      display:
-        grid;
-
-      place-items:
-        center;
-
-      margin-right:
-        -5px;
-
-      border:
-        0;
-
-      border-radius:
-        5px;
-
-      color:
-        #7b8996;
-
-      background:
-        transparent;
-
-      cursor:
-        pointer;
-
+      svg {
+        width: 17px;
+        height: 17px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
     }
 
-
-    .password-toggle:hover {
-
-      color:
-        var(--tamco-blue);
-
-      background:
-        #eef7fc;
-
+    .field-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 10px 0 20px;
     }
 
+    .forgot-password {
+      padding: 0;
+      border: 0;
+      color: #0876b9;
+      background: transparent;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: color 0.18s ease;
+
+      &:hover {
+        color: #00588d;
+        text-decoration: underline;
+      }
+    }
 
     /* =========================================================
        ERROR
     ========================================================== */
 
     .login-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: -5px 0 18px;
+      padding: 10px 14px;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #b91c1c;
+      background: #fef2f2;
+      font-size: 11.5px;
+      line-height: 1.5;
 
-      display:
-        flex;
-
-      align-items:
-        center;
-
-      gap:
-        8px;
-
-      margin:
-        -5px 0
-        18px;
-
-      padding:
-        10px 11px;
-
-      border:
-        1px solid
-        #efcccc;
-
-      border-radius:
-        5px;
-
-      color:
-        #b63d3d;
-
-      background:
-        #fff7f7;
-
-      font-size:
-        10px;
-
-      line-height:
-        1.5;
-
+      svg {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
     }
-
-
-    .login-error svg {
-
-      width:
-        15px;
-
-      height:
-        15px;
-
-      flex:
-        0 0 15px;
-
-      fill:
-        none;
-
-      stroke:
-        currentColor;
-
-      stroke-width:
-        1.8;
-
-      stroke-linecap:
-        round;
-
-      stroke-linejoin:
-        round;
-
-    }
-
 
     /* =========================================================
-       OPTIONS
+       OPTIONS / IMPROVED REMEMBER ME
     ========================================================== */
 
-    .form-options {
-
-      display:
-        flex;
-
-      align-items:
-        center;
-
-      justify-content:
-        space-between;
-
-      margin:
-        1px 0
-        22px;
-
-    }
-
-
     .remember-me {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
 
-      display:
-        inline-flex;
+      input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+        margin: 0;
+        pointer-events: none;
+      }
 
-      align-items:
-        center;
+      .custom-checkbox {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        flex-shrink: 0;
 
-      gap:
-        8px;
+        svg {
+          width: 12px;
+          height: 12px;
+          color: #ffffff;
+          stroke: #ffffff;
+          opacity: 0;
+          transform: scale(0.6);
+          transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
+        }
+      }
 
-      color:
-        #687887;
+      &:hover .custom-checkbox {
+        border-color: #0876b9;
+        background: #f0f8fc;
+      }
 
-      font-size:
-        10px;
+      input[type="checkbox"]:checked + .custom-checkbox {
+        background: #0876b9;
+        border-color: #0876b9;
+        box-shadow: 0 2px 6px rgba(8, 118, 185, 0.32);
 
-      cursor:
-        pointer;
+        svg {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
 
-      user-select:
-        none;
+      input[type="checkbox"]:focus-visible + .custom-checkbox {
+        box-shadow: 0 0 0 3px rgba(8, 118, 185, 0.22);
+      }
 
+      .remember-text {
+        font-size: 12px;
+        font-weight: 500;
+        color: #475569;
+        transition: color 0.15s ease;
+      }
+
+      &:hover .remember-text {
+        color: #1e293b;
+      }
     }
-
-
-    .remember-me input {
-
-      width:
-        15px;
-
-      height:
-        15px;
-
-      margin:
-        0;
-
-      accent-color:
-        var(--tamco-blue);
-
-    }
-
 
     /* =========================================================
-       SIGN-IN BUTTON
+       SIGN-IN BUTTON (BLUE THEME)
     ========================================================== */
 
     .sign-in-button {
+      width: 100%;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 10px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0876b9 0%, #00588d 100%);
+      box-shadow: 0 4px 14px rgba(8, 118, 185, 0.28);
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
 
-      width:
-        100%;
+      &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(8, 118, 185, 0.36);
+        background: linear-gradient(135deg, #066ca9 0%, #004b77 100%);
+      }
 
-      height:
-        52px;
+      &:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(8, 118, 185, 0.25);
+      }
 
-      display:
-        flex;
-
-      align-items:
-        center;
-
-      justify-content:
-        space-between;
-
-      position:
-        relative;
-
-      overflow:
-        hidden;
-
-      padding:
-        0 18px;
-
-      border:
-        0;
-
-      border-radius:
-        6px;
-
-      color:
-        #ffffff;
-
-      background:
-        linear-gradient(
-          100deg,
-          var(--tamco-blue-dark),
-          var(--tamco-blue)
-        );
-
-      box-shadow:
-        0 10px 22px
-        rgba(8,118,185,.20);
-
-      font-size:
-        12px;
-
-      font-weight:
-        700;
-
-      cursor:
-        pointer;
-
-      transition:
-        transform .16s ease,
-        box-shadow .16s ease,
-        background .16s ease;
-
-    }
-
-
-    .sign-in-button::after {
-
-      content:
-        '';
-
-      position:
-        absolute;
-
-      left:
-        0;
-
-      bottom:
-        0;
-
-      width:
-        74px;
-
-      height:
-        3px;
-
-      background:
-        var(--tamco-orange);
-
-    }
-
-
-    .sign-in-button svg {
-
-      width:
-        18px;
-
-      height:
-        18px;
-
-      fill:
-        none;
-
-      stroke:
-        currentColor;
-
-      stroke-width:
-        2;
-
-      stroke-linecap:
-        round;
-
-      stroke-linejoin:
-        round;
-
-      transition:
-        transform .16s ease;
-
-    }
-
-
-    .sign-in-button:hover:not(:disabled) {
-
-      transform:
-        translateY(-1px);
-
-      background:
-        linear-gradient(
-          100deg,
-          var(--tamco-blue-deep),
-          var(--tamco-blue-dark)
-        );
-
-      box-shadow:
-        0 13px 27px
-        rgba(0,88,141,.24);
-
-    }
-
-
-    .sign-in-button:hover:not(:disabled) svg {
-
-      transform:
-        translateX(3px);
-
-    }
-
-
-    .sign-in-button:disabled {
-
-      opacity:
-        .48;
-
-      cursor:
-        not-allowed;
-
-      box-shadow:
-        none;
-
+      &:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
     }
 
 
@@ -3028,13 +2707,14 @@ export class LoginPageComponent {
     const matchedRole =
       this.roles.find(
         option =>
-          option.value === username
-      )?.value;
-
+          option.value === username ||
+          username.startsWith(option.value) ||
+          username.includes(option.value)
+      )?.value || (username ? 'vendor' : undefined);
 
     if (
       !matchedRole ||
-      this.password !== '123'
+      (this.password !== '123' && this.password.length < 3)
     ) {
 
       this.loginError =

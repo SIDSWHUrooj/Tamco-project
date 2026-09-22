@@ -1,7 +1,10 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
+import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 
 export interface ControlledDoc {
   id: string;
@@ -17,40 +20,47 @@ export interface ControlledDoc {
 @Component({
   selector: 'app-documents',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
   template: `
     <app-page-heading eyebrow="Document Management" title="Controlled Document Repository" subtitle="Maintain supplier certificates, tax registration, ISO compliance documents and contractual attachments.">
       <div class="heading-actions">
-        <button class="btn" (click)="showAddDoc = !showAddDoc">
-          {{ showAddDoc ? '✕ Close Form' : '+ Upload Document' }}
+        <button class="btn" (click)="showAddDoc = !showAddDoc" style="display: inline-flex; align-items: center; gap: 6px;">
+          @if (showAddDoc) {
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span>Close Form</span>
+          } @else {
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Upload Document</span>
+          }
         </button>
-        <button class="btn secondary" (click)="exportIndex()">Export Document Index</button>
+        <button class="btn secondary" (click)="exportIndex()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Export Document Index</span>
+        </button>
       </div>
     </app-page-heading>
 
-    <!-- Upload Document Form -->
+    <!-- Upload New Compliance Document Form -->
     @if (showAddDoc) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Attach New Controlled Certificate / Document</h2>
-            <p>Upload stamped legal instrument, specify issuing authority and validity expiration.</p>
-          </div>
+          <h2>Attach New Controlled Certificate / Document</h2>
         </div>
 
         <div class="form-grid">
           <label>Document Name *<input [(ngModel)]="newDoc.name" placeholder="e.g. SECP-Form-29-Annual-Filing.pdf" /></label>
           <label>Document Category *
-            <select [(ngModel)]="newDoc.category" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Taxation">Taxation</option>
-              <option value="Banking Evidence">Banking Evidence</option>
-              <option value="Quality & ISO">Quality & ISO</option>
-              <option value="Corporate Legal">Corporate Legal</option>
-            </select>
+            <app-custom-select [(ngModel)]="newDoc.category" [options]="categoryOptions" />
           </label>
           <label>Issuing Authority / Agency *<input [(ngModel)]="newDoc.authority" placeholder="e.g. Federal Board of Revenue / SECP" /></label>
           <label>Certificate / Document #<input [(ngModel)]="newDoc.docNumber" placeholder="e.g. NTN-7483921" /></label>
-          <label>Expiration Date *<input type="date" [(ngModel)]="newDoc.expiryDate" /></label>
+          <label>Expiration Date *
+            <app-custom-date-picker [(ngModel)]="newDoc.expiryDate" />
+          </label>
           <label>Upload File (PDF/Image)
             <input type="file" (change)="onFileSelected($event)" />
           </label>
@@ -64,33 +74,26 @@ export interface ControlledDoc {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search documents by name, authority, or number..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search documents by name, authority, or number..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="categoryFilter"
-      >
-        <option value="">All Categories</option>
-        <option value="Taxation">Taxation</option>
-        <option value="Banking Evidence">Banking Evidence</option>
-        <option value="Quality & ISO">Quality & ISO</option>
-        <option value="Corporate Legal">Corporate Legal</option>
-      </select>
+        [options]="filterCategoryOptions"
+        minWidth="180px"
+      />
     </div>
 
     <!-- Live Documents Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Controlled Document Archive</h2>
-          <p>Verified certificates with automated expiry tracking</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -112,16 +115,37 @@ export interface ControlledDoc {
                 <td><input [(ngModel)]="d.category" style="width: 130px;" /></td>
                 <td><input [(ngModel)]="d.authority" style="min-width: 170px;" /></td>
                 <td><input [(ngModel)]="d.docNumber" style="font-family: monospace; font-size: 11px; width: 110px;" /></td>
-                <td><input type="date" [(ngModel)]="d.expiryDate" /></td>
+                <td>
+                  <app-custom-date-picker [(ngModel)]="d.expiryDate" [compact]="true" minWidth="135px" />
+                </td>
                 <td><small style="color: #64748b;">{{ d.fileSize }}</small></td>
                 <td>
                   <app-status [text]="d.status" [good]="d.status==='Verified'" [warn]="d.status==='Expiring Soon'" [bad]="d.status==='Expired'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="download(d)">Download</button>
-                    <button class="btn small ghost" (click)="saveDoc(d)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteDoc(d.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-download" (click)="download(d)" title="Download {{ d.name }}">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      <span>Download</span>
+                    </button>
+                    <button class="btn-action btn-action-save" (click)="saveDoc(d)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteDoc(d.id)" title="Delete document">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -138,6 +162,21 @@ export class DocumentsComponent {
   showAddDoc = false;
   searchQuery = '';
   categoryFilter = '';
+
+  readonly filterCategoryOptions = [
+    { value: '', label: 'All Categories' },
+    { value: 'Taxation', label: 'Taxation' },
+    { value: 'Banking Evidence', label: 'Banking Evidence' },
+    { value: 'Quality & ISO', label: 'Quality & ISO' },
+    { value: 'Corporate Legal', label: 'Corporate Legal' }
+  ];
+
+  readonly categoryOptions = [
+    'Taxation',
+    'Banking Evidence',
+    'Quality & ISO',
+    'Corporate Legal'
+  ];
 
   newDoc: ControlledDoc = {
     id: 'DOC-005',
@@ -157,15 +196,15 @@ export class DocumentsComponent {
     { id: 'DOC-004', name: 'Commercial-Registration-SECP.pdf', category: 'Corporate Legal', authority: 'SECP Pakistan', docNumber: 'SECP-009941', expiryDate: '2028-01-01', status: 'Verified', fileSize: '1.9 MB' }
   ];
 
-  filteredDocs = computed(() => {
+  filteredDocs(): ControlledDoc[] {
     const q = this.searchQuery.trim().toLowerCase();
     const cf = this.categoryFilter;
     return this.documents.filter(d => {
-      const matchQ = !q || d.name.toLowerCase().includes(q) || d.authority.toLowerCase().includes(q) || d.docNumber.toLowerCase().includes(q);
+      const matchQ = !q || (d.name || '').toLowerCase().includes(q) || (d.authority || '').toLowerCase().includes(q) || (d.docNumber || '').toLowerCase().includes(q) || (d.category || '').toLowerCase().includes(q) || (d.id || '').toLowerCase().includes(q);
       const matchC = !cf || d.category === cf;
       return matchQ && matchC;
     });
-  });
+  }
 
   addDoc(): void {
     if (!this.newDoc.name || !this.newDoc.authority) {

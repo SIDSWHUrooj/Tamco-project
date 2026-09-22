@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface CategoryAnalytics {
   id: string;
@@ -16,9 +17,9 @@ export interface CategoryAnalytics {
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, CustomSelectComponent],
   template: `
-    <app-page-heading eyebrow="Strategic Insights" title="Procurement Spend & Sourcing Analytics" subtitle="Analyze category spend velocity, e-bidding cost reductions, supplier participation rates and historical sourcing KPIs.">
+    <app-page-heading eyebrow="Strategic Insights" title="Procurement Spend & Sourcing Analytics">
       <div class="heading-actions">
         <button class="btn" (click)="showAddCategory = !showAddCategory">
           {{ showAddCategory ? '✕ Close Form' : '+ Add Category Target' }}
@@ -46,14 +47,11 @@ export interface CategoryAnalytics {
       </div>
     </section>
 
-    <!-- Add Category Analytics Form -->
+    <!-- Add Category Spend Form Panel -->
     @if (showAddCategory) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Set Category Spend Target & Benchmark</h2>
-            <p>Define category budget allocation, cost reduction benchmark and competitiveness goals.</p>
-          </div>
+          <h2>Set Category Spend Target & Benchmark</h2>
         </div>
 
         <div class="form-grid">
@@ -62,18 +60,10 @@ export interface CategoryAnalytics {
           <label>Target Bidders per RFQ *<input type="number" [(ngModel)]="newCat.avgBids" placeholder="4.5" /></label>
           <label>Target Cost Reduction (%) *<input type="number" [(ngModel)]="newCat.savingsRate" placeholder="9.5" /></label>
           <label>Spend Velocity Trend
-            <select [(ngModel)]="newCat.trend" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Increasing">Increasing</option>
-              <option value="Stable">Stable</option>
-              <option value="Decreasing">Decreasing</option>
-            </select>
+            <app-custom-select [(ngModel)]="newCat.trend" [options]="trendOptions" />
           </label>
           <label>Strategic Importance
-            <select [(ngModel)]="newCat.strategicImportance" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Standard">Standard</option>
-            </select>
+            <app-custom-select [(ngModel)]="newCat.strategicImportance" [options]="importanceOptions" />
           </label>
         </div>
 
@@ -86,13 +76,6 @@ export interface CategoryAnalytics {
 
     <!-- Live Analytics Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Category Spend Breakdown & Realized Sourcing Savings</h2>
-          <p>Multi-dimensional procurement analytics across operational verticals</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -114,19 +97,27 @@ export interface CategoryAnalytics {
                 <td><input type="number" step="0.1" [(ngModel)]="c.avgBids" style="width: 60px;" /> Bids</td>
                 <td><input type="number" step="0.1" [(ngModel)]="c.savingsRate" style="width: 60px;" /> %</td>
                 <td>
-                  <select [(ngModel)]="c.trend" style="border: 1px solid #dbe3ed; border-radius: 6px; padding: 4px;">
-                    <option value="Increasing">↑ Increasing</option>
-                    <option value="Stable">→ Stable</option>
-                    <option value="Decreasing">↓ Decreasing</option>
-                  </select>
+                  <app-custom-select [(ngModel)]="c.trend" [options]="trendOptions" minWidth="130px" />
                 </td>
                 <td>
                   <app-status [text]="c.strategicImportance" [bad]="c.strategicImportance==='Critical'" [warn]="c.strategicImportance==='High'" [good]="c.strategicImportance==='Standard'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveCategory(c)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteCategory(c.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveCategory(c)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteCategory(c.id)" title="Delete category target">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -141,6 +132,9 @@ export class AnalyticsComponent {
   readonly state = inject(PortalStateService);
 
   showAddCategory = false;
+
+  readonly trendOptions = ['Increasing', 'Stable', 'Decreasing'];
+  readonly importanceOptions = ['Critical', 'High', 'Standard'];
 
   newCat: CategoryAnalytics = {
     id: 'CAT-005',

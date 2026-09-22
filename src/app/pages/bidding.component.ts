@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { StatusComponent } from '../shared/ui.component';
+import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 
 export interface BiddingLineItem {
   id: string;
@@ -18,7 +19,7 @@ export interface BiddingLineItem {
 @Component({
   selector: 'app-bidding',
   standalone: true,
-  imports: [FormsModule, StatusComponent],
+  imports: [FormsModule, StatusComponent, CustomDatePickerComponent],
   template: `
     <div class="bidding-screen">
       <!-- Main Title -->
@@ -44,7 +45,14 @@ export interface BiddingLineItem {
 
           <div class="req-actions-group">
             <div class="status-wrap">
-              <span class="new-badge">{{ formStatus }}</span>
+              <span class="new-badge" [class.priority-badge]="toggleActive">
+                @if (toggleActive) {
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 3px; vertical-align: -1px;">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                }
+                {{ formStatus }}
+              </span>
             </div>
             <div class="buttons-row">
               <button type="button" class="btn-download" (click)="download()">Download PDF</button>
@@ -70,13 +78,25 @@ export interface BiddingLineItem {
               />
               <button
                 type="button"
-                class="dual-toggle-pill"
-                [class.switched]="toggleActive"
+                class="modern-priority-switch"
+                [class.active]="toggleActive"
                 (click)="toggleSwitch()"
-                title="Toggle Active Mode"
+                [title]="toggleActive ? 'Priority: High (Click to set Normal)' : 'Priority: Normal (Click to set High Priority)'"
               >
-                <span class="toggle-dark"></span>
-                <span class="toggle-cyan"></span>
+                <span class="switch-track">
+                  <span class="switch-thumb">
+                    @if (toggleActive) {
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="#d97706">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                      </svg>
+                    } @else {
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    }
+                  </span>
+                </span>
+                <span class="switch-label">{{ toggleActive ? 'Priority' : 'Normal' }}</span>
               </button>
             </div>
           </div>
@@ -112,10 +132,8 @@ export interface BiddingLineItem {
             <label class="bidding-label">
               Date
             </label>
-            <input
-              type="date"
+            <app-custom-date-picker
               [(ngModel)]="form.date"
-              name="date"
               placeholder="Requisition Date"
             />
           </div>
@@ -125,10 +143,8 @@ export interface BiddingLineItem {
             <label class="bidding-label">
               Date Required
             </label>
-            <input
-              type="date"
+            <app-custom-date-picker
               [(ngModel)]="form.dateRequired"
-              name="dateRequired"
               placeholder="Enter Date Required"
             />
           </div>
@@ -160,7 +176,7 @@ export interface BiddingLineItem {
           </div>
 
           <!-- Request Description -->
-          <div class="bidding-field-group">
+          <div class="bidding-field-group full-width">
             <label class="bidding-label">
               Request Description <span class="asterisk">*</span>
             </label>
@@ -173,7 +189,7 @@ export interface BiddingLineItem {
           </div>
 
           <!-- Comments -->
-          <div class="bidding-field-group">
+          <div class="bidding-field-group full-width">
             <label class="bidding-label">
               Comments
             </label>
@@ -228,7 +244,12 @@ export interface BiddingLineItem {
                       <td><input type="number" [(ngModel)]="item.days" style="width: 50px;" /> d</td>
                       <td><app-status [text]="item.status" [good]="item.status === 'Active' || item.status === 'Approved'" /></td>
                       <td>
-                        <button class="btn small danger-btn" (click)="deleteItem(item.id)">✕</button>
+                        <button class="btn-action btn-action-delete" (click)="deleteItem(item.id)" title="Delete quotation item">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   }
@@ -339,14 +360,24 @@ export interface BiddingLineItem {
     }
 
     .new-badge {
-      display: inline-block;
-      padding: 2px 10px;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
       border-radius: 99px;
       background: #e9f2fe;
       color: #1d72b8;
+      border: 1px solid #bfdbfe;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.02em;
+      transition: all 0.2s ease;
+
+      &.priority-badge {
+        background: #fef3c7;
+        color: #b45309;
+        border-color: #fcd34d;
+        box-shadow: 0 1px 4px rgba(245, 158, 11, 0.18);
+      }
     }
 
     .buttons-row {
@@ -391,15 +422,27 @@ export interface BiddingLineItem {
     }
 
     .bidding-form {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+
+      @media (max-width: 1200px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .bidding-field-group {
       display: flex;
       flex-direction: column;
       gap: 4px;
+
+      &.full-width {
+        grid-column: 1 / -1;
+      }
     }
 
     .bidding-label {
@@ -450,38 +493,84 @@ export interface BiddingLineItem {
       flex: 1;
     }
 
-    .dual-toggle-pill {
-      display: flex;
-      width: 38px;
-      height: 24px;
-      border-radius: 4px;
-      overflow: hidden;
-      border: none;
-      padding: 0;
+    .modern-priority-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 30px;
+      padding: 3px 8px 3px 4px;
+      border-radius: 9999px;
+      border: 1px solid #bbf7d0;
+      background: #f0fdf4;
+      box-shadow: 0 1px 4px rgba(22, 163, 74, 0.12);
       cursor: pointer;
       flex-shrink: 0;
-    }
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
 
-    .toggle-dark {
-      flex: 1;
-      height: 100%;
-      background: #002244;
-      transition: background 0.2s;
-    }
+      &:hover {
+        background: #dcfce7;
+        border-color: #86efac;
+      }
 
-    .toggle-cyan {
-      flex: 1;
-      height: 100%;
-      background: #00a0e9;
-      transition: background 0.2s;
-    }
+      .switch-track {
+        position: relative;
+        display: inline-block;
+        width: 32px;
+        height: 18px;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        box-shadow: 0 0 6px rgba(22, 163, 74, 0.35);
+        border-radius: 9999px;
+        transition: background-color 0.25s ease, box-shadow 0.25s ease;
+      }
 
-    .dual-toggle-pill.switched .toggle-dark {
-      background: #00a0e9;
-    }
+      .switch-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
 
-    .dual-toggle-pill.switched .toggle-cyan {
-      background: #002244;
+      .switch-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #15803d;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        transition: color 0.2s ease;
+      }
+
+      &.active {
+        background: #fffbeb;
+        border-color: #fde68a;
+        box-shadow: 0 1px 4px rgba(245, 158, 11, 0.15);
+
+        &:hover {
+          background: #fef3c7;
+          border-color: #fcd34d;
+        }
+
+        .switch-track {
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+        }
+
+        .switch-thumb {
+          transform: translateX(14px);
+        }
+
+        .switch-label {
+          color: #b45309;
+        }
+      }
     }
 
     .bidding-list-section {

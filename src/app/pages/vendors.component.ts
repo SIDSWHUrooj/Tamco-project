@@ -2,12 +2,14 @@ import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 import { Vendor } from '../core/models';
 
 @Component({
   selector: 'app-vendors',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Procurement control" title="Vendor Management & Verification" subtitle="Pre-qualify vendors, evaluate commercial capability, review documents and approve eligible categories.">
       <div class="heading-actions">
@@ -39,12 +41,9 @@ import { Vendor } from '../core/models';
 
     <!-- Add New Vendor Form Panel -->
     @if (showAddForm) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Register & Onboard New Vendor</h2>
-            <p>Enter company details, category specialization and banking info.</p>
-          </div>
+          <h2>Register & Onboard New Vendor</h2>
         </div>
 
         <div class="form-grid">
@@ -64,47 +63,39 @@ import { Vendor } from '../core/models';
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search vendor by name, code, or location..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search vendor by name, code, or location..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="categoryFilter"
-      >
-        <option value="">All Categories</option>
-        <option value="Electrical">Electrical</option>
-        <option value="Mechanical">Mechanical</option>
-        <option value="Safety Equipment">Safety Equipment</option>
-        <option value="IT & Hardware">IT & Hardware</option>
-        <option value="Raw Materials">Raw Materials</option>
-      </select>
+        [options]="categoryFilterOptions"
+        minWidth="170px"
+      />
     </div>
 
     <!-- Live Vendor Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Vendor Directory & Verification Queue</h2>
-          <p>Update information in-place, approve capabilities, and manage vendor records.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
-        <table>
+        <table class="vendor-table">
           <thead>
             <tr>
-              <th>Vendor ID</th>
-              <th>Company Name</th>
-              <th>Location</th>
-              <th>Approved Categories</th>
-              <th>Bank</th>
-              <th>Procurement</th>
-              <th>Finance</th>
-              <th>Score / QC</th>
-              <th>Actions</th>
+              <th style="width: 105px;">Vendor ID</th>
+              <th style="min-width: 180px;">Company Name</th>
+              <th style="min-width: 120px;">Location</th>
+              <th style="min-width: 200px;">Approved Categories</th>
+              <th style="min-width: 150px;">Bank</th>
+              <th style="width: 115px;">Procurement</th>
+              <th style="width: 115px;">Finance</th>
+              <th style="width: 155px;">Score / QC</th>
+              <th style="width: 205px;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -118,31 +109,89 @@ import { Vendor } from '../core/models';
             @for (v of filteredVendors(); track v.id; let idx = $index) {
               <tr>
                 <td><span class="mono">{{ v.id }}</span></td>
-                <td><input [(ngModel)]="v.name" style="font-weight: 600;" /></td>
-                <td><input [(ngModel)]="v.location" /></td>
-                <td><input [value]="v.categories.join(', ')" (input)="updateCategories(v, $any($event.target).value)" /></td>
-                <td><input [(ngModel)]="v.bank" /></td>
+                <td><input [(ngModel)]="v.name" class="table-cell-input" style="font-weight: 600;" /></td>
+                <td><input [(ngModel)]="v.location" class="table-cell-input" /></td>
+                <td><input [value]="v.categories.join(', ')" (input)="updateCategories(v, $any($event.target).value)" class="table-cell-input" /></td>
+                <td><input [(ngModel)]="v.bank" class="table-cell-input" /></td>
                 <td>
                   <app-status [text]="v.procurementStatus" [good]="v.procurementStatus==='Approved'" [warn]="v.procurementStatus==='Pending'" />
                 </td>
                 <td>
                   <app-status [text]="v.financeStatus" [good]="v.financeStatus==='Approved'" [warn]="v.financeStatus==='Pending'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 4px; align-items: center;">
-                    <input type="number" step="0.1" [(ngModel)]="v.rating" style="width: 55px;" />
-                    <small style="color: #64748b;">★</small>
-                    <input type="number" [(ngModel)]="v.qcPass" style="width: 55px;" />
-                    <small style="color: #64748b;">%</small>
+                <td style="white-space: nowrap;">
+                  <div class="score-qc-group">
+                    <div class="score-pill" title="Vendor Star Rating (1.0 - 5.0)">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="5"
+                        [(ngModel)]="v.rating"
+                        class="score-input"
+                        aria-label="Vendor Star Rating"
+                      />
+                      <span class="star-icon">★</span>
+                    </div>
+                    <div class="score-pill" title="QC Pass Percentage (0% - 100%)">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        [(ngModel)]="v.qcPass"
+                        class="score-input"
+                        aria-label="QC Pass Percentage"
+                      />
+                      <span class="percent-icon">%</span>
+                    </div>
                   </div>
                 </td>
-                <td>
-                  <div style="display: flex; gap: 6px;">
+                <td style="white-space: nowrap;">
+                  <div class="action-buttons-wrap">
                     @if (v.procurementStatus === 'Pending') {
-                      <button class="btn small" (click)="approveVendor(v.id)">Approve</button>
+                      <button
+                        class="btn-action btn-action-approve"
+                        (click)="toggleProcurementApproval(v.id)"
+                        title="Click to Approve Procurement Verification"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>Approve</span>
+                      </button>
+                    } @else {
+                      <button
+                        class="btn-action btn-action-approved"
+                        (click)="toggleProcurementApproval(v.id)"
+                        title="Approved (Click to Revoke Approval)"
+                      >
+                        <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                        <span class="text-approved">Approved</span>
+                        <span class="text-revoke">Revoke</span>
+                      </button>
                     }
-                    <button class="btn small ghost" (click)="saveVendor(v)">Update</button>
-                    <button class="btn small danger-btn" (click)="deleteVendor(v.id)">Delete</button>
+
+                    <button class="btn-action btn-action-save" (click)="saveVendor(v)" title="Save & Update Vendor Record">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      <span>Update</span>
+                    </button>
+
+                    <button class="btn-action btn-action-delete" (click)="deleteVendor(v.id)" title="Delete Vendor">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -151,7 +200,97 @@ import { Vendor } from '../core/models';
         </table>
       </div>
     </article>
-  `
+  `,
+  styles: [`
+    .vendor-table {
+      min-width: 1200px;
+      width: 100%;
+    }
+
+    .table-cell-input {
+      width: 100%;
+      height: 32px;
+      padding: 5px 10px;
+      font-size: 12.5px;
+      border: 1px solid var(--line-strong, #cbd5e1);
+      border-radius: var(--radius-sm, 6px);
+      background: #ffffff;
+      color: var(--text, #0f172a);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: var(--role-accent, #2563eb);
+        box-shadow: 0 0 0 2px var(--role-soft, rgba(37, 99, 235, 0.14));
+      }
+    }
+
+    .score-qc-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #ffffff;
+      border: 1px solid var(--line-strong, #cbd5e1);
+      border-radius: var(--radius-sm, 6px);
+      padding: 3px 6px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+      &:focus-within {
+        border-color: var(--role-accent, #2563eb);
+        box-shadow: 0 0 0 2px var(--role-soft, rgba(37, 99, 235, 0.14));
+      }
+
+      .score-input {
+        width: 36px !important;
+        height: 22px !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: var(--text, #0f172a) !important;
+        text-align: center !important;
+        outline: none !important;
+        box-shadow: none !important;
+        -moz-appearance: textfield;
+
+        &::-webkit-inner-spin-button,
+        &::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+      }
+
+      .star-icon {
+        color: #f59e0b;
+        font-size: 13px;
+        line-height: 1;
+        user-select: none;
+      }
+
+      .percent-icon {
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        user-select: none;
+      }
+    }
+
+    .action-buttons-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-start;
+    }
+  `]
 })
 export class VendorsComponent {
   readonly state = inject(PortalStateService);
@@ -159,6 +298,15 @@ export class VendorsComponent {
   showAddForm = true;
   searchQuery = '';
   categoryFilter = '';
+
+  readonly categoryFilterOptions = [
+    { value: '', label: 'All Categories' },
+    { value: 'Electrical', label: 'Electrical' },
+    { value: 'Mechanical', label: 'Mechanical' },
+    { value: 'Safety Equipment', label: 'Safety Equipment' },
+    { value: 'IT & Hardware', label: 'IT & Hardware' },
+    { value: 'Raw Materials', label: 'Raw Materials' }
+  ];
 
   newVendor: Vendor = {
     id: 'VEN-10028',
@@ -181,18 +329,28 @@ export class VendorsComponent {
     { id: 'VEN-10027', name: 'Tech Solutions', location: 'Islamabad', categories: ['IT & Hardware'], procurementStatus: 'Pending', financeStatus: 'Pending', bank: 'HBL', rating: 4.0, onTime: 85, qcPass: 90 }
   ];
 
-  filteredVendors = computed(() => {
+  filteredVendors(): Vendor[] {
     const q = this.searchQuery.trim().toLowerCase();
     const cat = this.categoryFilter;
     return this.vendorsList.filter(v => {
-      const matchQuery = !q || v.name.toLowerCase().includes(q) || v.id.toLowerCase().includes(q) || v.location.toLowerCase().includes(q);
-      const matchCat = !cat || v.categories.includes(cat);
+      const matchQuery = !q ||
+        (v.name || '').toLowerCase().includes(q) ||
+        (v.id || '').toLowerCase().includes(q) ||
+        (v.location || '').toLowerCase().includes(q) ||
+        (v.bank || '').toLowerCase().includes(q) ||
+        (v.categories || []).some(c => (c || '').toLowerCase().includes(q));
+      const matchCat = !cat || (v.categories || []).includes(cat);
       return matchQuery && matchCat;
     });
-  });
+  }
 
-  pendingCount = computed(() => this.vendorsList.filter(v => v.procurementStatus === 'Pending').length);
-  approvedCount = computed(() => this.vendorsList.filter(v => v.procurementStatus === 'Approved' && v.financeStatus === 'Approved').length);
+  pendingCount(): number {
+    return this.vendorsList.filter(v => v.procurementStatus === 'Pending').length;
+  }
+
+  approvedCount(): number {
+    return this.vendorsList.filter(v => v.procurementStatus === 'Approved' && v.financeStatus === 'Approved').length;
+  }
 
   addVendor(): void {
     if (!this.newVendor.name || !this.newVendor.id) {
@@ -227,8 +385,21 @@ export class VendorsComponent {
   }
 
   approveVendor(id: string): void {
-    this.vendorsList = this.vendorsList.map(v => v.id === id ? { ...v, procurementStatus: 'Approved' } : v);
-    this.state.notify(`Procurement verification approved for vendor ${id}.`);
+    this.toggleProcurementApproval(id);
+  }
+
+  toggleProcurementApproval(id: string): void {
+    const v = this.vendorsList.find(item => item.id === id);
+    if (!v) return;
+    const nextStatus = v.procurementStatus === 'Approved' ? 'Pending' : 'Approved';
+    this.vendorsList = this.vendorsList.map(item =>
+      item.id === id ? { ...item, procurementStatus: nextStatus } : item
+    );
+    if (nextStatus === 'Approved') {
+      this.state.notify(`Procurement verification approved for vendor ${v.name} (${id}).`);
+    } else {
+      this.state.notify(`Procurement verification revoked (reverted to Pending) for vendor ${v.name} (${id}).`);
+    }
   }
 
   saveVendor(v: Vendor): void {

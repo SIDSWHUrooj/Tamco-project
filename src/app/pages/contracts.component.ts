@@ -1,7 +1,10 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
+import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 
 export interface ContractItem {
   id: string;
@@ -18,7 +21,7 @@ export interface ContractItem {
 @Component({
   selector: 'app-contracts',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
   template: `
     <app-page-heading eyebrow="Commercial Agreements" title="Contract & SLA Management" subtitle="Maintain executed supplier master agreements, annual rate contracts, service level agreements and legal validity milestones.">
       <div class="heading-actions">
@@ -50,27 +53,23 @@ export interface ContractItem {
 
     <!-- Create New Contract Form -->
     @if (showAddContract) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Execute New Commercial Agreement / Contract</h2>
-            <p>Specify legal contract code, supplier partner, effective period and monetary commitment.</p>
-          </div>
+          <h2>Execute New Commercial Agreement / Contract</h2>
         </div>
 
         <div class="form-grid">
           <label>Contract Reference # *<input [(ngModel)]="newContract.contractNo" placeholder="e.g. CTR-2026-025" /></label>
           <label>Contracted Supplier *<input [(ngModel)]="newContract.vendor" placeholder="e.g. ABC Supplies Pvt. Ltd." /></label>
           <label>Agreement Type *
-            <select [(ngModel)]="newContract.type" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Annual Rate Contract">Annual Rate Contract</option>
-              <option value="Master Service Agreement">Master Service Agreement</option>
-              <option value="Raw Material Supply Agreement">Raw Material Supply Agreement</option>
-              <option value="Software & Hardware SLA">Software & Hardware SLA</option>
-            </select>
+            <app-custom-select [(ngModel)]="newContract.type" [options]="typeOptions" />
           </label>
-          <label>Effective Start Date *<input type="date" [(ngModel)]="newContract.startDate" /></label>
-          <label>Contract Expiry Date *<input type="date" [(ngModel)]="newContract.endDate" /></label>
+          <label>Effective Start Date *
+            <app-custom-date-picker [(ngModel)]="newContract.startDate" />
+          </label>
+          <label>Contract Expiry Date *
+            <app-custom-date-picker [(ngModel)]="newContract.endDate" />
+          </label>
           <label>Total Committed Value ($) *<input type="number" [(ngModel)]="newContract.value" placeholder="250000" /></label>
           <label class="span-2">Commercial Payment Terms<input [(ngModel)]="newContract.paymentTerms" placeholder="e.g. Net 30 Days after verified GRN & 3-Way Match" /></label>
         </div>
@@ -83,32 +82,26 @@ export interface ContractItem {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search contracts by #, supplier, or agreement type..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search contracts by #, supplier, or agreement type..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="statusFilter"
-      >
-        <option value="">All Statuses</option>
-        <option value="Active">Active</option>
-        <option value="Expiring Soon">Expiring Soon</option>
-        <option value="Terminated">Terminated</option>
-      </select>
+        [options]="statusOptions"
+        minWidth="170px"
+      />
     </div>
 
     <!-- Live Contracts Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Master Supplier Contracts Register</h2>
-          <p>Binding legal agreements and SLA terms</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -130,17 +123,33 @@ export interface ContractItem {
                 <td><span class="mono">{{ c.contractNo }}</span></td>
                 <td><input [(ngModel)]="c.vendor" style="font-weight: 600; min-width: 170px;" /></td>
                 <td><input [(ngModel)]="c.type" style="min-width: 190px;" /></td>
-                <td><input type="date" [(ngModel)]="c.startDate" /></td>
-                <td><input type="date" [(ngModel)]="c.endDate" /></td>
+                <td>
+                  <app-custom-date-picker [(ngModel)]="c.startDate" [compact]="true" minWidth="135px" />
+                </td>
+                <td>
+                  <app-custom-date-picker [(ngModel)]="c.endDate" [compact]="true" minWidth="135px" />
+                </td>
                 <td><input type="number" [(ngModel)]="c.value" style="width: 85px;" /></td>
                 <td><input [(ngModel)]="c.paymentTerms" style="min-width: 140px;" /></td>
                 <td>
                   <app-status [text]="c.status" [good]="c.status==='Active'" [warn]="c.status==='Expiring Soon'" [bad]="c.status==='Terminated'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveContract(c)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteContract(c.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveContract(c)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteContract(c.id)" title="Delete contract">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -157,6 +166,20 @@ export class ContractsComponent {
   showAddContract = false;
   searchQuery = '';
   statusFilter = '';
+
+  readonly statusOptions = [
+    { value: '', label: 'All Statuses' },
+    { value: 'Active', label: 'Active' },
+    { value: 'Expiring Soon', label: 'Expiring Soon' },
+    { value: 'Terminated', label: 'Terminated' }
+  ];
+
+  readonly typeOptions = [
+    'Annual Rate Contract',
+    'Master Service Agreement',
+    'Raw Material Supply Agreement',
+    'Software & Hardware SLA'
+  ];
 
   newContract: ContractItem = {
     id: 'CTR-005',
@@ -177,19 +200,19 @@ export class ContractsComponent {
     { id: 'CTR-004', contractNo: 'CTR-2026-015', vendor: 'Perfect Industrial', type: 'Raw Material Supply Agreement', startDate: '2026-03-15', endDate: '2027-03-14', value: 520000, paymentTerms: 'Net 60 Days', status: 'Active' }
   ];
 
-  filteredContracts = computed(() => {
+  filteredContracts(): ContractItem[] {
     const q = this.searchQuery.trim().toLowerCase();
     const sf = this.statusFilter;
     return this.contractsList.filter(c => {
-      const matchQ = !q || c.contractNo.toLowerCase().includes(q) || c.vendor.toLowerCase().includes(q) || c.type.toLowerCase().includes(q);
+      const matchQ = !q || (c.contractNo || '').toLowerCase().includes(q) || (c.vendor || '').toLowerCase().includes(q) || (c.type || '').toLowerCase().includes(q) || (c.id || '').toLowerCase().includes(q) || (c.paymentTerms || '').toLowerCase().includes(q);
       const matchS = !sf || c.status === sf;
       return matchQ && matchS;
     });
-  });
+  }
 
-  activeCount = computed(() => this.contractsList.filter(c => c.status === 'Active' || c.status === 'Expiring Soon').length);
-  totalValue = computed(() => this.contractsList.reduce((acc, c) => acc + (c.value || 0), 0));
-  expiringCount = computed(() => this.contractsList.filter(c => c.status === 'Expiring Soon').length);
+  activeCount(): number { return this.contractsList.filter(c => c.status === 'Active' || c.status === 'Expiring Soon').length; }
+  totalValue(): number { return this.contractsList.reduce((acc, c) => acc + (c.value || 0), 0); }
+  expiringCount(): number { return this.contractsList.filter(c => c.status === 'Expiring Soon').length; }
 
   addContract(): void {
     if (!this.newContract.contractNo || !this.newContract.vendor) {

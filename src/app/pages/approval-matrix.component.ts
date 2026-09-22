@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent } from '../shared/ui.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface ApprovalTier {
   id: string;
@@ -17,7 +18,7 @@ export interface ApprovalTier {
 @Component({
   selector: 'app-approval-matrix',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent],
+  imports: [FormsModule, PageHeadingComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Governance & Authorization" title="Approval Limits & Spending Matrix" subtitle="Define automated routing policies by financial value, category delegation limits and executive sign-off thresholds.">
       <div class="heading-actions">
@@ -30,12 +31,9 @@ export interface ApprovalTier {
 
     <!-- Add Approval Tier Form -->
     @if (showAddTier) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Define New Spending Authority Threshold</h2>
-            <p>Specify spend limits, required sign-off roles and auto-escalation periods.</p>
-          </div>
+          <h2>Define New Spending Authority Threshold</h2>
         </div>
 
         <div class="form-grid">
@@ -43,13 +41,7 @@ export interface ApprovalTier {
           <label>Minimum Amount (USD) *<input type="number" [(ngModel)]="newTier.minSpend" placeholder="500000" /></label>
           <label>Maximum Amount (USD) *<input type="number" [(ngModel)]="newTier.maxSpend" placeholder="2000000" /></label>
           <label>Primary Approver Role *
-            <select [(ngModel)]="newTier.primaryApprover" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Procurement Manager">Procurement Manager</option>
-              <option value="Head of Sourcing">Head of Sourcing</option>
-              <option value="Executive Director">Executive Director</option>
-              <option value="Chief Financial Officer (CFO)">Chief Financial Officer (CFO)</option>
-              <option value="Chief Executive Officer (CEO)">Chief Executive Officer (CEO)</option>
-            </select>
+            <app-custom-select [(ngModel)]="newTier.primaryApprover" [options]="approverOptions" />
           </label>
           <label>Secondary Sign-off Role<input [(ngModel)]="newTier.secondaryApprover" placeholder="e.g. Managing Director" /></label>
           <label>SLA Before Escalation (Hours)<input type="number" [(ngModel)]="newTier.slaHours" placeholder="48" /></label>
@@ -64,13 +56,6 @@ export interface ApprovalTier {
 
     <!-- Live Matrix Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Active Financial Delegation Matrix</h2>
-          <p>Commercial spend threshold routing rules configured in ERP</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -88,17 +73,31 @@ export interface ApprovalTier {
           <tbody>
             @for (t of matrixTiers; track t.id) {
               <tr>
-                <td><input [(ngModel)]="t.tierName" style="font-weight: 700; width: 130px;" /></td>
-                <td><input type="number" [(ngModel)]="t.minSpend" style="width: 85px;" /></td>
-                <td><input type="number" [(ngModel)]="t.maxSpend" style="width: 95px;" /></td>
-                <td><input [(ngModel)]="t.primaryApprover" style="min-width: 170px;" /></td>
-                <td><input [(ngModel)]="t.secondaryApprover" style="min-width: 150px;" /></td>
-                <td><input type="number" [(ngModel)]="t.slaHours" style="width: 55px;" /> hrs</td>
-                <td style="text-align: center;"><input type="checkbox" [(ngModel)]="t.autoEscalate" /></td>
+                <td><input [(ngModel)]="t.tierName" style="font-weight: 700; min-width: 170px;" /></td>
+                <td><input type="number" [(ngModel)]="t.minSpend" style="width: 90px;" /></td>
+                <td><input type="number" [(ngModel)]="t.maxSpend" style="width: 100px;" /></td>
+                <td><input [(ngModel)]="t.primaryApprover" style="min-width: 190px;" /></td>
+                <td><input [(ngModel)]="t.secondaryApprover" style="min-width: 170px;" /></td>
+                <td><input type="number" [(ngModel)]="t.slaHours" style="width: 60px;" /> hrs</td>
                 <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveTier(t)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteTier(t.id)">✕</button>
+                  <input type="checkbox" [(ngModel)]="t.autoEscalate" />
+                </td>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveTier(t)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteTier(t.id)" title="Delete tier">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -113,6 +112,14 @@ export class ApprovalMatrixComponent {
   readonly state = inject(PortalStateService);
 
   showAddTier = false;
+
+  readonly approverOptions = [
+    'Procurement Manager',
+    'Head of Sourcing',
+    'Executive Director',
+    'Chief Financial Officer (CFO)',
+    'Chief Executive Officer (CEO)'
+  ];
 
   newTier: ApprovalTier = {
     id: 'TR-005',

@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface ReportItem {
   id: string;
@@ -17,7 +19,7 @@ export interface ReportItem {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Business Intelligence" title="Operational Reports & Exports" subtitle="Generate, configure, and automate scheduled management reports across procurement, warehousing and payables.">
       <div class="heading-actions">
@@ -30,39 +32,21 @@ export interface ReportItem {
 
     <!-- Configure New Report Panel -->
     @if (showAddReport) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Configure Scheduled Enterprise Report</h2>
-            <p>Define reporting parameters, distribution frequency and recipient emails.</p>
-          </div>
+          <h2>Configure Scheduled Enterprise Report</h2>
         </div>
 
         <div class="form-grid">
           <label>Report Title *<input [(ngModel)]="newReport.title" placeholder="e.g. Weekly Purchase Order Delivery SLA" /></label>
           <label>Business Category *
-            <select [(ngModel)]="newReport.category" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Procurement">Procurement</option>
-              <option value="Finance & AP">Finance & AP</option>
-              <option value="Supply Chain">Supply Chain</option>
-              <option value="Compliance & Audit">Compliance & Audit</option>
-            </select>
+            <app-custom-select [(ngModel)]="newReport.category" [options]="categoryOptions" />
           </label>
           <label>Frequency
-            <select [(ngModel)]="newReport.frequency" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Monthly">Monthly</option>
-              <option value="Quarterly">Quarterly</option>
-            </select>
+            <app-custom-select [(ngModel)]="newReport.frequency" [options]="frequencyOptions" />
           </label>
           <label>Export Format
-            <select [(ngModel)]="newReport.format" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="PDF / XLSX">PDF / XLSX</option>
-              <option value="Excel (XLSX)">Excel (XLSX)</option>
-              <option value="CSV">CSV</option>
-              <option value="PDF Presentation">PDF Presentation</option>
-            </select>
+            <app-custom-select [(ngModel)]="newReport.format" [options]="formatOptions" />
           </label>
           <label class="span-2">Distribution Email List (comma separated)
             <input [(ngModel)]="newReport.recipients" placeholder="cfo@company.com, procurement.head@company.com" />
@@ -77,32 +61,26 @@ export interface ReportItem {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search reports by title or category..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search reports by title or category..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="categoryFilter"
-      >
-        <option value="">All Categories</option>
-        <option value="Procurement">Procurement</option>
-        <option value="Finance & AP">Finance & AP</option>
-        <option value="Supply Chain">Supply Chain</option>
-      </select>
+        [options]="categoryFilterOptions"
+        minWidth="170px"
+      />
     </div>
 
     <!-- Live Reports Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Standard & Custom Enterprise Reports</h2>
-          <p>Download instant snapshots or maintain automated distribution schedules</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -127,11 +105,30 @@ export interface ReportItem {
                 <td><input [(ngModel)]="r.recipients" style="min-width: 160px;" /></td>
                 <td><small style="color: #64748b;">{{ r.lastGenerated }}</small></td>
                 <td><app-status [text]="r.status" [good]="r.status==='Active'" /></td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="downloadReport(r)">Download</button>
-                    <button class="btn small ghost" (click)="saveReport(r)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteReport(r.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-download" (click)="downloadReport(r)" title="Download {{ r.title }}">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      <span>Download</span>
+                    </button>
+                    <button class="btn-action btn-action-save" (click)="saveReport(r)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteReport(r.id)" title="Delete report">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -148,6 +145,17 @@ export class ReportsComponent {
   showAddReport = false;
   searchQuery = '';
   categoryFilter = '';
+
+  readonly categoryFilterOptions = [
+    { value: '', label: 'All Categories' },
+    { value: 'Procurement', label: 'Procurement' },
+    { value: 'Finance & AP', label: 'Finance & AP' },
+    { value: 'Supply Chain', label: 'Supply Chain' }
+  ];
+
+  readonly categoryOptions = ['Procurement', 'Finance & AP', 'Supply Chain', 'Compliance & Audit'];
+  readonly frequencyOptions = ['Daily', 'Weekly', 'Monthly', 'Quarterly'];
+  readonly formatOptions = ['PDF / XLSX', 'Excel (XLSX)', 'CSV', 'PDF Presentation'];
 
   newReport: ReportItem = {
     id: 'REP-005',
@@ -167,15 +175,15 @@ export class ReportsComponent {
     { id: 'REP-004', title: 'Purchase Order Aging & Delivery Delays', category: 'Procurement', frequency: 'Weekly', format: 'PDF Presentation', recipients: 'mgmt@company.com', lastGenerated: '2026-08-23', status: 'Active' }
   ];
 
-  filteredReports = computed(() => {
+  filteredReports(): ReportItem[] {
     const q = this.searchQuery.trim().toLowerCase();
     const cf = this.categoryFilter;
     return this.reports.filter(r => {
-      const matchQ = !q || r.title.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+      const matchQ = !q || (r.title || '').toLowerCase().includes(q) || (r.category || '').toLowerCase().includes(q) || (r.format || '').toLowerCase().includes(q) || (r.frequency || '').toLowerCase().includes(q) || (r.id || '').toLowerCase().includes(q) || (r.recipients || '').toLowerCase().includes(q);
       const matchC = !cf || r.category === cf;
       return matchQ && matchC;
     });
-  });
+  }
 
   addReport(): void {
     if (!this.newReport.title) {

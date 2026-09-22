@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent } from '../shared/ui.component';
+import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 
 interface AttachmentRecord {
   id: string;
@@ -14,10 +15,9 @@ interface AttachmentRecord {
 @Component({
   selector: 'app-attachments',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent],
+  imports: [FormsModule, PageHeadingComponent, CustomDatePickerComponent],
   styles: [`
-    .attachment-head { background: #025c4d; color: #fff; padding: 10px 14px; border-radius: 5px; font-size: 15px; font-weight: 600; }
-    .attachment-table thead th { background: #149982; color: #fff; }
+    .attachment-table thead th { background: var(--role-accent, #50ae9b); color: #fff; border-bottom: 2px solid var(--role-accent-hover, #3d8e7e); transition: background-color 0.2s ease, border-color 0.2s ease; }
     .attachment-table input { min-width: 120px; }
     .attachment-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .attachment-modal-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(7, 18, 40, .45); display: grid; place-items: center; padding: 20px; }
@@ -32,12 +32,16 @@ interface AttachmentRecord {
     </app-page-heading>
 
     @if (showAddForm) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #025c4d;">
-        <div class="panel-title"><div><h2>Add Attachment</h2><p>Add a document description, validity dates and attached file.</p></div></div>
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
+        <div class="panel-title"><h2>Add Attachment</h2></div>
         <div class="form-grid">
           <label>Document Description *<input [(ngModel)]="newAttachment.description" placeholder="e.g. Trade License" /></label>
-          <label>Issue Date *<input type="date" [(ngModel)]="newAttachment.issueDate" /></label>
-          <label>Doc Expiry Date *<input type="date" [(ngModel)]="newAttachment.expiryDate" /></label>
+          <label>Issue Date *
+            <app-custom-date-picker [(ngModel)]="newAttachment.issueDate" />
+          </label>
+          <label>Doc Expiry Date *
+            <app-custom-date-picker [(ngModel)]="newAttachment.expiryDate" />
+          </label>
           <label>Attached File *<input type="file" (change)="onFileSelected($event)" /></label>
         </div>
         <div class="toolbar" style="margin-top: 16px;"><button class="btn secondary" (click)="resetForm()">Reset</button><button class="btn" (click)="addAttachment()">Save Attachment</button></div>
@@ -45,9 +49,6 @@ interface AttachmentRecord {
     }
 
     <article class="panel">
-      <div class="attachment-head">Attachment</div>
-      <hr style="margin: 5px 0 16px; border: 0; border-top: 1px solid forestgreen;" />
-      <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;"><button class="btn" (click)="showAddForm = true">+ Add Attachment</button></div>
       <div class="table-scroll">
         <table class="attachment-table">
           <thead><tr><th>SR</th><th>Document Description</th><th>Issue Date</th><th>Doc Expiry Date</th><th>Attached File</th><th>Action</th></tr></thead>
@@ -56,10 +57,27 @@ interface AttachmentRecord {
               <tr>
                 <td>{{ i + 1 }}</td>
                 <td><input [(ngModel)]="attachment.description" [readonly]="!editing" /></td>
-                <td><input type="date" [(ngModel)]="attachment.issueDate" [readonly]="!editing" /></td>
-                <td><input type="date" [(ngModel)]="attachment.expiryDate" [readonly]="!editing" /></td>
+                <td>
+                  <app-custom-date-picker [(ngModel)]="attachment.issueDate" [readonly]="!editing" [compact]="true" minWidth="135px" />
+                </td>
+                <td>
+                  <app-custom-date-picker [(ngModel)]="attachment.expiryDate" [readonly]="!editing" [compact]="true" minWidth="135px" />
+                </td>
                 <td><span>{{ attachment.fileName || 'No File' }}</span></td>
-                <td><div class="attachment-actions"><button class="btn small ghost" (click)="viewAttachment(attachment)">View</button><button class="btn small danger-btn" (click)="deleteAttachment(attachment.id)">✕</button></div></td>
+                <td>
+                  <div class="attachment-actions" style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-view" (click)="viewAttachment(attachment)" title="View Attachment">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <span>View</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteAttachment(attachment.id)" title="Delete attachment">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
               </tr>
             }
           </tbody>
@@ -71,7 +89,7 @@ interface AttachmentRecord {
     @if (viewingAttachment) {
       <div class="attachment-modal-overlay" (click)="viewingAttachment = undefined">
         <div class="attachment-modal" (click)="$event.stopPropagation()">
-          <div class="panel-title"><div><h2>View Attachment</h2><p>{{ viewingAttachment.fileName || 'No file attached.' }}</p></div><button class="btn small" (click)="viewingAttachment = undefined">✕</button></div>
+          <div class="panel-title"><h2>View Attachment</h2><button class="btn small" (click)="viewingAttachment = undefined">✕</button></div>
           @if (viewingAttachment.fileName) { <div class="callout info">Attached file: <b>{{ viewingAttachment.fileName }}</b></div> } @else { <div class="callout warn">No file attached.</div> }
         </div>
       </div>

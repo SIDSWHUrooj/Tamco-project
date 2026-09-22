@@ -31,12 +31,9 @@ export interface RolePermission {
 
     <!-- Create Custom Role Panel -->
     @if (showAddRole) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Define Custom Authorization Role</h2>
-            <p>Specify role title, business description and toggle module authorizations.</p>
-          </div>
+          <h2>Define Custom Authorization Role</h2>
         </div>
 
         <div class="form-grid">
@@ -70,13 +67,6 @@ export interface RolePermission {
 
     <!-- Live Roles Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>System Role Authorization Matrix</h2>
-          <p>Toggle checkboxes to modify live permissions for all assigned users.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -103,10 +93,22 @@ export interface RolePermission {
                 <td style="text-align: center;"><input type="checkbox" [(ngModel)]="r.invoicesPay" /></td>
                 <td style="text-align: center;"><input type="checkbox" [(ngModel)]="r.adminControls" /></td>
                 <td><strong style="color: #1769e0;">{{ r.userCount }} users</strong></td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveRole(r)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteRole(r.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveRole(r)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteRole(r.id)" title="Delete role">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>

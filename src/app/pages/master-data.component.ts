@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface MasterDataItem {
   id: string;
@@ -15,7 +17,7 @@ export interface MasterDataItem {
 @Component({
   selector: 'app-master-data',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="System Core" title="Enterprise Master Data Directory" subtitle="Maintain shared procurement categories, plant locations, corporate legal entities and standardized payment terms.">
       <div class="heading-actions">
@@ -28,24 +30,16 @@ export interface MasterDataItem {
 
     <!-- Add Master Data Form -->
     @if (showAddEntry) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #1769e0;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Register Master Data Record</h2>
-            <p>Define taxonomy code, nomenclature, category classification and parent operating entity.</p>
-          </div>
+          <h2>Register Master Data Record</h2>
         </div>
 
         <div class="form-grid">
           <label>Taxonomy Code *<input [(ngModel)]="newEntry.code" placeholder="e.g. CAT-SOLAR" /></label>
           <label>Nomenclature / Full Name *<input [(ngModel)]="newEntry.name" placeholder="e.g. Solar Photovoltaic Equipment" /></label>
           <label>Record Classification Type *
-            <select [(ngModel)]="newEntry.type" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Procurement Category">Procurement Category</option>
-              <option value="Plant / Receiving Location">Plant / Receiving Location</option>
-              <option value="Operating Entity">Operating Entity</option>
-              <option value="Standard Payment Term">Standard Payment Term</option>
-            </select>
+            <app-custom-select [(ngModel)]="newEntry.type" [options]="typeOptions" />
           </label>
           <label>Parent Operating Entity<input [(ngModel)]="newEntry.parentUnit" placeholder="e.g. TAMCO Middle East Ltd." /></label>
         </div>
@@ -58,32 +52,26 @@ export interface MasterDataItem {
     }
 
     <!-- Search & Filter Bar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search master data by code, name, or parent..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search master data by code, name, or parent..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="typeFilter"
-      >
-        <option value="">All Classification Types</option>
-        <option value="Procurement Category">Procurement Category</option>
-        <option value="Plant / Receiving Location">Plant / Receiving Location</option>
-        <option value="Standard Payment Term">Standard Payment Term</option>
-      </select>
+        [options]="typeFilterOptions"
+        minWidth="200px"
+      />
     </div>
 
     <!-- Live Master Data Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Enterprise Reference Data Taxonomy</h2>
-          <p>Global master categories synchronized across ERP and portal</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
         <table>
           <thead>
@@ -106,10 +94,22 @@ export interface MasterDataItem {
                 <td>
                   <app-status [text]="m.status" [good]="m.status==='Active'" [bad]="m.status==='Inactive'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 5px;">
-                    <button class="btn small ghost" (click)="saveEntry(m)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteEntry(m.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn-action btn-action-save" (click)="saveEntry(m)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteEntry(m.id)" title="Delete master entry">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -127,6 +127,20 @@ export class MasterDataComponent {
   searchQuery = '';
   typeFilter = '';
 
+  readonly typeFilterOptions = [
+    { value: '', label: 'All Classification Types' },
+    { value: 'Procurement Category', label: 'Procurement Category' },
+    { value: 'Plant / Receiving Location', label: 'Plant / Receiving Location' },
+    { value: 'Standard Payment Term', label: 'Standard Payment Term' }
+  ];
+
+  readonly typeOptions = [
+    'Procurement Category',
+    'Plant / Receiving Location',
+    'Operating Entity',
+    'Standard Payment Term'
+  ];
+
   newEntry: MasterDataItem = {
     id: 'MD-005',
     code: 'CAT-SOLAR',
@@ -143,15 +157,15 @@ export class MasterDataComponent {
     { id: 'MD-004', code: 'LOC-LHR', name: 'Lahore Regional Distribution Hub', type: 'Plant / Receiving Location', parentUnit: 'TAMCO ME Ltd.', status: 'Active' }
   ];
 
-  filteredData = computed(() => {
+  filteredData(): MasterDataItem[] {
     const q = this.searchQuery.trim().toLowerCase();
     const tf = this.typeFilter;
     return this.masterData.filter(m => {
-      const matchQ = !q || m.code.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || m.parentUnit.toLowerCase().includes(q);
+      const matchQ = !q || (m.code || '').toLowerCase().includes(q) || (m.name || '').toLowerCase().includes(q) || (m.parentUnit || '').toLowerCase().includes(q) || (m.type || '').toLowerCase().includes(q) || (m.id || '').toLowerCase().includes(q);
       const matchT = !tf || m.type === tf;
       return matchQ && matchT;
     });
-  });
+  }
 
   addEntry(): void {
     if (!this.newEntry.code || !this.newEntry.name) {

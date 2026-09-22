@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface FinanceVendorProfile {
   id: string;
@@ -19,7 +21,7 @@ export interface FinanceVendorProfile {
 @Component({
   selector: 'app-finance-vendors',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent],
+  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
     <app-page-heading eyebrow="Accounts Payable Master" title="Vendors (Finance Master)" subtitle="Maintain financial profiles, payment terms, tax exemptions and credit limits for authorized vendors.">
       <div class="heading-actions">
@@ -51,35 +53,21 @@ export interface FinanceVendorProfile {
 
     <!-- Add Financial Profile Form -->
     @if (showAddForm) {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid #16855b;">
+      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
         <div class="panel-title">
-          <div>
-            <h2>Create / Update Vendor Financial Profile</h2>
-            <p>Define commercial payment terms, currency agreements and tax parameters.</p>
-          </div>
+          <h2>Create / Update Vendor Financial Profile</h2>
         </div>
 
-        <div class="form-grid">
+        <div class="form-grid four-col">
           <label>Vendor Code *<input [(ngModel)]="newProfile.vendorId" placeholder="e.g. VEN-10024" /></label>
           <label>Vendor Legal Name *<input [(ngModel)]="newProfile.vendorName" placeholder="Enter vendor legal name" /></label>
           <label>Designated Bank<input [(ngModel)]="newProfile.bank" placeholder="e.g. Meezan Bank / HBL" /></label>
           <label>IBAN<input [(ngModel)]="newProfile.iban" placeholder="PK44 MEZN 0000 9876 5432 1001" /></label>
           <label>Payment Terms
-            <select [(ngModel)]="newProfile.paymentTerms" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="Net 15 Days">Net 15 Days</option>
-              <option value="Net 30 Days">Net 30 Days</option>
-              <option value="Net 45 Days">Net 45 Days</option>
-              <option value="Net 60 Days">Net 60 Days</option>
-              <option value="Advance 20%, Balance Net 30">Advance 20%, Balance Net 30</option>
-            </select>
+            <app-custom-select [(ngModel)]="newProfile.paymentTerms" [options]="paymentTermsOptions" />
           </label>
           <label>Settlement Currency
-            <select [(ngModel)]="newProfile.currency" style="width: 100%; border: 1px solid #dbe3ed; border-radius: 8px; padding: 10px;">
-              <option value="USD">USD ($)</option>
-              <option value="PKR">PKR (Rs.)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="AED">AED (AED)</option>
-            </select>
+            <app-custom-select [(ngModel)]="newProfile.currency" [options]="currencyOptions" />
           </label>
           <label>Credit Limit ($)<input type="number" [(ngModel)]="newProfile.creditLimit" placeholder="100000" /></label>
           <label>Tax Withholding Category<input [(ngModel)]="newProfile.taxStatus" placeholder="e.g. Active Filer (4.5% WHT)" /></label>
@@ -92,46 +80,40 @@ export interface FinanceVendorProfile {
       </article>
     }
 
-    <!-- Search & Filter -->
-    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-      <input
-        style="flex: 1; min-width: 240px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;"
-        [(ngModel)]="searchQuery"
-        placeholder="🔍 Search finance profiles by vendor, code, bank or tax status..."
-      />
-      <select
-        style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: #fff;"
+    <!-- Search & Filter Bar -->
+    <div class="search-filter-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">
+          <app-icon name="search" [size]="15" />
+        </span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          placeholder="Search finance profiles by vendor, code, bank or tax status..."
+        />
+      </div>
+      <app-custom-select
         [(ngModel)]="termsFilter"
-      >
-        <option value="">All Payment Terms</option>
-        <option value="Net 30 Days">Net 30 Days</option>
-        <option value="Net 45 Days">Net 45 Days</option>
-        <option value="Net 60 Days">Net 60 Days</option>
-      </select>
+        [options]="filterTermsOptions"
+        minWidth="180px"
+      />
     </div>
 
     <!-- Live Table -->
     <article class="panel">
-      <div class="panel-title">
-        <div>
-          <h2>Financial Terms & Payables Register</h2>
-          <p>Commercial profiles mapped to ERP accounts payable system.</p>
-        </div>
-      </div>
-
       <div class="table-scroll">
-        <table>
+        <table class="finance-table">
           <thead>
             <tr>
-              <th>Vendor ID</th>
-              <th>Vendor Name</th>
-              <th>Bank</th>
-              <th>Payment Terms</th>
-              <th>Currency</th>
-              <th>Credit Limit</th>
-              <th>Tax Status</th>
-              <th>Finance Status</th>
-              <th>Actions</th>
+              <th style="min-width: 105px;">Vendor ID</th>
+              <th style="min-width: 170px;">Vendor Name</th>
+              <th style="min-width: 150px;">Bank</th>
+              <th style="min-width: 150px;">Payment Terms</th>
+              <th style="min-width: 80px;">Currency</th>
+              <th style="min-width: 110px;">Credit Limit</th>
+              <th style="min-width: 170px;">Tax Status</th>
+              <th style="min-width: 110px;">Finance Status</th>
+              <th style="min-width: 100px; text-align: left;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -148,12 +130,7 @@ export interface FinanceVendorProfile {
                 <td><input [(ngModel)]="p.vendorName" style="font-weight: 600;" /></td>
                 <td><input [(ngModel)]="p.bank" /></td>
                 <td>
-                  <select [(ngModel)]="p.paymentTerms" style="border: 1px solid #dbe3ed; border-radius: 6px; padding: 4px;">
-                    <option value="Net 15 Days">Net 15 Days</option>
-                    <option value="Net 30 Days">Net 30 Days</option>
-                    <option value="Net 45 Days">Net 45 Days</option>
-                    <option value="Net 60 Days">Net 60 Days</option>
-                  </select>
+                  <app-custom-select [(ngModel)]="p.paymentTerms" [options]="paymentTermsOptions" minWidth="130px" />
                 </td>
                 <td><input [(ngModel)]="p.currency" style="width: 55px;" /></td>
                 <td><input type="number" [(ngModel)]="p.creditLimit" style="width: 85px;" /></td>
@@ -161,10 +138,22 @@ export interface FinanceVendorProfile {
                 <td>
                   <app-status [text]="p.financeStatus" [good]="p.financeStatus==='Approved'" [warn]="p.financeStatus==='Pending'" [bad]="p.financeStatus==='On Hold'" />
                 </td>
-                <td>
-                  <div style="display: flex; gap: 6px;">
-                    <button class="btn small ghost" (click)="saveProfile(p)">Save</button>
-                    <button class="btn small danger-btn" (click)="deleteProfile(p.id)">✕</button>
+                <td style="white-space: nowrap;">
+                  <div class="row-actions">
+                    <button class="btn-action btn-action-save" (click)="saveProfile(p)" title="Save changes">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                      </svg>
+                      <span>Save</span>
+                    </button>
+                    <button class="btn-action btn-action-delete" (click)="deleteProfile(p.id)" title="Delete financial profile">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -173,7 +162,51 @@ export interface FinanceVendorProfile {
         </table>
       </div>
     </article>
-  `
+  `,
+  styles: [`
+    .finance-table {
+      width: 100%;
+      min-width: 1100px;
+      border-collapse: separate;
+      border-spacing: 0;
+
+      thead th {
+        background: var(--role-accent, #7048d7);
+        color: #ffffff;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 11px 12px;
+        border: none;
+        white-space: nowrap;
+
+        &:first-child {
+          border-top-left-radius: var(--radius-sm, 6px);
+        }
+        &:last-child {
+          border-top-right-radius: var(--radius-sm, 6px);
+        }
+      }
+
+      tbody tr:hover {
+        background: rgba(112, 72, 215, 0.04);
+      }
+
+      tbody td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--line, #e2e8f0);
+      }
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-start;
+    }
+  `]
 })
 export class FinanceVendorsComponent {
   readonly state = inject(PortalStateService);
@@ -181,6 +214,28 @@ export class FinanceVendorsComponent {
   showAddForm = true;
   searchQuery = '';
   termsFilter = '';
+
+  readonly filterTermsOptions = [
+    { value: '', label: 'All Payment Terms' },
+    { value: 'Net 30 Days', label: 'Net 30 Days' },
+    { value: 'Net 45 Days', label: 'Net 45 Days' },
+    { value: 'Net 60 Days', label: 'Net 60 Days' }
+  ];
+
+  readonly paymentTermsOptions = [
+    'Net 15 Days',
+    'Net 30 Days',
+    'Net 45 Days',
+    'Net 60 Days',
+    'Advance 20%, Balance Net 30'
+  ];
+
+  readonly currencyOptions = [
+    'USD',
+    'PKR',
+    'EUR',
+    'AED'
+  ];
 
   newProfile: FinanceVendorProfile = {
     id: 'FIN-105',
@@ -202,18 +257,18 @@ export class FinanceVendorsComponent {
     { id: 'FIN-104', vendorId: 'VEN-10027', vendorName: 'Tech Solutions', bank: 'HBL', iban: 'PK21 HABB 0000 6677 8899 0011', paymentTerms: 'Net 15 Days', currency: 'USD', creditLimit: 75000, taxStatus: 'Active Filer (4.5% WHT)', financeStatus: 'On Hold' }
   ];
 
-  filteredProfiles = computed(() => {
+  filteredProfiles(): FinanceVendorProfile[] {
     const q = this.searchQuery.trim().toLowerCase();
     const t = this.termsFilter;
     return this.profiles.filter(p => {
-      const matchQuery = !q || p.vendorName.toLowerCase().includes(q) || p.vendorId.toLowerCase().includes(q) || p.bank.toLowerCase().includes(q) || p.taxStatus.toLowerCase().includes(q);
+      const matchQuery = !q || (p.vendorName || '').toLowerCase().includes(q) || (p.vendorId || '').toLowerCase().includes(q) || (p.bank || '').toLowerCase().includes(q) || (p.taxStatus || '').toLowerCase().includes(q) || (p.iban || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q);
       const matchTerms = !t || p.paymentTerms === t;
       return matchQuery && matchTerms;
     });
-  });
+  }
 
-  approvedCount = computed(() => this.profiles.filter(p => p.financeStatus === 'Approved').length);
-  pendingCount = computed(() => this.profiles.filter(p => p.financeStatus !== 'Approved').length);
+  approvedCount(): number { return this.profiles.filter(p => p.financeStatus === 'Approved').length; }
+  pendingCount(): number { return this.profiles.filter(p => p.financeStatus !== 'Approved').length; }
 
   addProfile(): void {
     if (!this.newProfile.vendorId || !this.newProfile.vendorName) {
