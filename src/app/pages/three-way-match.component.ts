@@ -69,7 +69,7 @@ export interface MatchEntry {
           <label>Quality Inspection (QC)
             <app-custom-select [(ngModel)]="newEntry.qcStatus" [options]="qcOptions" />
           </label>
-          <label>Calculated Variance ($)<input type="number" [value]="newEntry.variance" readonly style="background: #f1f5f9;" /></label>
+          <label>Calculated Variance ($)<input type="number" [value]="newEntry.variance" readonly style="background: var(--surface-3);" /></label>
         </div>
 
         <div class="toolbar" style="margin-top: 16px;">
@@ -225,7 +225,7 @@ export interface MatchEntry {
       tbody td {
         padding: 10px 12px;
         vertical-align: middle;
-        border-bottom: 1px solid var(--line, #e2e8f0);
+        border-bottom: 1px solid var(--line, var(--line));
       }
     }
 

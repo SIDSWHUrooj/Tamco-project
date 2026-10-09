@@ -17,6 +17,11 @@
   --bg: #f8fafc;
   --panel: #ffffff;
   --text: #0f172a;
+  --text-2: #475569;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --text-muted: var(--muted);
+  color-scheme: light;
   --muted: #64748b;
   --text-light: #94a3b8;
   --line: #e2e8f0;
@@ -156,7 +161,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: #ffffff;
+  background: var(--panel);
   padding: 9px 12px;
   color: var(--text);
   font-size: 13px;
@@ -178,7 +183,7 @@ textarea {
   }
 
   &:disabled, &[readonly] {
-    background-color: #f1f5f9;
+    background-color: var(--surface-3);
     color: var(--muted);
     cursor: not-allowed;
     border-style: solid;
@@ -208,10 +213,10 @@ input[type="radio"] {
   -webkit-appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid var(--line-strong, #cbd5e1);
+  border: 2px solid var(--line-strong, var(--line-strong));
   border-radius: 50%;
   outline: none;
-  background-color: #ffffff;
+  background-color: var(--panel);
   cursor: pointer;
   vertical-align: middle;
   display: inline-grid;
@@ -257,13 +262,13 @@ input[type="radio"] {
 .tabs-option-6, .profile-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 20px;
-  background: #f8fafc;
-  padding: 5px;
+  background: var(--panel);
+  padding: 5px 6px;
   border-radius: 9999px;
-  border: 1px solid var(--line, #e2e8f0);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--line, var(--line));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -278,31 +283,57 @@ input[type="radio"] {
     background: transparent;
     color: var(--muted, #64748b);
     font-weight: 600;
-    font-size: 13px;
+    font-size: 13.5px;
     cursor: pointer;
     border-radius: 9999px;
     white-space: nowrap;
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s ease;
     outline: none;
     line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
 
     &:hover:not(.active) {
       color: var(--text, #0f172a);
-      background: #ffffff;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      background: var(--surface-3);
     }
 
     &.active {
       background: var(--role-accent, #2563eb);
       color: #ffffff;
-      font-weight: 700;
-      box-shadow: 0 4px 14px -1px var(--role-glow, rgba(37, 99, 235, 0.38));
-      transform: translateY(-1px);
+      font-weight: 600;
+      box-shadow: 0 3px 10px var(--role-glow, rgba(37, 99, 235, 0.35));
     }
 
-    &:active {
-      transform: translateY(0);
+    /* Small counter badge removed as per Option 6 design */
+    .tab-badge {
+      display: none !important;
     }
+  }
+}
+
+/* =========================================================
+   UNIVERSAL ROLE-THEMED HEADINGS & BANNERS
+   Dynamically matches each portal's theme color (Admin Teal, Procurement Blue, etc.)
+   ========================================================= */
+.main-heading-banner,
+.po-main-heading,
+.section-heading-banner {
+  background-color: var(--role-accent, #2563eb) !important;
+  color: #ffffff !important;
+  padding: 9px 18px;
+  border-radius: var(--radius-md, 8px) var(--radius-md, 8px) 0 0;
+  text-align: center;
+  width: 100%;
+
+  h5, h4, h3 {
+    margin: 0;
+    color: #ffffff !important;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
   }
 }
 
@@ -334,8 +365,8 @@ input[type="radio"] {
   }
 
   &:hover {
-    background: #f8fafc;
-    border-color: var(--line, #e2e8f0);
+    background: var(--surface-2);
+    border-color: var(--line, var(--line));
     color: var(--text, #0f172a);
   }
 
@@ -386,9 +417,9 @@ input[type="radio"] {
       height: 38px;
       padding-left: 36px !important;
       padding-right: 12px !important;
-      border: 1px solid var(--line-strong, #cbd5e1);
+      border: 1px solid var(--line-strong, var(--line-strong));
       border-radius: var(--radius-sm, 6px);
-      background: #ffffff;
+      background: var(--panel);
       font-size: 12.5px;
       color: var(--text, #1e293b);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -417,9 +448,9 @@ input[type="radio"] {
     width: auto !important;
     min-width: 160px;
     padding: 7px 32px 7px 12px !important;
-    border: 1px solid var(--line-strong, #cbd5e1);
+    border: 1px solid var(--line-strong, var(--line-strong));
     border-radius: var(--radius-sm, 6px);
-    background-color: #ffffff;
+    background-color: var(--panel);
     font-size: 12.5px;
     font-weight: 500;
     color: var(--text, #334155);
@@ -434,7 +465,7 @@ input[type="radio"] {
 
     &:hover:not(:disabled) {
       border-color: #94a3b8;
-      background-color: #f8fafc;
+      background-color: var(--surface-2);
     }
 
     &:focus {
@@ -489,13 +520,13 @@ input[type="radio"] {
   }
 
   &.secondary, &.ghost {
-    background: #ffffff;
+    background: var(--panel);
     color: var(--text);
     border: 1px solid var(--line-strong);
     box-shadow: none;
 
     &:hover {
-      background: #f8fafc;
+      background: var(--surface-2);
       border-color: #94a3b8;
       color: var(--role-accent);
     }
@@ -603,7 +634,7 @@ input[type="radio"] {
 
   /* Approved State with Interactive Revoke on Hover */
   &.btn-action-approved {
-    background: #ecfdf5;
+    background: var(--green-soft);
     color: #047857;
     border-color: #6ee7b7;
     min-width: 96px;
@@ -614,7 +645,7 @@ input[type="radio"] {
     .text-revoke { display: none; }
 
     &:hover {
-      background: #fff1f2;
+      background: var(--red-soft);
       color: #dc2626;
       border-color: #fecaca;
       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
@@ -628,7 +659,7 @@ input[type="radio"] {
 
   /* Rejected State with Interactive Re-open on Hover */
   &.btn-action-rejected {
-    background: #fff1f2;
+    background: var(--red-soft);
     color: #e11d48;
     border-color: #fecdd3;
     min-width: 96px;
@@ -639,7 +670,7 @@ input[type="radio"] {
     .text-reopen { display: none; }
 
     &:hover {
-      background: #eff6ff;
+      background: var(--blue-soft);
       color: #2563eb;
       border-color: #bfdbfe;
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
@@ -653,7 +684,7 @@ input[type="radio"] {
 
   /* Paid State with Interactive Revert on Hover */
   &.btn-action-paid {
-    background: #ecfdf5;
+    background: var(--green-soft);
     color: #059669;
     border-color: #a7f3d0;
     min-width: 96px;
@@ -664,7 +695,7 @@ input[type="radio"] {
     .text-revert { display: none; }
 
     &:hover:not([disabled]) {
-      background: #fff1f2;
+      background: var(--red-soft);
       color: #e11d48;
       border-color: #fecdd3;
       box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2);
@@ -687,7 +718,7 @@ input[type="radio"] {
 
   /* Save / Update (Crisp Themed Contrast) */
   &.btn-action-save {
-    background: #ffffff;
+    background: var(--panel);
     color: var(--role-accent, #2563eb);
     border-color: var(--role-border, #bfdbfe);
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
@@ -702,9 +733,9 @@ input[type="radio"] {
 
   /* View / Inspect (Refined Slate with Themed Hover) */
   &.btn-action-view {
-    background: #f8fafc;
-    color: #1e293b;
-    border-color: #cbd5e1;
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--line-strong);
 
     &:hover {
       background: var(--role-accent, #2563eb);
@@ -730,7 +761,7 @@ input[type="radio"] {
 
   /* Reject (Vibrant Rose Accent) */
   &.btn-action-reject {
-    background: #fff1f2;
+    background: var(--red-soft);
     color: #e11d48;
     border-color: #fecdd3;
     min-width: 84px;
@@ -749,7 +780,7 @@ input[type="radio"] {
     height: 31px;
     min-width: 31px;
     padding: 0;
-    background: #fef2f2;
+    background: var(--red-soft);
     color: #dc2626;
     border-color: #fecaca;
     border-radius: var(--radius-sm, 7px);
@@ -813,7 +844,7 @@ td:has(.date-picker-wrapper.is-open) {
 .stat-card {
   position: relative;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 14px 16px;
@@ -906,7 +937,7 @@ td:has(.date-picker-wrapper.is-open) {
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.09), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
-    border-color: var(--role-border, #cbd5e1);
+    border-color: var(--role-border, var(--line-strong));
 
     &::before {
       transform: scaleX(1);
@@ -1094,7 +1125,7 @@ td:has(.date-picker-wrapper.is-open) {
 
 .topbar {
   height: 60px;
-  background: #ffffff;
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -1152,8 +1183,8 @@ td:has(.date-picker-wrapper.is-open) {
     height: 34px;
     padding: 4px 10px;
     font-size: 12px;
-    background: #ffffff;
-    border: 1px solid var(--line-strong, #cbd5e1);
+    background: var(--panel);
+    border: 1px solid var(--line-strong, var(--line-strong));
     border-radius: var(--radius-sm, 6px);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 
@@ -1227,7 +1258,7 @@ td:has(.date-picker-wrapper.is-open) {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--text);
-  background: #ffffff;
+  background: var(--panel);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1235,7 +1266,7 @@ td:has(.date-picker-wrapper.is-open) {
 
   &:hover {
     border-color: var(--line-strong);
-    background: #f8fafc;
+    background: var(--surface-2);
     color: var(--red);
   }
 }
@@ -1310,7 +1341,7 @@ td:has(.date-picker-wrapper.is-open) {
   font-weight: 700;
   white-space: nowrap;
   line-height: 1.3;
-  background: #f1f5f9;
+  background: var(--surface-3);
   color: var(--muted);
 
   &.good, &.success {
@@ -1339,7 +1370,7 @@ td:has(.date-picker-wrapper.is-open) {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: #ffffff;
+  background: var(--panel);
 }
 
 table {
@@ -1404,7 +1435,7 @@ tbody tr:last-child td {
 }
 
 tbody tr:hover {
-  background: #f8fafc;
+  background: var(--surface-2);
 }
 
 tbody tr.highlight {
@@ -1498,12 +1529,12 @@ tbody tr.highlight {
   }
 
   &.emerald {
-    background: #ecfdf5;
+    background: var(--green-soft);
     color: #059669;
     border: 1px solid #a7f3d0;
   }
   &.blue {
-    background: #eff6ff;
+    background: var(--blue-soft);
     color: #2563eb;
     border: 1px solid #bfdbfe;
   }
@@ -1513,17 +1544,17 @@ tbody tr.highlight {
     border: 1px solid #c7d2fe;
   }
   &.purple {
-    background: #f5f3ff;
+    background: var(--purple-soft);
     color: #7c3aed;
     border: 1px solid #ddd6fe;
   }
   &.amber {
-    background: #fffbeb;
+    background: var(--amber-soft);
     color: #d97706;
     border: 1px solid #fde68a;
   }
   &.rose {
-    background: #fff1f2;
+    background: var(--red-soft);
     color: #e11d48;
     border: 1px solid #fecdd3;
   }
@@ -1538,7 +1569,7 @@ tbody tr.highlight {
   position: relative;
   overflow: hidden;
   min-height: 100px;
-  background: #ffffff;
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 14px 16px;
@@ -1615,7 +1646,7 @@ tbody tr.highlight {
       text-decoration: none;
 
       &:hover {
-        background: #ffffff;
+        background: var(--panel);
       }
     }
   }
@@ -1623,7 +1654,7 @@ tbody tr.highlight {
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.09), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
-    border-color: var(--role-border, #cbd5e1);
+    border-color: var(--role-border, var(--line-strong));
 
     &::before {
       transform: scaleX(1);
@@ -1733,7 +1764,7 @@ tbody tr.highlight {
     content: "";
     position: absolute;
     inset: 18px;
-    background: #ffffff;
+    background: var(--panel);
     border-radius: 50%;
     box-shadow: inset 0 0 0 1px var(--line);
   }
@@ -1852,7 +1883,7 @@ tbody tr.highlight {
     gap: 8px;
     font-size: 12px;
     font-weight: 600;
-    background: #ffffff;
+    background: var(--panel);
     color: var(--text);
     transition: all 0.15s ease;
 
@@ -1947,7 +1978,7 @@ tbody tr.highlight {
       font-weight: 700;
       font-size: 11px;
       text-transform: uppercase;
-      background: #f8fafc;
+      background: var(--surface-2);
       padding: 0 4px;
     }
   }
@@ -2006,7 +2037,7 @@ tbody tr.highlight {
     > i {
       height: 8px;
       border-radius: var(--radius-full);
-      background: #f1f5f9;
+      background: var(--surface-3);
       overflow: hidden;
 
       b {
@@ -2116,7 +2147,7 @@ tbody tr.highlight {
 
 .upload-zone {
   border: 1.5px dashed var(--line-strong);
-  background: #f8fafc;
+  background: var(--surface-2);
   border-radius: var(--radius-md);
   padding: 28px;
   text-align: center;

@@ -1,728 +1,906 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
-import { StatusComponent } from '../shared/ui.component';
-import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
+import { PageHeadingComponent } from '../shared/ui.component';
+import { IconComponent } from '../shared/icon.component';
 
 export interface BiddingLineItem {
-  id: string;
-  itemCode: string;
+  sr: number;
+  price: number | null;
+  cost?: number;
+  itemNo: string;
+  dateRequired: string;
+  itemDesc: string;
+  uom: string;
+  qty: number;
+  loc: string;
+  project: string;
+  incoterm: string;
+  shipvia: string;
+  comments: string;
+}
+
+export interface BiddingRequestHeader {
+  reqNo: string;
+  reqFor: string;
+  enteredBy: string;
+  date: string;
+  dateRequired: string;
+  shipVia: string;
+  location: string;
   description: string;
-  vendor: string;
-  quantity: number;
-  unitPrice: number;
-  amount: number;
-  days: number;
-  status: string;
+  comments: string;
+  items: BiddingLineItem[];
 }
 
 @Component({
   selector: 'app-bidding',
   standalone: true,
-  imports: [FormsModule, StatusComponent, CustomDatePickerComponent],
+  imports: [CommonModule, FormsModule, PageHeadingComponent, IconComponent],
   template: `
-    <div class="bidding-screen">
-      <!-- Main Title -->
-      <h1 class="page-main-title">Vendor Bidding & Requisition Form</h1>
+    <app-page-heading
+      eyebrow="Commercial Sourcing"
+      title="Vendor Bidding"
+      subtitle="Submit formal quotation unit prices for active TAMCO RFQs and Procurement requisitions.">
+    </app-page-heading>
 
-      <!-- Top Requisition Card -->
-      <div class="bidding-panel main-form-panel">
-        
-        <!-- Header Banner with Logo, Meta, Status and Actions -->
-        <div class="requisition-header">
-          <div class="req-identity">
-            <div class="logo-box">
-              <span>Logo</span>
-            </div>
-            <div class="req-text-info">
-              <h2>Requisition # {{ form.documentNumber || 'REQ-1023' }}</h2>
-              <div class="req-meta">
-                <span class="req-by">Requested By: <strong>{{ form.enteredBy || 'Ali Khan' }}</strong></span>
-                <span class="req-sub">{{ form.date || '12 May, 2024' }} · {{ form.location || 'Karachi' }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="req-actions-group">
-            <div class="status-wrap">
-              <span class="new-badge" [class.priority-badge]="toggleActive">
-                @if (toggleActive) {
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 3px; vertical-align: -1px;">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                }
-                {{ formStatus }}
-              </span>
-            </div>
-            <div class="buttons-row">
-              <button type="button" class="btn-download" (click)="download()">Download PDF</button>
-              <button type="button" class="btn-save" (click)="saveChanges()">Save Changes</button>
-            </div>
-          </div>
+    <div class="bidding-container">
+      <!-- TOP CARD: REQUISITION HEADER DETAILS (Matches Bidding/BiddinView.cshtml) -->
+      <div class="card-body-box">
+        <div class="row-header">
+          <h5 class="main-heading">Vendor Bidding</h5>
         </div>
 
-        <!-- Form Fields -->
-        <form class="bidding-form" (ngSubmit)="saveChanges()">
-
-          <!-- Document Number with right-side Toggle -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Document Number <span class="asterisk">*</span>
-            </label>
-            <div class="input-with-toggle">
+        <div class="form-row form-row-4">
+          <!-- Document Number with Search and Refresh buttons -->
+          <div class="form-group">
+            <label class="form-label">Document Number <span class="req-star">*</span></label>
+            <div class="input-group-custom">
               <input
                 type="text"
-                [(ngModel)]="form.documentNumber"
-                name="documentNumber"
+                [(ngModel)]="header.reqNo"
                 placeholder="Enter Requisition Number"
+                class="form-control-legacy"
+                readonly
               />
               <button
                 type="button"
-                class="modern-priority-switch"
-                [class.active]="toggleActive"
-                (click)="toggleSwitch()"
-                [title]="toggleActive ? 'Priority: High (Click to set Normal)' : 'Priority: Normal (Click to set High Priority)'"
-              >
-                <span class="switch-track">
-                  <span class="switch-thumb">
-                    @if (toggleActive) {
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="#d97706">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                      </svg>
-                    } @else {
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    }
-                  </span>
-                </span>
-                <span class="switch-label">{{ toggleActive ? 'Priority' : 'Normal' }}</span>
+                class="btn-search-blue"
+                (click)="openReqModal()"
+                title="Select Bidding Request Lookup">
+                <app-icon name="search" [size]="14" />
+              </button>
+              <button
+                type="button"
+                class="btn-refresh-sky"
+                (click)="refreshCurrentReq()"
+                title="Reload / Reset Form">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
               </button>
             </div>
           </div>
 
           <!-- Required For -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Required For <span class="asterisk">*</span>
-            </label>
+          <div class="form-group">
+            <label class="form-label">Required For <span class="req-star">*</span></label>
             <input
               type="text"
-              [(ngModel)]="form.requiredFor"
-              name="requiredFor"
-              placeholder="e.g. Substation Switchgear Upgrade Phase 2"
+              [(ngModel)]="header.reqFor"
+              placeholder="Required For"
+              class="form-control-legacy"
+              readonly
             />
           </div>
 
           <!-- Entered By -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Entered By
-            </label>
+          <div class="form-group">
+            <label class="form-label">Entered By</label>
             <input
               type="text"
-              [(ngModel)]="form.enteredBy"
-              name="enteredBy"
-              placeholder="e.g. Ali Khan (Procurement Engineer)"
+              [(ngModel)]="header.enteredBy"
+              placeholder="Entered By"
+              class="form-control-legacy"
+              readonly
             />
           </div>
 
           <!-- Date -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Date
-            </label>
-            <app-custom-date-picker
-              [(ngModel)]="form.date"
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input
+              type="text"
+              [(ngModel)]="header.date"
               placeholder="Requisition Date"
+              class="form-control-legacy"
+              readonly
             />
           </div>
+        </div>
 
+        <div class="form-row form-row-3">
           <!-- Date Required -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Date Required
-            </label>
-            <app-custom-date-picker
-              [(ngModel)]="form.dateRequired"
+          <div class="form-group">
+            <label class="form-label">Date Required</label>
+            <input
+              type="text"
+              [(ngModel)]="header.dateRequired"
               placeholder="Enter Date Required"
+              class="form-control-legacy"
+              readonly
             />
           </div>
 
           <!-- Ship VIA -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Ship VIA
-            </label>
+          <div class="form-group">
+            <label class="form-label">Ship VIA</label>
             <input
               type="text"
-              [(ngModel)]="form.shipVia"
-              name="shipVia"
-              placeholder="e.g. Road Freight / Air Express / TCS Logistics"
+              [(ngModel)]="header.shipVia"
+              placeholder="Ship VIA"
+              class="form-control-legacy"
+              readonly
             />
           </div>
 
           <!-- Location -->
-          <div class="bidding-field-group">
-            <label class="bidding-label">
-              Location
-            </label>
+          <div class="form-group">
+            <label class="form-label">Location</label>
             <input
               type="text"
-              [(ngModel)]="form.location"
-              name="location"
-              placeholder="e.g. Karachi Central Facility"
+              [(ngModel)]="header.location"
+              placeholder="Location"
+              class="form-control-legacy"
+              readonly
             />
           </div>
+        </div>
 
+        <div class="form-row form-row-2">
           <!-- Request Description -->
-          <div class="bidding-field-group full-width">
-            <label class="bidding-label">
-              Request Description <span class="asterisk">*</span>
-            </label>
+          <div class="form-group">
+            <label class="form-label">Request Description <span class="req-star">*</span></label>
             <textarea
               rows="2"
-              [(ngModel)]="form.requestDescription"
-              name="requestDescription"
-              placeholder="Enter detailed technical description of goods/services required..."
-            ></textarea>
+              [(ngModel)]="header.description"
+              placeholder="Enter Request Description"
+              class="form-control-legacy textarea-fixed"
+              readonly></textarea>
           </div>
 
           <!-- Comments -->
-          <div class="bidding-field-group full-width">
-            <label class="bidding-label">
-              Comments
-            </label>
+          <div class="form-group">
+            <label class="form-label">Comments</label>
             <textarea
               rows="2"
-              [(ngModel)]="form.comments"
-              name="comments"
-              placeholder="Enter internal comments, delivery instructions, or special terms..."
-            ></textarea>
-          </div>
-
-        </form>
-
-      </div>
-
-      <!-- Bottom Card: Vendor Bidding List -->
-      <div class="bidding-list-section">
-        <h2 class="section-title">Vendor Bidding List & Line Items</h2>
-        
-        <div class="bidding-panel list-panel">
-          <div class="list-top-action" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <button type="button" class="btn-create" (click)="createBid()">+ Create Item</button>
-            <span style="font-size: 11px; color: #64748b;">Total Line Items: <strong>{{ biddingItems.length }}</strong></span>
-          </div>
-
-          <!-- Dynamic Bidding List Items Table -->
-          @if (biddingItems.length > 0) {
-            <div class="table-scroll" style="margin: 8px 0 16px;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Item Code</th>
-                    <th>Description</th>
-                    <th>Vendor Name</th>
-                    <th>Qty</th>
-                    <th>Unit Price ($)</th>
-                    <th>Total ($)</th>
-                    <th>Delivery</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of biddingItems; track item.id; let idx = $index) {
-                    <tr>
-                      <td><input [(ngModel)]="item.itemCode" style="font-family: monospace; font-size: 11px; width: 90px;" /></td>
-                      <td><input [(ngModel)]="item.description" style="min-width: 160px;" /></td>
-                      <td><input [(ngModel)]="item.vendor" style="font-weight: 600; min-width: 140px;" /></td>
-                      <td><input type="number" [(ngModel)]="item.quantity" (ngModelChange)="recalc(item)" style="width: 55px;" /></td>
-                      <td><input type="number" [(ngModel)]="item.unitPrice" (ngModelChange)="recalc(item)" style="width: 80px;" /></td>
-                      <td><strong style="color: #1769e0;">\${{ item.amount.toLocaleString() }}</strong></td>
-                      <td><input type="number" [(ngModel)]="item.days" style="width: 50px;" /> d</td>
-                      <td><app-status [text]="item.status" [good]="item.status === 'Active' || item.status === 'Approved'" /></td>
-                      <td>
-                        <button class="btn-action btn-action-delete" (click)="deleteItem(item.id)" title="Delete quotation item">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          } @else {
-            <div class="empty-list-space">
-              <p style="text-align: center; color: #94a3b8; font-size: 11px; padding: 18px 0;">No bid items added yet. Click "+ Create Item" above to add items.</p>
-            </div>
-          }
-
-          <div class="list-bottom-actions">
-            <button type="button" class="btn-submit" (click)="submitBidding()">Submit Bidding</button>
-            <button type="button" class="btn-delete" (click)="deleteBidding()">Delete Last</button>
+              [(ngModel)]="header.comments"
+              placeholder="Enter your comments"
+              class="form-control-legacy textarea-fixed"
+              readonly></textarea>
           </div>
         </div>
       </div>
 
+      <!-- BOTTOM CARD: VENDOR BIDDING LIST TABLE (Matches Bidding/BiddinView.cshtml) -->
+      <div class="card-body-box mt-3">
+        <div class="row-header">
+          <h5 class="main-heading">Vendor Bidding List</h5>
+        </div>
+
+        <div class="table-responsive-wrap">
+          <table class="legacy-datatable">
+            <thead>
+              <tr>
+                <th style="width: 50px;">Sr</th>
+                <th style="width: 140px; background: #e0e7ff; color: #1e1b4b;">Price (Quote) <span class="req-star">*</span></th>
+                <th style="width: 120px;">Item No</th>
+                <th style="width: 120px;">Date Required</th>
+                <th style="min-width: 160px;">Item Desc</th>
+                <th style="width: 80px;">UOM</th>
+                <th style="width: 90px; text-align: center;">Quantity</th>
+                <th style="width: 110px;">Location</th>
+                <th style="width: 110px;">Project</th>
+                <th style="width: 100px;">Inco Term</th>
+                <th style="width: 110px;">Ship Via</th>
+                <th style="min-width: 140px;">Comments</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (items.length === 0) {
+                <tr>
+                  <td colspan="12" style="text-align: center; color: #94a3b8; padding: 28px;">
+                    No line items available. Click the search button 🔍 above to pick an open RFQ / Bidding Request.
+                  </td>
+                </tr>
+              }
+              @for (item of items; track item.sr; let idx = $index) {
+                <tr>
+                  <td style="text-align: center; font-weight: 700; color: #64748b;">{{ item.sr }}</td>
+                  <!-- Price editable input matching .NET: <input id="price" type="number" name="price" /> -->
+                  <td>
+                    <div class="price-input-wrapper">
+                      <span class="currency-tag">AED</span>
+                      <input
+                        type="number"
+                        [(ngModel)]="item.price"
+                        name="price-{{ idx }}"
+                        placeholder="0.00"
+                        class="price-input-control"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </td>
+                  <td><strong style="color: #4338ca;">{{ item.itemNo }}</strong></td>
+                  <td>{{ item.dateRequired }}</td>
+                  <td>{{ item.itemDesc }}</td>
+                  <td style="text-align: center;"><span class="uom-pill">{{ item.uom }}</span></td>
+                  <td style="text-align: center; font-weight: 700;">{{ item.qty }}</td>
+                  <td>{{ item.loc }}</td>
+                  <td>{{ item.project }}</td>
+                  <td>{{ item.incoterm }}</td>
+                  <td>{{ item.shipvia }}</td>
+                  <td>{{ item.comments }}</td>
+                </tr>
+              }
+            </tbody>
+            @if (items.length > 0) {
+              <tfoot>
+                <tr>
+                  <td colspan="1" style="text-align: center; font-weight: 700;">Total</td>
+                  <td style="font-weight: 800; color: #16a34a; font-size: 13.5px;">
+                    {{ totalQuotationValue().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} AED
+                  </td>
+                  <td colspan="10" style="color: #64748b; font-size: 12px;">
+                    * All unit prices are binding and inclusive of specified delivery terms.
+                  </td>
+                </tr>
+              </tfoot>
+            }
+          </table>
+        </div>
+
+        <!-- Action Buttons matching .NET: Submit (#007bff) and Delete (#dc3545) -->
+        <div class="action-footer">
+          <button
+            type="button"
+            class="btn-submit-dotnet"
+            (click)="submitBidding()"
+            title="Submit Quotation to Procurement">
+            Submit
+          </button>
+          <button
+            type="button"
+            class="btn-delete-dotnet"
+            (click)="clearQuotes()"
+            title="Clear Quoted Prices">
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- MODAL: SELECT BIDDING REQUEST (Matches #searchReqheader in Bidding/BiddinView.cshtml) -->
+    @if (showReqModal) {
+      <div class="req-modal-overlay" (click)="closeReqModal()">
+        <div class="req-modal-content" (click)="$event.stopPropagation()">
+          <div class="req-modal-header">
+            <h5 class="req-modal-title">Select Bidding Request</h5>
+            <button type="button" class="btn-close-modal" (click)="closeReqModal()">&times;</button>
+          </div>
+
+          <div class="req-modal-body">
+            <table class="modal-table">
+              <thead>
+                <tr>
+                  <th>Request No</th>
+                  <th>Req For</th>
+                  <th>Date Required</th>
+                  <th>Ship VIA</th>
+                  <th>Loc</th>
+                  <th style="text-align: center; width: 90px;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (req of availableRequests; track req.reqNo) {
+                  <tr (click)="selectRequest(req)" style="cursor: pointer;">
+                    <td><strong style="color: #1e40af;">{{ req.reqNo }}</strong></td>
+                    <td>{{ req.reqFor }}</td>
+                    <td>{{ req.dateRequired }}</td>
+                    <td>{{ req.shipVia }}</td>
+                    <td>{{ req.location }}</td>
+                    <td style="text-align: center;">
+                      <button
+                        type="button"
+                        class="btn-select-pill"
+                        (click)="selectRequest(req); $event.stopPropagation()">
+                        Select
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="req-modal-footer">
+            <button type="button" class="btn-modal-close" (click)="closeReqModal()">Close</button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
-    .bidding-screen {
-      padding: 6px 4px 30px;
-      max-width: 1560px;
-      margin: 0 auto;
-      font-family: inherit;
+    .bidding-container {
+      max-width: 100%;
+      margin-bottom: 40px;
     }
 
-    .page-main-title {
-      font-size: 16px;
-      font-weight: 800;
-      color: #17263c;
-      margin: 0 0 14px;
-      letter-spacing: -0.01em;
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #17263c;
-      margin: 18px 0 10px;
-      letter-spacing: -0.01em;
-    }
-
-    .bidding-panel {
-      background: #ffffff;
-      border: 1px solid #e1e7f0;
+    .card-body-box {
+      background-color: #ffffff;
+      padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(15, 34, 58, 0.04);
-      padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e2e8f0;
     }
 
-    .requisition-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-bottom: 14px;
+    .mt-3 {
+      margin-top: 18px;
+    }
+
+    /* .NET Main Heading: #887bb5 */
+    .row-header {
       margin-bottom: 16px;
-      border-bottom: 1px solid #f0f4f8;
-      gap: 16px;
-      flex-wrap: wrap;
     }
 
-    .req-identity {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .logo-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 6px;
-      background: #eef4fc;
-      border: 1px solid #d4e2f5;
-      display: grid;
-      place-items: center;
-      color: #2b6cb0;
-      font-weight: 700;
-      font-size: 11px;
-    }
-
-    .req-text-info h2 {
-      margin: 0 0 3px;
-      font-size: 13px;
-      font-weight: 800;
-      color: #18273d;
-    }
-
-    .req-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: 10px;
-      color: #718096;
-    }
-
-    .req-by strong {
-      color: #2d3748;
-    }
-
-    .req-actions-group {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 8px;
-    }
-
-    .new-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 10px;
-      border-radius: 99px;
-      background: #e9f2fe;
-      color: #1d72b8;
-      border: 1px solid #bfdbfe;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      transition: all 0.2s ease;
-
-      &.priority-badge {
-        background: #fef3c7;
-        color: #b45309;
-        border-color: #fcd34d;
-        box-shadow: 0 1px 4px rgba(245, 158, 11, 0.18);
-      }
-    }
-
-    .buttons-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-download {
-      padding: 6px 14px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #4a5568;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn-download:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-    }
-
-    .btn-save {
-      padding: 6px 16px;
-      font-size: 11px;
-      font-weight: 700;
+    .main-heading {
+      background-color: #887bb5;
       color: #ffffff;
-      background: #1769e0;
-      border: 1px solid #1769e0;
+      padding: 8px 16px;
       border-radius: 5px;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(23, 105, 224, 0.2);
-      transition: all 0.15s;
+      text-align: center;
+      width: 100%;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      box-shadow: 0 2px 6px rgba(136, 123, 181, 0.25);
     }
 
-    .btn-save:hover {
-      background: #1157be;
-      border-color: #1157be;
-    }
-
-    .bidding-form {
+    /* Form Layouts */
+    .form-row {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-
-      @media (max-width: 1200px) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      @media (max-width: 768px) {
-        grid-template-columns: 1fr;
-      }
+      gap: 16px;
+      margin-bottom: 14px;
     }
 
-    .bidding-field-group {
+    .form-row-4 {
+      grid-template-columns: 1.4fr 1.6fr 1.2fr 1fr;
+    }
+
+    .form-row-3 {
+      grid-template-columns: 1fr 1.5fr 1.5fr;
+    }
+
+    .form-row-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    @media (max-width: 992px) {
+      .form-row-4 { grid-template-columns: 1fr 1fr; }
+      .form-row-3 { grid-template-columns: 1fr; }
+      .form-row-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .form-row-4 { grid-template-columns: 1fr; }
+    }
+
+    .form-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
+    }
 
-      &.full-width {
-        grid-column: 1 / -1;
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .req-star {
+      color: #dc3545;
+      font-weight: 700;
+    }
+
+    .form-control-legacy {
+      width: 100%;
+      height: 38px;
+      padding: 6px 12px;
+      font-size: 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background-color: #f8fafc;
+      color: #1e293b;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: #887bb5;
+        outline: none;
       }
     }
 
-    .bidding-label {
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #4a5568;
+    .textarea-fixed {
+      height: 48px;
+      resize: none;
     }
 
-    .asterisk {
-      color: #e53e3e;
-      font-weight: 800;
-    }
-
-    .bidding-field-group input,
-    .bidding-field-group textarea {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 7px 12px;
-      font-size: 11px;
-      color: #1a202c;
-      background: #ffffff;
-      border: 1px solid #d9e2ec;
-      border-radius: 5px;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      font-family: inherit;
-    }
-
-    .bidding-field-group input::placeholder,
-    .bidding-field-group textarea::placeholder {
-      color: #a0aec0;
-      font-size: 10.5px;
-    }
-
-    .bidding-field-group input:focus,
-    .bidding-field-group textarea:focus {
-      border-color: #2b6cb0;
-      box-shadow: 0 0 0 2px rgba(43, 108, 176, 0.12);
-    }
-
-    .input-with-toggle {
+    .input-group-custom {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
     }
 
-    .input-with-toggle input {
-      flex: 1;
-    }
-
-    .modern-priority-switch {
+    /* .NET Search button: #00008B */
+    .btn-search-blue {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      height: 30px;
-      padding: 3px 8px 3px 4px;
-      border-radius: 9999px;
-      border: 1px solid #bbf7d0;
-      background: #f0fdf4;
-      box-shadow: 0 1px 4px rgba(22, 163, 74, 0.12);
-      cursor: pointer;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
       flex-shrink: 0;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      user-select: none;
+      border: 0;
+      border-radius: 3px;
+      background-color: #00008B;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background-color 0.2s;
 
       &:hover {
-        background: #dcfce7;
-        border-color: #86efac;
-      }
-
-      .switch-track {
-        position: relative;
-        display: inline-block;
-        width: 32px;
-        height: 18px;
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        box-shadow: 0 0 6px rgba(22, 163, 74, 0.35);
-        border-radius: 9999px;
-        transition: background-color 0.25s ease, box-shadow 0.25s ease;
-      }
-
-      .switch-thumb {
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 14px;
-        height: 14px;
-        background: #ffffff;
-        border-radius: 50%;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-
-      .switch-label {
-        font-size: 10px;
-        font-weight: 700;
-        color: #15803d;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        transition: color 0.2s ease;
-      }
-
-      &.active {
-        background: #fffbeb;
-        border-color: #fde68a;
-        box-shadow: 0 1px 4px rgba(245, 158, 11, 0.15);
-
-        &:hover {
-          background: #fef3c7;
-          border-color: #fcd34d;
-        }
-
-        .switch-track {
-          background: linear-gradient(135deg, #f59e0b, #d97706);
-          box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
-        }
-
-        .switch-thumb {
-          transform: translateX(14px);
-        }
-
-        .switch-label {
-          color: #b45309;
-        }
+        background-color: #000066;
       }
     }
 
-    .bidding-list-section {
-      margin-top: 10px;
-    }
-
-    .list-panel {
-      min-height: 130px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .btn-create {
-      padding: 5px 16px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #2d3748;
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 5px;
+    /* .NET Refresh button: deepskyblue */
+    .btn-refresh-sky {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      border: 0;
+      border-radius: 3px;
+      background-color: deepskyblue;
+      color: #ffffff;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #0099cc;
+      }
     }
 
-    .btn-create:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
+    /* Data Table */
+    .table-responsive-wrap {
+      max-height: 440px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
     }
 
-    .empty-list-space {
-      min-height: 48px;
+    .legacy-datatable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      white-space: nowrap;
     }
 
-    .list-bottom-actions {
+    .legacy-datatable thead th {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-weight: 700;
+      padding: 9px 12px;
+      border: 1px solid #dee2e6;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .legacy-datatable tbody td {
+      padding: 7px 12px;
+      border: 1px solid #dee2e6;
+      vertical-align: middle;
+      color: #1e293b;
+    }
+
+    .legacy-datatable tbody tr:hover {
+      background-color: #f1f5f9;
+    }
+
+    .legacy-datatable tfoot td {
+      background-color: #f8fafc;
+      border: 1px solid #dee2e6;
+      padding: 9px 12px;
+    }
+
+    .price-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .currency-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .price-input-control {
+      width: 90px;
+      height: 30px;
+      padding: 2px 8px;
+      border: 1.5px solid #6366f1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #1e1b4b;
+      background: #ffffff;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: #4338ca;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        outline: none;
+      }
+    }
+
+    .uom-pill {
+      display: inline-block;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    /* Action Footer Buttons */
+    .action-footer {
       display: flex;
       justify-content: flex-end;
-      align-items: center;
-      gap: 8px;
-      margin-top: auto;
+      gap: 10px;
+      margin-top: 16px;
       padding-top: 12px;
     }
 
-    .btn-submit {
-      padding: 6px 18px;
-      font-size: 11px;
-      font-weight: 700;
+    .btn-submit-dotnet {
+      background-color: #007bff;
+      border: 1px solid #007bff;
       color: #ffffff;
-      background: #1769e0;
-      border: 1px solid #1769e0;
       border-radius: 5px;
-      cursor: pointer;
-      box-shadow: 0 2px 5px rgba(23, 105, 224, 0.2);
-      transition: all 0.15s;
-    }
-
-    .btn-submit:hover {
-      background: #1157be;
-    }
-
-    .btn-delete {
-      padding: 6px 18px;
-      font-size: 11px;
+      padding: 9px 24px;
       font-weight: 700;
-      color: #ffffff;
-      background: #1769e0;
-      border: 1px solid #1769e0;
-      border-radius: 5px;
+      font-size: 13.5px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background-color 0.2s, box-shadow 0.2s;
+
+      &:hover {
+        background-color: #0069d9;
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.35);
+      }
     }
 
-    .btn-delete:hover {
-      background: #c53030;
-      border-color: #c53030;
+    .btn-delete-dotnet {
+      background-color: #dc3545;
+      border: 1px solid #dc3545;
+      color: #ffffff;
+      border-radius: 5px;
+      padding: 9px 24px;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #c82333;
+      }
+    }
+
+    /* Modal Structure */
+    .req-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.55);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      backdrop-filter: blur(2px);
+    }
+
+    .req-modal-content {
+      width: min(840px, 100%);
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #cbd5e1;
+    }
+
+    .req-modal-header {
+      background-color: #00008B;
+      color: #ffffff;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+    }
+
+    .req-modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0;
+      color: #ffffff;
+      text-align: center;
+      width: 100%;
+    }
+
+    .btn-close-modal {
+      background: none;
+      border: 0;
+      color: #ffffff;
+      font-size: 26px;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 0.85;
+      &:hover { opacity: 1; }
+    }
+
+    .req-modal-body {
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .modal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .modal-table thead th {
+      padding: 8px 10px;
+      background: #f8fafc;
+      border: 1px solid #dee2e6;
+      text-align: left;
+      font-weight: 700;
+    }
+
+    .modal-table tbody td {
+      padding: 8px 10px;
+      border: 1px solid #dee2e6;
+      vertical-align: middle;
+    }
+
+    .modal-table tbody tr:hover {
+      background: #eff6ff;
+    }
+
+    .btn-select-pill {
+      background-color: #007bff;
+      color: #ffffff;
+      border: none;
+      padding: 3px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #0056b3;
+      }
+    }
+
+    .req-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      padding: 10px 18px;
+      background: #f8fafc;
+      border-top: 1px solid #dee2e6;
+    }
+
+    .btn-modal-close {
+      background-color: #dc3545;
+      border: 1px solid #dc3545;
+      color: #ffffff;
+      padding: 6px 18px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #c82333;
+      }
     }
   `]
 })
-export class BiddingComponent {
+export class BiddingComponent implements OnInit {
   private readonly state = inject(PortalStateService);
+  private readonly route = inject(ActivatedRoute);
 
-  toggleActive = false;
-  formStatus = 'New';
+  showReqModal = false;
 
-  form = {
-    documentNumber: 'REQ-1023',
-    requiredFor: 'Main Substation 11kV Switchgear Project',
-    enteredBy: 'Ali Khan',
-    date: '2024-05-12',
-    dateRequired: '2024-06-15',
+  header: BiddingRequestHeader = {
+    reqNo: 'RFQ-0061',
+    reqFor: 'Main Substation 11kV Switchgear Project',
+    enteredBy: 'Tariq Mehmood (Procurement)',
+    date: '2026-08-10',
+    dateRequired: '2026-08-26',
     shipVia: 'Road Logistics (Korangi Warehouse)',
-    location: 'Karachi',
-    requestDescription: 'Supply and installation of 11kV gas-insulated vacuum circuit breakers with auxiliary relays.',
-    comments: 'Strict adherence to IEEE and IEC-62271 standards is mandatory. Origin inspection required.'
+    location: 'Dubai Warehouse 2',
+    description: 'Supply and installation of 11kV gas-insulated vacuum circuit breakers with auxiliary protection relays.',
+    comments: 'Strict adherence to IEEE and IEC-62271 standards is mandatory. Origin inspection required.',
+    items: []
   };
 
-  biddingItems: BiddingLineItem[] = [
-    { id: '1', itemCode: 'ITM-EL-01', description: '11kV Vacuum Circuit Breaker', vendor: 'ABC Supplies Pvt. Ltd.', quantity: 4, unitPrice: 13000, amount: 52000, days: 7, status: 'Active' },
-    { id: '2', itemCode: 'ITM-EL-02', description: 'Busbar Insulators & Connectors', vendor: 'Perfect Industrial', quantity: 12, unitPrice: 3650, amount: 43800, days: 5, status: 'Active' }
+  items: BiddingLineItem[] = [
+    {
+      sr: 1,
+      price: 18500,
+      itemNo: 'SWG-GIS-11KV',
+      dateRequired: '2026-08-26',
+      itemDesc: '11kV GIS Incoming Panel',
+      uom: 'SET',
+      qty: 2,
+      loc: 'WH-02',
+      project: 'Substation Ph2',
+      incoterm: 'DDP',
+      shipvia: 'Road Freight',
+      comments: 'Factory Acceptance Test (FAT) witness required'
+    },
+    {
+      sr: 2,
+      price: 12,
+      itemNo: 'CBL-CTL-4C',
+      dateRequired: '2026-08-26',
+      itemDesc: 'Control Cable 4C 2.5mm',
+      uom: 'MTR',
+      qty: 500,
+      loc: 'WH-02',
+      project: 'Substation Ph2',
+      incoterm: 'DDP',
+      shipvia: 'Road Freight',
+      comments: 'Drums of 250m each'
+    },
+    {
+      sr: 3,
+      price: 420,
+      itemNo: 'MCCB-250A-4P',
+      dateRequired: '2026-08-26',
+      itemDesc: 'Spare MCCB 250A 4-Pole',
+      uom: 'PCS',
+      qty: 8,
+      loc: 'WH-02',
+      project: 'Substation Ph2',
+      incoterm: 'DDP',
+      shipvia: 'Road Freight',
+      comments: 'Including auxiliary contacts'
+    }
   ];
 
-  toggleSwitch(): void {
-    this.toggleActive = !this.toggleActive;
-    this.formStatus = this.toggleActive ? 'Priority' : 'New';
-    this.state.notify(`Requisition mode switched to: ${this.formStatus}`);
+  readonly availableRequests: BiddingRequestHeader[] = [
+    {
+      reqNo: 'RFQ-0061',
+      reqFor: 'Main Substation 11kV Switchgear Project',
+      enteredBy: 'Tariq Mehmood (Procurement)',
+      date: '2026-08-10',
+      dateRequired: '2026-08-26',
+      shipVia: 'Road Logistics',
+      location: 'Dubai Warehouse 2',
+      description: 'Supply and installation of 11kV gas-insulated vacuum circuit breakers with auxiliary relays.',
+      comments: 'Strict adherence to IEEE and IEC-62271 standards is mandatory. Origin inspection required.',
+      items: [
+        { sr: 1, price: 18500, itemNo: 'SWG-GIS-11KV', dateRequired: '2026-08-26', itemDesc: '11kV GIS Incoming Panel', uom: 'SET', qty: 2, loc: 'WH-02', project: 'Substation Ph2', incoterm: 'DDP', shipvia: 'Road Freight', comments: 'FAT witness required' },
+        { sr: 2, price: 12, itemNo: 'CBL-CTL-4C', dateRequired: '2026-08-26', itemDesc: 'Control Cable 4C 2.5mm', uom: 'MTR', qty: 500, loc: 'WH-02', project: 'Substation Ph2', incoterm: 'DDP', shipvia: 'Road Freight', comments: 'Drums of 250m each' },
+        { sr: 3, price: 420, itemNo: 'MCCB-250A-4P', dateRequired: '2026-08-26', itemDesc: 'Spare MCCB 250A 4-Pole', uom: 'PCS', qty: 8, loc: 'WH-02', project: 'Substation Ph2', incoterm: 'DDP', shipvia: 'Road Freight', comments: 'Including aux contacts' }
+      ]
+    },
+    {
+      reqNo: 'RFQ-0060',
+      reqFor: 'Safety Equipment — Substation PPE Lot',
+      enteredBy: 'Procurement Safety Div',
+      date: '2026-08-05',
+      dateRequired: '2026-08-23',
+      shipVia: 'Air Express',
+      location: 'Abu Dhabi Central',
+      description: 'High voltage flash PPE, arc-rated suits, insulated safety boots and helmets.',
+      comments: 'Arc-rated EN standards compliance certificate attached.',
+      items: [
+        { sr: 1, price: 850, itemNo: 'PPE-ARC-40CAL', dateRequired: '2026-08-23', itemDesc: 'Arc Flash Suit 40 Cal/cm²', uom: 'SET', qty: 15, loc: 'AD-01', project: 'Safety Upgrade', incoterm: 'CIP', shipvia: 'Air Express', comments: 'Sizes: L & XL' },
+        { sr: 2, price: 180, itemNo: 'BOOTS-HV-1000V', dateRequired: '2026-08-23', itemDesc: 'Dielectric HV Safety Boots 1kV', uom: 'PRS', qty: 30, loc: 'AD-01', project: 'Safety Upgrade', incoterm: 'CIP', shipvia: 'Air Express', comments: 'EN ISO 20345' }
+      ]
+    },
+    {
+      reqNo: 'RFQ-0059',
+      reqFor: 'Mechanical Heavy Pump Seals & Impellers',
+      enteredBy: 'Farhan Zaidi',
+      date: '2026-07-28',
+      dateRequired: '2026-08-15',
+      shipVia: 'Sea Freight Logistics',
+      location: 'Jebel Ali Facility',
+      description: 'Replacement impellers and cartridge mechanical seals for primary cooling pumps.',
+      comments: 'Hydrostatic pressure test report and material cert 3.1 mandatory.',
+      items: [
+        { sr: 1, price: 1450, itemNo: 'PUMP-SEAL-150', dateRequired: '2026-08-15', itemDesc: 'Pump Mechanical Seal Kit 150mm', uom: 'SET', qty: 6, loc: 'JA-03', project: 'Cooling Plant', incoterm: 'FOB', shipvia: 'Sea Freight', comments: 'Silicon carbide faces' },
+        { sr: 2, price: 12800, itemNo: 'IMP-ASSY-150', dateRequired: '2026-08-15', itemDesc: 'Bronze Impeller Assembly 150mm', uom: 'SET', qty: 2, loc: 'JA-03', project: 'Cooling Plant', incoterm: 'FOB', shipvia: 'Sea Freight', comments: 'Dynamically balanced ISO G2.5' }
+      ]
+    }
+  ];
+
+  ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const rfqId = params['rfq'] || params['reqNo'];
+      if (rfqId) {
+        const found = this.availableRequests.find(r => r.reqNo.toLowerCase() === rfqId.toLowerCase());
+        if (found) {
+          this.selectRequest(found);
+        }
+      }
+    });
   }
 
-  recalc(item: BiddingLineItem): void {
-    item.amount = (item.quantity || 0) * (item.unitPrice || 0);
+  openReqModal(): void {
+    this.showReqModal = true;
   }
 
-  saveChanges(): void {
-    this.state.notify(`Requisition ${this.form.documentNumber} saved successfully.`);
+  closeReqModal(): void {
+    this.showReqModal = false;
   }
 
-  download(): void {
-    this.state.notify(`Downloading Requisition ${this.form.documentNumber} PDF export.`);
+  selectRequest(req: BiddingRequestHeader): void {
+    this.header = { ...req };
+    this.items = req.items.map(it => ({ ...it }));
+    this.closeReqModal();
+    this.state.notify(`Bidding request ${req.reqNo} loaded successfully.`);
   }
 
-  createBid(): void {
-    const newItem: BiddingLineItem = {
-      id: String(Date.now()),
-      itemCode: `ITM-EL-0${this.biddingItems.length + 1}`,
-      description: 'Auxiliary Protection Relay Panel',
-      vendor: 'Global Traders Sourcing',
-      quantity: 2,
-      unitPrice: 8500,
-      amount: 17000,
-      days: 6,
-      status: 'Active'
-    };
-    this.biddingItems = [...this.biddingItems, newItem];
-    this.state.notify(`Line item ${newItem.itemCode} added to bidding list.`);
+  refreshCurrentReq(): void {
+    const defaultReq = this.availableRequests[0];
+    this.selectRequest(defaultReq);
   }
 
-  deleteItem(id: string): void {
-    this.biddingItems = this.biddingItems.filter(i => i.id !== id);
-    this.state.notify('Line item removed from bidding list.');
+  totalQuotationValue(): number {
+    return this.items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.qty) || 0)), 0);
+  }
+
+  clearQuotes(): void {
+    this.items.forEach(it => it.price = null);
+    this.state.notify('Quoted prices cleared.');
   }
 
   submitBidding(): void {
-    this.formStatus = 'Submitted';
-    this.state.notify(`Bidding list for ${this.form.documentNumber} officially submitted to Procurement.`);
-  }
-
-  deleteBidding(): void {
-    if (this.biddingItems.length > 0) {
-      const popped = this.biddingItems[this.biddingItems.length - 1];
-      this.biddingItems = this.biddingItems.slice(0, -1);
-      this.state.notify(`Item ${popped.itemCode} removed.`);
-    } else {
-      this.state.notify('No items to delete.');
+    const unquoted = this.items.filter(it => it.price === null || it.price === undefined || it.price <= 0);
+    if (unquoted.length > 0) {
+      this.state.notify(`Please enter unit price for line item #${unquoted[0].sr} before submitting.`);
+      return;
     }
+
+    const total = this.totalQuotationValue();
+    this.state.submitVendorBid(this.header.reqNo, total, 7);
+    this.state.notify(`Quotation for ${this.header.reqNo} (${total.toLocaleString()} AED) submitted successfully to TAMCO Procurement!`);
   }
 }

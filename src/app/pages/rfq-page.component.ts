@@ -377,6 +377,18 @@ import { CustomDatePickerComponent } from '../shared/custom-date-picker.componen
           <h2>Publish New Request for Quotation (RFQ)</h2>
         </div>
 
+        <div style="background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <app-icon name="rfqs" [size]="15" />
+            <span style="font-size: 12.5px; color: var(--text);">
+              <strong>Sourcing Eligibility Policy:</strong> Invitations will only be dispatched to active vendors verified by both Procurement & Finance.
+            </span>
+          </div>
+          <span style="font-size: 12px; font-weight: 700; color: var(--green); background: var(--green-soft); border: 1px solid var(--green-border); padding: 3px 9px; border-radius: 9999px;">
+            {{ state.approvedVendors().length }} Qualified Vendors
+          </span>
+        </div>
+
         <div class="form-grid">
           <label>RFQ Reference # *<input [(ngModel)]="newRfq.id" placeholder="e.g. RFQ-2026-089" /></label>
           <label>RFQ Title / Description *<input [(ngModel)]="newRfq.title" placeholder="e.g. 11kV Gas-Insulated Switchgear Supply" /></label>
@@ -622,9 +634,10 @@ export class RfqPageComponent {
       this.state.notify('Error: RFQ reference number and title are required.');
       return;
     }
-    const created = { ...this.newRfq, status: 'Open', bidsCount: 0 };
+    const approvedCount = this.state.approvedVendors().length;
+    const created = { ...this.newRfq, status: 'Open', bidsCount: approvedCount };
     this.rfqsList = [created, ...this.rfqsList];
-    this.state.notify(`RFQ "${created.id} - ${created.title}" published.`);
+    this.state.notify(`RFQ "${created.id} - ${created.title}" published. Dispatched to ${approvedCount} approved vendor(s).`);
     this.resetRfqForm();
   }
 

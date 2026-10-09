@@ -26,11 +26,361 @@ export interface SagePurchaseOrder {
   lines: PoLine[];
 }
 
+export interface CreatePoItem {
+  srNo: number;
+  itemNumber: string;
+  description: string;
+  price: number;
+  qty: number;
+}
+
+export interface DetailedPoItem {
+  srNo: number;
+  itemNumber: string;
+  description: string;
+  qty: number;
+  uom: string;
+  cost: number;
+}
+
+export interface DetailedPurchaseOrder {
+  purchaseOrderNumber: string;
+  vendorId: string;
+  vendorName: string;
+  purchaseOrderDate: string;
+  arrivalDate: string;
+  paymentTerm: string;
+  description: string;
+  comments: string;
+  items: DetailedPoItem[];
+}
+
+export interface VendorCatalogEntry {
+  vendorId: string;
+  vendorName: string;
+  category: string;
+  contactPerson: string;
+  items: {
+    itemNumber: string;
+    description: string;
+    price: number;
+    qty: number;
+  }[];
+}
+
 @Component({
   selector: 'app-orders-page',
   standalone: true,
   imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
   styles: [`
+    /* Option 6 Pill Capsule Tabs */
+    .profile-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 20px;
+      background: #ffffff;
+      padding: 5px 6px;
+      border-radius: 9999px;
+      border: 1px solid var(--line, #e2e8f0);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .profile-tabs button {
+      border: 0;
+      padding: 8px 22px;
+      background: transparent;
+      color: var(--muted, #64748b);
+      font-weight: 600;
+      font-size: 13.5px;
+      cursor: pointer;
+      border-radius: 9999px;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      outline: none;
+      line-height: 1.4;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+
+      &:hover:not(.active) {
+        color: var(--text, #0f172a);
+        background: #f1f5f9;
+      }
+
+      &.active {
+        background: var(--role-accent, #2563eb);
+        color: #ffffff;
+        font-weight: 600;
+        box-shadow: 0 3px 10px var(--role-glow, rgba(37, 99, 235, 0.35));
+      }
+    }
+
+    /* Heading Banners */
+    .po-main-heading {
+      background-color: var(--role-accent, #2563eb);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 5px;
+      text-align: center;
+      width: 100%;
+      margin-bottom: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      box-shadow: 0 2px 6px var(--role-glow, rgba(37, 99, 235, 0.2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* Screen Card Wrap */
+    .screen-card {
+      background-color: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--line, #e2e8f0);
+      margin-bottom: 20px;
+    }
+
+    /* Form Grids */
+    .form-grid-create {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 1.4fr) minmax(170px, 1fr) auto;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .form-grid-viewer-row1 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .form-grid-viewer-row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 992px) {
+      .form-grid-create { grid-template-columns: 1fr 1fr; }
+      .form-grid-viewer-row1 { grid-template-columns: 1fr 1fr; }
+      .form-grid-viewer-row2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .form-grid-create { grid-template-columns: 1fr; }
+      .form-grid-viewer-row1 { grid-template-columns: 1fr; }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .req-star {
+      color: #dc3545;
+      font-weight: 700;
+    }
+
+    .input-group-custom {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .form-control-custom {
+      width: 100%;
+      height: 38px;
+      padding: 6px 12px;
+      font-size: 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background-color: #ffffff;
+      color: #0f172a;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      box-sizing: border-box;
+
+      &:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        outline: none;
+      }
+
+      &[readonly] {
+        background-color: #f8fafc;
+        color: #334155;
+      }
+    }
+
+    .btn-search-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      border: 0;
+      border-radius: 4px;
+      background-color: var(--role-accent, #2563eb);
+      color: #ffffff;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+
+      &:hover {
+        background-color: #1e3a8a;
+        transform: translateY(-1px);
+      }
+    }
+
+    .btn-refresh-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      border: 0;
+      border-radius: 4px;
+      background-color: #16a34a;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+
+      &:hover {
+        background-color: #15803d;
+        transform: translateY(-1px);
+      }
+    }
+
+    .btn-create-po-action {
+      height: 38px;
+      padding: 0 20px;
+      background-color: #007bff;
+      border: 1px solid #007bff;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 13.5px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, box-shadow 0.2s ease;
+      white-space: nowrap;
+
+      &:hover {
+        background-color: #0069d9;
+        border-color: #0062cc;
+        box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+      }
+    }
+
+    /* Enterprise Data Tables */
+    .legacy-datatable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 13px;
+    }
+
+    .legacy-datatable thead th {
+      background-color: #f1f5f9;
+      color: #0b1f3a;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 10px 12px;
+      border: 1px solid #dee2e6;
+      text-align: left;
+    }
+
+    .legacy-datatable thead th.text-center { text-align: center; }
+    .legacy-datatable thead th.text-right { text-align: right; }
+
+    .legacy-datatable tbody td {
+      padding: 8px 12px;
+      border: 1px solid #dee2e6;
+      vertical-align: middle;
+      color: #1e293b;
+    }
+
+    .legacy-datatable tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    .legacy-datatable tbody input {
+      width: 100%;
+      height: 32px;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12.5px;
+      background: #ffffff;
+
+      &:focus {
+        border-color: #2563eb;
+        outline: none;
+      }
+    }
+
+    .legacy-datatable tfoot td {
+      padding: 10px 12px;
+      background-color: #f8fafc;
+      border: 1px solid #dee2e6;
+      font-weight: 700;
+    }
+
+    /* Modal Overlays */
+    .po-modal-overlay {
+      position: fixed; inset: 0; z-index: 90; background: rgba(15, 23, 42, 0.55);
+      display: grid; place-items: center; padding: 20px;
+      backdrop-filter: blur(2px);
+    }
+
+    .po-modal-dialog {
+      width: min(880px, 100%); background: #ffffff; border-radius: 8px; overflow: hidden;
+      box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25); max-height: 90vh; display: flex; flex-direction: column;
+      border: 1px solid #cbd5e1;
+    }
+
+    .po-modal-header {
+      background-color: var(--role-accent, #2563eb); color: #ffffff; height: 50px; display: flex; align-items: center;
+      padding: 0 18px; font-size: 15px; font-weight: 700; justify-content: space-between;
+    }
+
+    .po-modal-header button.btn-close-modal {
+      background: none; border: 0; color: #ffffff; font-size: 22px; cursor: pointer; opacity: 0.8;
+      &:hover { opacity: 1; }
+    }
+
+    .po-modal-body { padding: 18px; overflow-y: auto; }
+    .po-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+
+    /* PO Register & Badges */
     .po-active-badge {
       font-size: 12px;
       font-weight: 700;
@@ -40,244 +390,13 @@ export interface SagePurchaseOrder {
       color: var(--role-accent, #2563eb);
       border: 1px solid var(--role-border, #bfdbfe);
     }
-    .po-date-badge {
-      font-size: 12px;
-      color: var(--muted, #64748b);
-      font-weight: 500;
-    }
-
-    /* Enhanced Browse Button */
-    .po-browse-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 36px;
-      padding: 0 14px 0 10px;
-      font-size: 12.5px;
-      font-weight: 600;
-      border-radius: var(--radius-sm, 6px);
-      background: #ffffff;
-      color: var(--navy, #0b1f3a);
-      border: 1.5px solid var(--line-strong, #cbd5e1);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-
-      .browse-icon-wrap {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        background: var(--role-soft, #eff6ff);
-        color: var(--role-accent, #2563eb);
-        transition: all 0.2s ease;
-      }
-
-      .browse-text {
-        letter-spacing: -0.01em;
-        white-space: nowrap;
-      }
-
-      .browse-pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1px 7px;
-        font-size: 11px;
-        font-weight: 700;
-        border-radius: var(--radius-full, 9999px);
-        background: #f1f5f9;
-        color: var(--muted, #64748b);
-        transition: all 0.2s ease;
-      }
-
-      &:hover {
-        border-color: var(--role-accent, #2563eb);
-        color: var(--role-accent, #2563eb);
-        background: #ffffff;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.16);
-
-        .browse-icon-wrap {
-          background: var(--role-accent, #2563eb);
-          color: #ffffff;
-        }
-
-        .browse-pill {
-          background: var(--role-soft, #eff6ff);
-          color: var(--role-accent, #2563eb);
-        }
-      }
-
-      &:active {
-        transform: translateY(0);
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      }
-    }
-
-    /* Fixed-Width Perfectly Aligned Line Items Table */
-    .po-lines {
-      width: 100%;
-      min-width: 780px;
-      border-collapse: separate;
-      border-spacing: 0;
-      table-layout: fixed;
-    }
-    .po-lines thead th {
-      background: var(--role-accent, #16a34a);
-      color: #ffffff;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      font-size: 11.5px;
-      font-weight: 700;
-      padding: 10px 12px;
-      border-bottom: 2px solid var(--role-accent-hover, #15803d);
-      transition: background-color 0.2s ease, border-color 0.2s ease;
-
-      &:first-child {
-        border-top-left-radius: var(--radius-sm, 6px);
-      }
-      &:last-child {
-        border-top-right-radius: var(--radius-sm, 6px);
-      }
-    }
-    .po-lines tbody td {
-      padding: 6px 10px;
-      border-bottom: 1px solid var(--line, #e2e8f0);
-      vertical-align: middle;
-    }
-
-    /* Column Width Distribution */
-    .po-lines .col-desc {
-      width: auto;
-      text-align: left;
-    }
-    .po-lines .col-qty {
-      width: 95px;
-      text-align: center;
-    }
-    .po-lines .col-uom {
-      width: 75px;
-      text-align: center;
-    }
-    .po-lines .col-curr {
-      width: 80px;
-      text-align: center;
-    }
-    .po-lines .col-price {
-      width: 110px;
-      text-align: right;
-    }
-    .po-lines .col-vat {
-      width: 100px;
-      text-align: right;
-    }
-    .po-lines .col-total {
-      width: 130px;
-      text-align: right;
-      padding-right: 14px;
-    }
-
-    /* Crisp Modern Input Fields inside Line Item Cells */
-    .po-lines tbody input {
-      width: 100%;
-      height: 36px;
-      box-sizing: border-box;
-      border: 1px solid var(--line-strong, #cbd5e1);
-      border-radius: var(--radius-sm, 6px);
-      padding: 6px 10px;
-      font-size: 12.5px;
-      color: var(--text, #0f172a);
-      background: #ffffff;
-      transition: all 0.15s ease;
-
-      &:focus {
-        border-color: var(--role-accent, #2563eb);
-        box-shadow: 0 0 0 3px var(--role-soft, #eff6ff);
-        outline: none;
-      }
-    }
-    .po-lines .col-qty input,
-    .po-lines .col-uom input,
-    .po-lines .col-curr input {
-      text-align: center;
-    }
-    .po-lines .col-price input,
-    .po-lines .col-vat input {
-      text-align: right;
-    }
-    .po-lines .col-total input {
-      text-align: right;
-      font-weight: 700;
-    }
-
-    /* Grand Total Row */
-    .po-lines tfoot td {
-      padding: 10px 10px;
-      border-top: 2px solid var(--line, #e2e8f0);
-      background: #f8fafc;
-      vertical-align: middle;
-    }
-    .po-lines .grand-total-label {
-      text-align: right;
-      padding-right: 16px;
-      font-weight: 700;
-      font-size: 12.5px;
-      color: var(--text, #0f172a);
-    }
-    .po-lines .grand-total-input {
-      width: 100%;
-      height: 38px;
-      box-sizing: border-box;
-      text-align: right;
-      font-weight: 800;
-      font-size: 14px;
-      color: var(--role-accent, #2563eb);
-      border: 1.5px solid var(--role-accent, #2563eb);
-      border-radius: var(--radius-sm, 6px);
-      padding: 6px 12px;
-      background: var(--role-soft, #eff6ff);
-    }
-
-    .po-finder-overlay {
-      position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.5);
-      display: grid; place-items: center; padding: 20px;
-      backdrop-filter: blur(2px);
-    }
-    .po-finder {
-      width: min(860px, 100%); background: #ffffff; border-radius: var(--radius-md, 10px); overflow: hidden;
-      box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25); max-height: 90vh; display: flex; flex-direction: column;
-      border: 1px solid var(--line, #e2e8f0);
-    }
-    .po-finder-header {
-      background: var(--navy, #0b1f3a); color: #ffffff; height: 52px; display: flex; align-items: center;
-      padding: 0 18px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
-    }
-    .po-finder-header button {
-      margin-left: auto; background: none; border: 0; color: rgba(255, 255, 255, 0.7); font-size: 20px; cursor: pointer;
-      &:hover { color: #ffffff; }
-    }
-    .po-finder-body { padding: 18px; overflow: auto; }
-    .po-finder tbody tr { cursor: pointer; transition: background 0.15s ease; }
-    .po-finder tbody tr:hover, .po-finder tbody tr.selected { background: var(--role-soft, #eff6ff); }
-    .po-finder-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line, #e2e8f0); background: #f8fafc; }
   `],
   template: `
-    <app-page-heading eyebrow="Purchase orders" [title]="role()==='vendor' ? 'My Purchase Orders' : 'Purchase Order Management'" [subtitle]="role()==='vendor' ? 'Review released orders, milestone dates, GRN acceptances and QC inspection results.' : 'Issue, approve, route and release purchase orders to qualified suppliers.'">
+    <app-page-heading
+      eyebrow="Procurement Management"
+      [title]="role() === 'vendor' ? 'My Purchase Orders' : 'Purchase Orders Hub'"
+      [subtitle]="role() === 'vendor' ? 'Review released purchase orders, milestones, GRN acceptances and QC inspection results.' : 'Issue, inspect and release purchase orders matching TAMCO .NET Procurement & ERP workflows.'">
       <div class="heading-actions">
-        @if (role() !== 'vendor') {
-          <button class="btn" (click)="showNewPo = !showNewPo">
-            @if (showNewPo) {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              <span>Close Form</span>
-            } @else {
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>Issue New PO</span>
-            }
-          </button>
-        }
         <button class="btn secondary" (click)="exportPos()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -289,270 +408,618 @@ export interface SagePurchaseOrder {
       </div>
     </app-page-heading>
 
-    <section class="dash-kpis three">
-      <article class="dash-kpi">
-        <div class="kpi-top-row">
-          <span class="kpi-label">Total POs</span>
-          <span class="kpi-icon-badge blue">
-            <app-icon name="orders" [size]="16" />
+    <!-- Option 6 Pill Capsule Tabs Navigation -->
+    <div class="profile-tabs">
+      @if (role() !== 'vendor') {
+        <button
+          type="button"
+          [class.active]="activeTab === 'create'"
+          (click)="switchTab('create')">
+          <app-icon name="plus" [size]="14" />
+          <span>Create PO</span>
+        </button>
+      }
+
+      <button
+        type="button"
+        [class.active]="activeTab === 'viewer'"
+        (click)="switchTab('viewer')">
+        <app-icon name="search" [size]="14" />
+        <span>Purchase Order</span>
+      </button>
+
+      <button
+        type="button"
+        [class.active]="activeTab === 'register'"
+        (click)="switchTab('register')">
+        <app-icon name="table" [size]="14" />
+        <span>Purchase Orders Register</span>
+      </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 1: CREATE PO (Legacy PO_vendor_Create.cshtml - Photo 2)             -->
+    <!-- ========================================================================= -->
+    @if (activeTab === 'create' && role() !== 'vendor') {
+      <!-- Top Card: Create PO Input Bar -->
+      <section class="screen-card">
+        <h5 class="po-main-heading">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span>Create PO</span>
+        </h5>
+
+        <div class="form-grid-create">
+          <!-- Vendor ID Field with Search and Refresh -->
+          <div class="form-group">
+            <label>Vendor ID <span class="req-star">*</span></label>
+            <div class="input-group-custom">
+              <input
+                type="text"
+                [(ngModel)]="createVendorId"
+                placeholder="Enter Vendor ID"
+                class="form-control-custom"
+              />
+              <button
+                type="button"
+                class="btn-search-icon"
+                (click)="openVendorLookup()"
+                title="Search Vendor List Lookup">
+                <app-icon name="search" [size]="14" />
+              </button>
+              <button
+                type="button"
+                class="btn-refresh-icon"
+                (click)="refreshPoCreate()"
+                title="Refresh / Reload Form">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Vendor Name Field -->
+          <div class="form-group">
+            <label>Vendor Name <span class="req-star">*</span></label>
+            <input
+              type="text"
+              [(ngModel)]="createVendorName"
+              placeholder="Enter Vendor Name"
+              class="form-control-custom"
+            />
+          </div>
+
+          <!-- Date Field -->
+          <div class="form-group">
+            <label>Date</label>
+            <input
+              type="date"
+              [(ngModel)]="createPoDate"
+              class="form-control-custom"
+            />
+          </div>
+
+          <!-- Action Button: Create PO -->
+          <div>
+            <button
+              type="button"
+              class="btn-create-po-action"
+              (click)="submitCreatePo()"
+              title="Click to generate and release PO">
+              <span>Create PO</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Card: PO Vendor List (Table of line items) -->
+      <section class="screen-card">
+        <h5 class="po-main-heading">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span>PO Vendor List</span>
+        </h5>
+
+        <div class="table-scroll">
+          <table class="legacy-datatable">
+            <thead>
+              <tr>
+                <th style="width: 70px;" class="text-center">SrNo</th>
+                <th style="width: 250px;">Item Number</th>
+                <th style="width: 150px;" class="text-right">Price</th>
+                <th style="width: 120px;" class="text-center">Qty</th>
+                <th style="width: 150px;" class="text-right">Subtotal ($)</th>
+                <th style="width: 80px;" class="text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (createPoItems.length === 0) {
+                <tr>
+                  <td colspan="6" style="text-align: center; color: #94a3b8; padding: 24px;">
+                    No line items added yet. Click Search 🔍 above to pick an awarded vendor with items, or add lines below.
+                  </td>
+                </tr>
+              }
+              @for (item of createPoItems; track item.srNo; let idx = $index) {
+                <tr>
+                  <td class="text-center" style="font-weight: 700; color: #64748b;">{{ item.srNo }}</td>
+                  <td>
+                    <input [(ngModel)]="item.itemNumber" placeholder="Item Code / Number" style="font-weight: 600;" />
+                  </td>
+                  <td>
+                    <input type="number" [(ngModel)]="item.price" style="text-align: right;" />
+                  </td>
+                  <td>
+                    <input type="number" [(ngModel)]="item.qty" style="text-align: center;" />
+                  </td>
+                  <td class="text-right" style="font-weight: 700; color: var(--role-accent);">
+                    \${{ ((item.price || 0) * (item.qty || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </td>
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="btn-action btn-action-delete"
+                      (click)="removePoItemRow(idx)"
+                      title="Remove Item">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" style="text-align: right; font-weight: 700;">Total PO Order Value:</td>
+                <td class="text-right" style="font-size: 15px; font-weight: 800; color: #007bff;">
+                  \${{ createPoTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+          <button type="button" class="btn secondary small" (click)="addPoItemRow()">
+            <app-icon name="plus" [size]="12" />
+            <span>+ Add Row</span>
+          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn secondary small" (click)="clearPoCreateForm()">Clear</button>
+            <button type="button" class="btn small" (click)="submitCreatePo()" style="background: #007bff; border-color: #007bff;">Create PO</button>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 2: PURCHASE ORDER VIEWER & LOOKUP (Purchase_Order.cshtml - Photo 1) -->
+    <!-- ========================================================================= -->
+    @if (activeTab === 'viewer') {
+      <!-- Top Card: Purchase Order 7-Field Header -->
+      <section class="screen-card">
+        <div style="text-align: left; background-color: #67008a; padding: 10px 16px; border-radius: 5px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); margin-bottom: 8px;">
+          <h5 style="color: white; margin: 0; font-weight: 600; font-size: 15px;">
+            Purchase Order
+          </h5>
+        </div>
+        <hr style="margin: 0 0 14px 0; border: none; border-top: 1.5px solid forestgreen;" />
+
+        <!-- Row 1: Purchase Number*, Vendor ID*, PO Date*, Arrival Date* -->
+        <div class="form-grid-viewer-row1">
+          <div class="form-group">
+            <label>Purchase Number <span class="req-star">*</span></label>
+            <div class="input-group-custom">
+              <input
+                type="text"
+                [(ngModel)]="currentPoNumber"
+                placeholder="Enter Purchase Number"
+                class="form-control-custom"
+                readonly
+              />
+              <button
+                type="button"
+                class="btn-search-icon"
+                (click)="openPoSearchModal()"
+                title="Search Purchase Orders">
+                <app-icon name="search" [size]="14" />
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Vendor ID <span class="req-star">*</span></label>
+            <input
+              type="text"
+              [(ngModel)]="currentPoVendorId"
+              placeholder="Enter Vendor ID"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Purchase Order Date <span class="req-star">*</span></label>
+            <input
+              type="date"
+              [(ngModel)]="currentPoDate"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Arrival Date <span class="req-star">*</span></label>
+            <input
+              type="date"
+              [(ngModel)]="currentPoArrivalDate"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+        </div>
+
+        <!-- Row 2: Payment Term, Description, Comments -->
+        <div class="form-grid-viewer-row2">
+          <div class="form-group">
+            <label>Payment Term</label>
+            <input
+              type="text"
+              [(ngModel)]="currentPoPaymentTerm"
+              placeholder="Enter Payment Term"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Description</label>
+            <input
+              type="text"
+              [(ngModel)]="currentPoDescription"
+              placeholder="Enter Description"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Comments</label>
+            <input
+              type="text"
+              [(ngModel)]="currentPoComments"
+              placeholder="Enter Comments"
+              class="form-control-custom"
+              readonly
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Card: Purchase Order List (Table of line items) -->
+      <section class="screen-card">
+        <div style="text-align: left; background-color: #67008a; padding: 10px 16px; border-radius: 5px; box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); margin-bottom: 8px;">
+          <h5 style="color: white; margin: 0; font-weight: 600; font-size: 15px;">
+            Purchase Order List
+          </h5>
+        </div>
+        <hr style="margin: 0 0 14px 0; border: none; border-top: 1.5px solid forestgreen;" />
+
+        <div class="table-scroll">
+          <table class="legacy-datatable">
+            <thead>
+              <tr>
+                <th style="width: 70px;" class="text-center">SrNo</th>
+                <th style="width: 180px;">Item Number</th>
+                <th>Description</th>
+                <th style="width: 100px;" class="text-center">Qty</th>
+                <th style="width: 90px;" class="text-center">UOM</th>
+                <th style="width: 130px;" class="text-right">Cost</th>
+                <th style="width: 140px;" class="text-right">Line Total ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (currentPoItems.length === 0) {
+                <tr>
+                  <td colspan="7" style="text-align: center; color: #94a3b8; padding: 24px;">
+                    Select a purchase order using the search button 🔍 above to display line items.
+                  </td>
+                </tr>
+              }
+              @for (item of currentPoItems; track item.srNo) {
+                <tr>
+                  <td class="text-center" style="font-weight: 700; color: #64748b;">{{ item.srNo }}</td>
+                  <td><strong style="color: var(--role-accent);">{{ item.itemNumber }}</strong></td>
+                  <td>{{ item.description }}</td>
+                  <td class="text-center font-bold">{{ item.qty }}</td>
+                  <td class="text-center"><span class="badge" style="background: #f1f5f9; padding: 2px 6px;">{{ item.uom }}</span></td>
+                  <td class="text-right">\${{ item.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-bold" style="color: var(--role-accent);">
+                    \${{ (item.cost * item.qty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6" style="text-align: right; font-weight: 700;">Purchase Order Total:</td>
+                <td class="text-right" style="font-size: 15px; font-weight: 800; color: #007bff;">
+                  \${{ currentPoGrandTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 700; color: #0b1f3a;">Order Status:</span>
+            <app-status [text]="currentPoStatus()" [good]="currentPoStatus()==='Approved'" [warn]="currentPoStatus()==='Pending'" />
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn secondary small" (click)="openPoSearchModal()">
+              <app-icon name="search" [size]="12" />
+              <span>Browse / Search Other POs</span>
+            </button>
+            <button type="button" class="btn secondary small" (click)="switchTab('register')">
+              <app-icon name="table" [size]="12" />
+              <span>View in Register</span>
+            </button>
+            @if (role() !== 'vendor') {
+              @if (currentPoStatus() === 'Pending') {
+                <button type="button" class="btn small" (click)="toggleCurrentPoApproval()" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Approve & Release to Supplier</span>
+                </button>
+              } @else {
+                <button type="button" class="btn secondary small" (click)="toggleCurrentPoApproval()" style="color: #dc3545; border-color: #fca5a5;">
+                  <span>Revoke Approval</span>
+                </button>
+              }
+            } @else {
+              @if (!isVendorAcknowledged()) {
+                <button type="button" class="btn small" (click)="acknowledgeCurrentPo()" style="background: #004225; border-color: #004225; color: #ffffff; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Acknowledge PO Acceptance</span>
+                </button>
+              } @else {
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f0fdf4; color: #16a34a; font-weight: 700; border-radius: 4px; border: 1px solid #bbf7d0; font-size: 12.5px;">
+                  ✓ PO Accepted by Vendor
+                </span>
+              }
+            }
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- ========================================================================= -->
+    <!-- SCREEN 3: PURCHASE ORDERS REGISTER (Master Orders Register & Approvals)  -->
+    <!-- ========================================================================= -->
+    @if (activeTab === 'register') {
+      <section class="dash-kpis three">
+        <article class="dash-kpi">
+          <div class="kpi-top-row">
+            <span class="kpi-label">Total POs</span>
+            <span class="kpi-icon-badge blue">
+              <app-icon name="orders" [size]="16" />
+            </span>
+          </div>
+          <strong class="kpi-value">{{ poList.length }}</strong>
+          <small>Active procurement purchase orders</small>
+        </article>
+
+        <article class="dash-kpi">
+          <div class="kpi-top-row">
+            <span class="kpi-label">Committed Spend</span>
+            <span class="kpi-icon-badge emerald">
+              <app-icon name="payments" [size]="16" />
+            </span>
+          </div>
+          <strong class="kpi-value" style="color: #059669;">\${{ totalValue().toLocaleString() }}</strong>
+          <small>Total order value commitment</small>
+        </article>
+
+        <article class="dash-kpi">
+          <div class="kpi-top-row">
+            <span class="kpi-label">Pending Approval</span>
+            <span class="kpi-icon-badge amber">
+              <app-icon name="approval-matrix" [size]="16" />
+            </span>
+          </div>
+          <strong class="kpi-value" style="color: #d97706;">{{ pendingApprovalCount() }}</strong>
+          <small>Awaiting manager authorization</small>
+        </article>
+      </section>
+
+      <!-- Search & Filter Bar -->
+      <div class="search-filter-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">
+            <app-icon name="search" [size]="15" />
           </span>
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            placeholder="Search POs by number, supplier, or category..."
+          />
         </div>
-        <strong class="kpi-value">{{ poList.length }}</strong>
-        <small>Active procurement purchase orders</small>
-      </article>
+        <app-custom-select
+          [(ngModel)]="approvalFilter"
+          [options]="approvalOptions"
+          minWidth="170px"
+        />
+      </div>
 
-      <article class="dash-kpi">
-        <div class="kpi-top-row">
-          <span class="kpi-label">Committed Spend</span>
-          <span class="kpi-icon-badge emerald">
-            <app-icon name="payments" [size]="16" />
-          </span>
-        </div>
-        <strong class="kpi-value" style="color: #059669;">\${{ totalValue().toLocaleString() }}</strong>
-        <small>Total order value commitment</small>
-      </article>
-
-      <article class="dash-kpi">
-        <div class="kpi-top-row">
-          <span class="kpi-label">Pending Approval</span>
-          <span class="kpi-icon-badge amber">
-            <app-icon name="approval-matrix" [size]="16" />
-          </span>
-        </div>
-        <strong class="kpi-value" style="color: #d97706;">{{ pendingApprovalCount() }}</strong>
-        <small>Awaiting manager authorization</small>
-      </article>
-    </section>
-
-    @if (showNewPo && role() !== 'vendor') {
-      <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
-        <div class="panel-title">
-          <h2>Issue New Purchase Order</h2>
-        </div>
-
-        <div class="form-grid">
-          <label>PO Reference # *<input [(ngModel)]="newPo.id" placeholder="e.g. PO-002350" /></label>
-          <label>Awarded Supplier *<input [(ngModel)]="newPo.vendor" placeholder="e.g. ABC Supplies Pvt. Ltd." /></label>
-          <label>Category *
-            <app-custom-select [(ngModel)]="newPo.category" [options]="categoryOptions" />
-          </label>
-          <label>Total PO Amount ($) *<input type="number" [(ngModel)]="newPo.amount" placeholder="52000" /></label>
-          <label>Required Delivery Date *
-            <app-custom-date-picker [(ngModel)]="newPo.requiredDate" />
-          </label>
-          <label>Committed Arrival Date *
-            <app-custom-date-picker [(ngModel)]="newPo.arrivalDate" />
-          </label>
-        </div>
-
-        <div class="toolbar" style="margin-top: 16px;">
-          <button class="btn secondary" (click)="resetPoForm()">Reset</button>
-          <button class="btn" (click)="createPo()">Create & Route for Approval</button>
+      <article class="panel" style="margin-bottom: 18px;">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>PO #</th>
+                <th>Supplier Name</th>
+                <th>Category</th>
+                <th>Amount ($)</th>
+                <th>Required Date</th>
+                <th>Approval</th>
+                <th>GRN</th>
+                <th>QC Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (po of filteredPos(); track po.id) {
+                <tr [class.highlight]="po.id === currentPoNumber">
+                  <td><span class="mono">{{ po.id }}</span></td>
+                  <td><input [(ngModel)]="po.vendor" style="font-weight: 600;" /></td>
+                  <td><input [(ngModel)]="po.category" /></td>
+                  <td><input type="number" [(ngModel)]="po.amount" style="width: 85px;" /></td>
+                  <td>
+                    <app-custom-date-picker [(ngModel)]="po.requiredDate" [compact]="true" minWidth="135px" />
+                  </td>
+                  <td>
+                    <app-status [text]="po.approval" [good]="po.approval==='Approved'" [warn]="po.approval==='Pending'" />
+                  </td>
+                  <td>
+                    <app-status [text]="po.grn" [good]="po.grn==='Passed'" [warn]="po.grn==='Pending'" />
+                  </td>
+                  <td>
+                    <app-status [text]="po.qc" [good]="po.qc==='Passed'" [warn]="po.qc==='Pending'" [bad]="po.qc==='Rejected'" />
+                  </td>
+                  <td>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                      <button class="btn-action btn-action-view" (click)="inspectPo(po.id)" title="View PO Details in Inspector">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <span>View</span>
+                      </button>
+                      @if (role() !== 'vendor') {
+                        @if (po.approval === 'Pending') {
+                          <button class="btn-action btn-action-approve" (click)="toggleApproval(po.id)" title="Click to Approve Purchase Order">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                            <span>Approve</span>
+                          </button>
+                        } @else {
+                          <button class="btn-action btn-action-approved" (click)="toggleApproval(po.id)" title="Approved (Click to Revoke Approval)">
+                            <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                            <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <span class="text-approved">Approved</span>
+                            <span class="text-revoke">Revoke</span>
+                          </button>
+                        }
+                      }
+                      <button class="btn-action btn-action-save" (click)="savePo(po)" title="Save changes">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        <span>Save</span>
+                      </button>
+                      @if (role() !== 'vendor') {
+                        <button class="btn-action btn-action-delete" (click)="deletePo(po.id)" title="Delete Purchase Order">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       </article>
     }
 
-    <!-- Search & Filter Bar -->
-    <div class="search-filter-bar">
-      <div class="search-input-wrap">
-        <span class="search-icon">
-          <app-icon name="search" [size]="15" />
-        </span>
-        <input
-          type="text"
-          [(ngModel)]="searchQuery"
-          placeholder="Search POs by number, supplier, or category..."
-        />
-      </div>
-      <app-custom-select
-        [(ngModel)]="approvalFilter"
-        [options]="approvalOptions"
-        minWidth="170px"
-      />
-    </div>
-
-    <article class="panel" style="margin-bottom: 18px;">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>PO #</th>
-              <th>Supplier Name</th>
-              <th>Category</th>
-              <th>Amount ($)</th>
-              <th>Required Date</th>
-              <th>Approval</th>
-              <th>GRN</th>
-              <th>QC Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (po of filteredPos(); track po.id) {
-              <tr [class.highlight]="po.id === selectedPoNumber">
-                <td><span class="mono">{{ po.id }}</span></td>
-                <td><input [(ngModel)]="po.vendor" style="font-weight: 600;" /></td>
-                <td><input [(ngModel)]="po.category" /></td>
-                <td><input type="number" [(ngModel)]="po.amount" style="width: 85px;" /></td>
-                <td>
-                  <app-custom-date-picker [(ngModel)]="po.requiredDate" [compact]="true" minWidth="135px" />
-                </td>
-                <td>
-                  <app-status [text]="po.approval" [good]="po.approval==='Approved'" [warn]="po.approval==='Pending'" />
-                </td>
-                <td>
-                  <app-status [text]="po.grn" [good]="po.grn==='Passed'" [warn]="po.grn==='Pending'" />
-                </td>
-                <td>
-                  <app-status [text]="po.qc" [good]="po.qc==='Passed'" [warn]="po.qc==='Pending'" [bad]="po.qc==='Rejected'" />
-                </td>
-                <td>
-                  <div style="display: flex; gap: 5px; align-items: center;">
-                    <button class="btn-action btn-action-view" (click)="loadPo(po.id)" title="View PO Details">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                      <span>View</span>
-                    </button>
-                    @if (role() !== 'vendor') {
-                      @if (po.approval === 'Pending') {
-                        <button class="btn-action btn-action-approve" (click)="toggleApproval(po.id)" title="Click to Approve Purchase Order">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                          <span>Approve</span>
-                        </button>
-                      } @else {
-                        <button class="btn-action btn-action-approved" (click)="toggleApproval(po.id)" title="Approved (Click to Revoke Approval)">
-                          <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                          <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          <span class="text-approved">Approved</span>
-                          <span class="text-revoke">Revoke</span>
-                        </button>
-                      }
-                    }
-                    <button class="btn-action btn-action-save" (click)="savePo(po)" title="Save changes">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                      <span>Save</span>
-                    </button>
-                    @if (role() !== 'vendor') {
-                      <button class="btn-action btn-action-delete" (click)="deletePo(po.id)" title="Delete Purchase Order">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                      </button>
-                    }
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </article>
-
-    <article class="panel" style="margin-bottom: 18px;">
-      <div class="panel-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <h2>Purchase Order Line Items</h2>
-          <span class="mono po-active-badge">{{ selectedPoNumber }}</span>
-          <span class="po-date-badge">Order Date: {{ selectedPoDate }}</span>
-        </div>
-        <button type="button" class="po-browse-btn" (click)="openFinder()" title="Browse all purchase orders directory">
-          <span class="browse-icon-wrap">
-            <app-icon name="search" [size]="14" />
-          </span>
-          <span class="browse-text">Browse All POs</span>
-          <span class="browse-pill">{{ sagePos.length }}</span>
-        </button>
-      </div>
-
-      <div class="table-scroll" style="margin-top: 14px;">
-        <table class="po-lines">
-          <thead>
-            <tr>
-              <th class="col-desc">Item Description</th>
-              <th class="col-qty">PO Quantity</th>
-              <th class="col-uom">UOM</th>
-              <th class="col-curr">Currency</th>
-              <th class="col-price">Unit Price</th>
-              <th class="col-vat">VAT</th>
-              <th class="col-total">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            @if (selectedLines.length === 0) {
-              <tr>
-                <td colspan="7" style="text-align: center; color: #94a3b8; padding: 24px;">Select a purchase order above to view line items.</td>
-              </tr>
-            }
-            @for (line of selectedLines; track $index) {
-              <tr>
-                <td class="col-desc"><input [(ngModel)]="line.itemDescription" /></td>
-                <td class="col-qty"><input type="number" [(ngModel)]="line.quantityOrdered" (ngModelChange)="recalcLine(line)" /></td>
-                <td class="col-uom"><input [(ngModel)]="line.unitOfMeasure" /></td>
-                <td class="col-curr"><input [(ngModel)]="line.currency" /></td>
-                <td class="col-price"><input type="number" [(ngModel)]="line.unitCost" (ngModelChange)="recalcLine(line)" /></td>
-                <td class="col-vat"><input type="number" [(ngModel)]="line.vat" /></td>
-                <td class="col-total"><input type="number" [(ngModel)]="line.total" /></td>
-              </tr>
-            }
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="6" class="grand-total-label">Grand Total ({{ selectedCurrency }}):</td>
-              <td class="col-total">
-                <input type="text" [value]="grandTotal().toFixed(2)" readonly class="grand-total-input" />
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </article>
-
-
-
-    @if (showFinder) {
-      <div class="po-finder-overlay" (click)="closeFinder()">
-        <div class="po-finder" (click)="$event.stopPropagation()">
-          <div class="po-finder-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <app-icon name="search" [size]="16" />
-              <span>Purchase Order Catalog Directory</span>
-            </div>
-            <button type="button" (click)="closeFinder()" aria-label="Close" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.1); color: #ffffff; border: none; cursor: pointer;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
+    <!-- ========================================================================= -->
+    <!-- MODAL: VENDOR LIST LOOKUP (Matching Legacy #purchaseorderlist in Create)   -->
+    <!-- ========================================================================= -->
+    @if (showVendorLookup) {
+      <div class="po-modal-overlay" (click)="closeVendorLookup()">
+        <div class="po-modal-dialog" (click)="$event.stopPropagation()">
+          <div class="po-modal-header">
+            <span>Vendor List</span>
+            <button type="button" class="btn-close-modal" (click)="closeVendorLookup()">&times;</button>
           </div>
-          <div class="po-finder-body">
+          <div class="po-modal-body">
             <input
-              [(ngModel)]="finderQuery"
-              placeholder="Search by PO number or description..."
-              style="width: 100%; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;"
+              [(ngModel)]="vendorLookupQuery"
+              placeholder="Search vendor by ID, Name or Quoted Category..."
+              style="width: 100%; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;"
             />
-            <table>
+            <table class="legacy-datatable">
               <thead>
                 <tr>
-                  <th>PO Number</th>
-                  <th>PO Date</th>
-                  <th>PO Description</th>
+                  <th style="width: 140px;">Vendor ID</th>
+                  <th>Vendor Name</th>
+                  <th style="width: 140px;">Category</th>
+                  <th style="width: 100px; text-align: center;">Action</th>
                 </tr>
               </thead>
               <tbody>
-                @for (po of filteredFinderPos(); track po.purchaseOrderNumber) {
-                  <tr class="po-row" [class.selected]="po.purchaseOrderNumber === pendingFinderPo" (click)="highlightFinderPo(po.purchaseOrderNumber)">
-                    <td class="mono">{{ po.purchaseOrderNumber }}</td>
-                    <td>{{ formatDate(po.purchaseOrderDate) }}</td>
-                    <td>{{ po.description }}</td>
+                @for (vendor of filteredVendorCatalog(); track vendor.vendorId) {
+                  <tr (click)="selectLookupVendor(vendor)" style="cursor: pointer;">
+                    <td><strong style="color: var(--role-accent);">{{ vendor.vendorId }}</strong></td>
+                    <td style="font-weight: 600;">{{ vendor.vendorName }}</td>
+                    <td>{{ vendor.category }}</td>
+                    <td style="text-align: center;">
+                      <button type="button" class="btn small" (click)="selectLookupVendor(vendor); $event.stopPropagation()" style="background: #007bff; border-color: #007bff; padding: 3px 10px; font-size: 11.5px;">
+                        Select
+                      </button>
+                    </td>
                   </tr>
                 }
               </tbody>
             </table>
           </div>
-          <div class="po-finder-footer">
-            <button type="button" class="btn secondary small" (click)="closeFinder()">Close</button>
-            <button type="button" class="btn small" (click)="confirmFinderPo()" style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <span>Select Purchase Order</span>
-            </button>
+          <div class="po-modal-footer">
+            <button type="button" class="btn secondary small" (click)="closeVendorLookup()" style="background: #dc3545; color: #fff; border-color: #dc3545;">Close</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ========================================================================= -->
+    <!-- MODAL: PURCHASE ORDER LIST LOOKUP (Matching Legacy #purchaseorderlist)     -->
+    <!-- ========================================================================= -->
+    @if (showPoSearchModal) {
+      <div class="po-modal-overlay" (click)="closePoSearchModal()">
+        <div class="po-modal-dialog" (click)="$event.stopPropagation()">
+          <div class="po-modal-header">
+            <span>Purchase Order List</span>
+            <button type="button" class="btn-close-modal" (click)="closePoSearchModal()">&times;</button>
+          </div>
+          <div class="po-modal-body">
+            <input
+              [(ngModel)]="poSearchQuery"
+              placeholder="Search PO Number, Vendor ID or Description..."
+              style="width: 100%; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;"
+            />
+            <table class="legacy-datatable">
+              <thead>
+                <tr>
+                  <th style="width: 150px;">PO Number</th>
+                  <th style="width: 150px;">Vendor ID</th>
+                  <th>Name / Description</th>
+                  <th style="width: 100px; text-align: center;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (po of filteredDetailedPos(); track po.purchaseOrderNumber) {
+                  <tr (click)="selectDetailedPo(po)" style="cursor: pointer;">
+                    <td><strong style="color: var(--role-accent);">{{ po.purchaseOrderNumber }}</strong></td>
+                    <td>{{ po.vendorId }}</td>
+                    <td>{{ po.vendorName }} — {{ po.description }}</td>
+                    <td style="text-align: center;">
+                      <button type="button" class="btn small" (click)="selectDetailedPo(po); $event.stopPropagation()" style="background: #007bff; border-color: #007bff; padding: 3px 10px; font-size: 11.5px;">
+                        Select
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="po-modal-footer">
+            <button type="button" class="btn secondary small" (click)="closePoSearchModal()" style="background: #dc3545; color: #fff; border-color: #dc3545;">Close</button>
           </div>
         </div>
       </div>
@@ -563,8 +1030,20 @@ export class OrdersPageComponent {
   readonly state = inject(PortalStateService);
   readonly role = computed(() => this.state.role());
 
-  showNewPo = false;
-  showFinder = false;
+  // Active Tab:
+  // 'create'  -> Screen 1: Create PO (PO_vendor_Create.cshtml - Photo 2)
+  // 'viewer'  -> Screen 2: Purchase Order Viewer & Lookup (Purchase_Order.cshtml - Photo 1)
+  // 'register' -> Master Purchase Orders Register with approval workflows
+  activeTab: 'create' | 'viewer' | 'register' = 'create';
+
+  // Modal controls
+  showVendorLookup = false;
+  vendorLookupQuery = '';
+
+  showPoSearchModal = false;
+  poSearchQuery = '';
+
+  // Search & Filters for Tab 3 (Register)
   searchQuery = '';
   approvalFilter = '';
 
@@ -574,34 +1053,155 @@ export class OrdersPageComponent {
     { value: 'Pending', label: 'Pending' }
   ];
 
-  readonly categoryOptions = [
-    'Electrical',
-    'Safety Equipment',
-    'Mechanical',
-    'IT & Hardware',
-    'Raw Materials'
+  // ---------------------------------------------------------------------------
+  // SCREEN 1 (Create PO) State - Matches Photo 2
+  // ---------------------------------------------------------------------------
+  createVendorId = 'VEN-10024';
+  createVendorName = 'ABC Supplies Pvt. Ltd.';
+  createPoDate = '2026-10-02';
+  createPoCategory = 'Electrical';
+
+  createPoItems: CreatePoItem[] = [
+    { srNo: 1, itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
+    { srNo: 2, itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
+    { srNo: 3, itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
   ];
 
-  finderQuery = '';
-  pendingFinderPo = '';
+  readonly vendorCatalog: VendorCatalogEntry[] = [
+    {
+      vendorId: 'VEN-10024',
+      vendorName: 'ABC Supplies Pvt. Ltd.',
+      category: 'Electrical',
+      contactPerson: 'Adnan Tariq',
+      items: [
+        { itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
+        { itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
+        { itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
+      ]
+    },
+    {
+      vendorId: 'VEN-10031',
+      vendorName: 'Perfect Industrial',
+      category: 'Mechanical',
+      contactPerson: 'Zubair Khan',
+      items: [
+        { itemNumber: 'PUMP-SEAL-150', description: 'Pump Mechanical Seal Kit', price: 1450, qty: 6 },
+        { itemNumber: 'IMP-ASSY-150', description: 'Impeller Assembly 150mm', price: 12800, qty: 2 }
+      ]
+    },
+    {
+      vendorId: 'VEN-10045',
+      vendorName: 'Global Traders',
+      category: 'Raw Materials',
+      contactPerson: 'Mohammad Al-Rashid',
+      items: [
+        { itemNumber: 'XLPE-120MM', description: 'XLPE Copper Cable 120mm²', price: 28, qty: 800 },
+        { itemNumber: 'DRUM-STEEL', description: 'Heavy Steel Cable Drum', price: 2150, qty: 4 }
+      ]
+    },
+    {
+      vendorId: 'VEN-10052',
+      vendorName: 'Gulf Electro Mechanical',
+      category: 'Electrical',
+      contactPerson: 'Farhan Zaidi',
+      items: [
+        { itemNumber: 'RELAY-AUX-24', description: 'Switchgear Auxiliary Relay 24V', price: 340, qty: 15 },
+        { itemNumber: 'EARTH-TAPE-CU', description: 'Earthing Copper Tape 25x3mm', price: 45, qty: 120 }
+      ]
+    },
+    {
+      vendorId: 'VEN-10060',
+      vendorName: 'Siemens Energy Middle East',
+      category: 'Electrical',
+      contactPerson: 'Klaus Schmidt',
+      items: [
+        { itemNumber: 'SIPROTEC-5', description: 'Digital Protection Relay SIPROTEC', price: 8200, qty: 4 },
+        { itemNumber: 'TEST-BLK-VT', description: 'CT/VT Secondary Test Block', price: 290, qty: 10 }
+      ]
+    }
+  ];
 
-  selectedPoNumber = 'PO-002345';
-  selectedPoDate = '12/08/2026';
-  selectedCurrency = 'USD';
-  selectedLines: PoLine[] = [];
+  // ---------------------------------------------------------------------------
+  // SCREEN 2 (Purchase Order Inspector) State - Matches Photo 1
+  // ---------------------------------------------------------------------------
+  currentPoNumber = 'PO-002345';
+  currentPoVendorId = 'VEN-10024';
+  currentPoDate = '2026-08-12';
+  currentPoArrivalDate = '2026-08-27';
+  currentPoPaymentTerm = 'Net 30 Days';
+  currentPoDescription = 'Electrical — LV Switchgear & Control Cable Lot';
+  currentPoComments = 'Deliver to Warehouse 2, standard manufacturer test certificate required.';
 
-  newPo: PurchaseOrder = {
-    id: 'PO-002348',
-    vendor: 'ABC Supplies Pvt. Ltd.',
-    category: 'Electrical',
-    amount: 64000,
-    requiredDate: '2026-09-12',
-    arrivalDate: '2026-09-10',
-    approval: 'Pending',
-    grn: 'Pending',
-    qc: 'Pending'
-  };
+  currentPoItems: DetailedPoItem[] = [
+    { srNo: 1, itemNumber: 'SWG-GIS-11KV', description: '11kV GIS Incoming Panel', qty: 2, uom: 'SET', cost: 18500 },
+    { srNo: 2, itemNumber: 'CBL-CTL-4C', description: 'Control Cable 4C 2.5mm', qty: 500, uom: 'MTR', cost: 12 },
+    { srNo: 3, itemNumber: 'MCCB-250A-4P', description: 'Spare MCCB 250A 4-Pole', qty: 8, uom: 'PCS', cost: 420 }
+  ];
 
+  detailedPos: DetailedPurchaseOrder[] = [
+    {
+      purchaseOrderNumber: 'PO-002345',
+      vendorId: 'VEN-10024',
+      vendorName: 'ABC Supplies Pvt. Ltd.',
+      purchaseOrderDate: '2026-08-12',
+      arrivalDate: '2026-08-27',
+      paymentTerm: 'Net 30 Days',
+      description: 'Electrical — LV Switchgear & Control Cable Lot',
+      comments: 'Deliver to Warehouse 2, standard manufacturer test certificate required.',
+      items: [
+        { srNo: 1, itemNumber: 'SWG-GIS-11KV', description: '11kV GIS Incoming Panel', qty: 2, uom: 'SET', cost: 18500 },
+        { srNo: 2, itemNumber: 'CBL-CTL-4C', description: 'Control Cable 4C 2.5mm', qty: 500, uom: 'MTR', cost: 12 },
+        { srNo: 3, itemNumber: 'MCCB-250A-4P', description: 'Spare MCCB 250A 4-Pole', qty: 8, uom: 'PCS', cost: 420 }
+      ]
+    },
+    {
+      purchaseOrderNumber: 'PO-002334',
+      vendorId: 'VEN-10024',
+      vendorName: 'ABC Supplies Pvt. Ltd.',
+      purchaseOrderDate: '2026-08-04',
+      arrivalDate: '2026-08-22',
+      paymentTerm: 'Net 45 Days',
+      description: 'Safety Equipment — PPE Lot for Substations',
+      comments: 'Arc-rated EN standards compliance certificate attached.',
+      items: [
+        { srNo: 1, itemNumber: 'PPE-FR-COV', description: 'FR Coverall — Arc Rated 40 cal', qty: 40, uom: 'SET', cost: 185 },
+        { srNo: 2, itemNumber: 'PPE-HLM-VSR', description: 'Safety Helmet with Face Visor', qty: 40, uom: 'PCS', cost: 42 },
+        { srNo: 3, itemNumber: 'GLV-INS-CL2', description: 'Insulated Gloves Class 2 17kV', qty: 20, uom: 'PAIR', cost: 68 }
+      ]
+    },
+    {
+      purchaseOrderNumber: 'PO-002321',
+      vendorId: 'VEN-10031',
+      vendorName: 'Perfect Industrial',
+      purchaseOrderDate: '2026-07-28',
+      arrivalDate: '2026-08-21',
+      paymentTerm: 'Net 30 Days',
+      description: 'Mechanical Parts — Heavy Duty Pump Spares',
+      comments: 'OEM warranty certificates with shipment.',
+      items: [
+        { srNo: 1, itemNumber: 'SEAL-PUMP-150', description: 'Pump Mechanical Seal Kit 150mm', qty: 6, uom: 'PCS', cost: 1450 },
+        { srNo: 2, itemNumber: 'IMP-ASSY-BRNZ', description: 'Impeller Assembly Bronze 150mm', qty: 2, uom: 'SET', cost: 12800 }
+      ]
+    },
+    {
+      purchaseOrderNumber: 'PO-002315',
+      vendorId: 'VEN-10045',
+      vendorName: 'Global Traders',
+      purchaseOrderDate: '2026-07-18',
+      arrivalDate: '2026-08-14',
+      paymentTerm: 'Letter of Credit (LC)',
+      description: 'Raw Materials — High Voltage Copper Cables',
+      comments: 'Inspected by third party BV inspector prior to dispatch.',
+      items: [
+        { srNo: 1, itemNumber: 'CBL-CU-120MM', description: 'XLPE Copper Cable 120mm² High Voltage', qty: 800, uom: 'MTR', cost: 28 },
+        { srNo: 2, itemNumber: 'DRM-STL-HD', description: 'Heavy Steel Cable Drum 1200mm', qty: 4, uom: 'PCS', cost: 2150 }
+      ]
+    }
+  ];
+
+  // ---------------------------------------------------------------------------
+  // SCREEN 3 (Master PO Register) State
+  // ---------------------------------------------------------------------------
   poList: PurchaseOrder[] = [
     { id: 'PO-002345', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Electrical', amount: 52000, requiredDate: '2026-08-25', arrivalDate: '2026-08-27', approval: 'Pending', grn: 'Pending', qc: 'Pending' },
     { id: 'PO-002334', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Safety Equipment', amount: 18600, requiredDate: '2026-08-22', arrivalDate: '2026-08-22', approval: 'Approved', grn: 'Passed', qc: 'Passed' },
@@ -609,59 +1209,224 @@ export class OrdersPageComponent {
     { id: 'PO-002315', vendor: 'Global Traders', category: 'Raw Materials', amount: 31500, requiredDate: '2026-08-15', arrivalDate: '2026-08-14', approval: 'Approved', grn: 'Passed', qc: 'Passed' }
   ];
 
-  sagePos: SagePurchaseOrder[] = [
-    {
-      purchaseOrderNumber: 'PO-002345',
-      purchaseOrderDate: '2026-08-12',
-      description: 'Electrical — LV Switchgear & Control Cable',
-      vendor: 'ABC Supplies Pvt. Ltd.',
-      currency: 'USD',
-      lines: [
-        this.makeLine('11kV GIS Incoming Panel', 2, 'SET', 'USD', 18500),
-        this.makeLine('Control Cable 4C 2.5mm', 500, 'MTR', 'USD', 12),
-        this.makeLine('Spare MCCB 250A', 8, 'PCS', 'USD', 420)
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002334',
-      purchaseOrderDate: '2026-08-04',
-      description: 'Safety Equipment — PPE Lot',
-      vendor: 'ABC Supplies Pvt. Ltd.',
-      currency: 'USD',
-      lines: [
-        this.makeLine('FR Coverall — Arc Rated', 40, 'SET', 'USD', 185),
-        this.makeLine('Safety Helmet with Visor', 40, 'PCS', 'USD', 42),
-        this.makeLine('Insulated Gloves Class 2', 20, 'PAIR', 'USD', 68)
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002321',
-      purchaseOrderDate: '2026-07-28',
-      description: 'Mechanical Parts — Pump Spares',
-      vendor: 'Perfect Industrial',
-      currency: 'USD',
-      lines: [
-        this.makeLine('Pump Mechanical Seal Kit', 6, 'PCS', 'USD', 1450),
-        this.makeLine('Impeller Assembly 150mm', 2, 'SET', 'USD', 12800)
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002315',
-      purchaseOrderDate: '2026-07-18',
-      description: 'Raw Materials — Copper Cable',
-      vendor: 'Global Traders',
-      currency: 'USD',
-      lines: [
-        this.makeLine('XLPE Copper Cable 120mm²', 800, 'MTR', 'USD', 28),
-        this.makeLine('Steel Cable Drum', 4, 'PCS', 'USD', 2150)
-      ]
-    }
-  ];
-
   constructor() {
-    this.loadPo(this.selectedPoNumber);
+    if (this.role() === 'vendor') {
+      this.activeTab = 'viewer';
+    }
   }
 
+  switchTab(tab: 'create' | 'viewer' | 'register'): void {
+    if (this.role() === 'vendor' && tab === 'create') return;
+    this.activeTab = tab;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACTIONS FOR SCREEN 1 (Create PO)
+  // ---------------------------------------------------------------------------
+  openVendorLookup(): void {
+    this.vendorLookupQuery = '';
+    this.showVendorLookup = true;
+  }
+
+  closeVendorLookup(): void {
+    this.showVendorLookup = false;
+  }
+
+  filteredVendorCatalog(): VendorCatalogEntry[] {
+    const q = this.vendorLookupQuery.trim().toLowerCase();
+    if (!q) return this.vendorCatalog;
+    return this.vendorCatalog.filter(v =>
+      v.vendorId.toLowerCase().includes(q) ||
+      v.vendorName.toLowerCase().includes(q) ||
+      v.category.toLowerCase().includes(q)
+    );
+  }
+
+  selectLookupVendor(vendor: VendorCatalogEntry): void {
+    this.createVendorId = vendor.vendorId;
+    this.createVendorName = vendor.vendorName;
+    this.createPoCategory = vendor.category;
+    this.createPoItems = vendor.items.map((it, idx) => ({
+      srNo: idx + 1,
+      itemNumber: it.itemNumber,
+      description: it.description,
+      price: it.price,
+      qty: it.qty
+    }));
+    this.closeVendorLookup();
+    this.state.notify(`Vendor ${vendor.vendorName} and items loaded.`);
+  }
+
+  refreshPoCreate(): void {
+    this.createVendorId = 'VEN-10024';
+    this.createVendorName = 'ABC Supplies Pvt. Ltd.';
+    this.createPoDate = new Date().toISOString().substring(0, 10);
+    this.createPoCategory = 'Electrical';
+    this.createPoItems = [
+      { srNo: 1, itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
+      { srNo: 2, itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
+      { srNo: 3, itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
+    ];
+    this.state.notify('Create PO form refreshed.');
+  }
+
+  clearPoCreateForm(): void {
+    this.createVendorId = '';
+    this.createVendorName = '';
+    this.createPoItems = [];
+    this.state.notify('Create PO form cleared.');
+  }
+
+  addPoItemRow(): void {
+    const nextSr = this.createPoItems.length + 1;
+    this.createPoItems = [
+      ...this.createPoItems,
+      { srNo: nextSr, itemNumber: `ITM-00${nextSr}`, description: 'Material Line Item', price: 100, qty: 1 }
+    ];
+  }
+
+  removePoItemRow(index: number): void {
+    this.createPoItems = this.createPoItems
+      .filter((_, idx) => idx !== index)
+      .map((item, idx) => ({ ...item, srNo: idx + 1 }));
+  }
+
+  createPoTotal(): number {
+    return this.createPoItems.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.qty) || 0)), 0);
+  }
+
+  submitCreatePo(): void {
+    if (!this.createVendorId.trim() || !this.createVendorName.trim()) {
+      this.state.notify('Vendor ID and Vendor Name are required.');
+      return;
+    }
+
+    if (this.createPoItems.length === 0) {
+      this.state.notify('Please add line items to the PO Vendor List.');
+      return;
+    }
+
+    const nextPoNum = `PO-00${Math.floor(2350 + Math.random() * 50)}`;
+    const totalAmount = this.createPoTotal();
+
+    const createdPo: PurchaseOrder = {
+      id: nextPoNum,
+      vendor: this.createVendorName,
+      category: this.createPoCategory || 'Electrical',
+      amount: totalAmount,
+      requiredDate: '2026-10-25',
+      arrivalDate: '2026-10-22',
+      approval: 'Pending',
+      grn: 'Pending',
+      qc: 'Pending'
+    };
+
+    const newDetailedPo: DetailedPurchaseOrder = {
+      purchaseOrderNumber: nextPoNum,
+      vendorId: this.createVendorId,
+      vendorName: this.createVendorName,
+      purchaseOrderDate: this.createPoDate,
+      arrivalDate: '2026-10-22',
+      paymentTerm: 'Net 30 Days',
+      description: `${this.createPoCategory} — ${this.createPoItems[0]?.itemNumber || 'Procurement Batch'}`,
+      comments: 'Generated from Vendor Sourcing. Released for manager approval.',
+      items: this.createPoItems.map((item, idx) => ({
+        srNo: idx + 1,
+        itemNumber: item.itemNumber,
+        description: item.description || item.itemNumber,
+        qty: item.qty,
+        uom: 'PCS',
+        cost: item.price
+      }))
+    };
+
+    // Prepend to lists
+    this.poList = [createdPo, ...this.poList];
+    this.detailedPos = [newDetailedPo, ...this.detailedPos];
+    this.state.purchaseOrders.update(list => [createdPo, ...list]);
+
+    // Switch to Viewer tab to inspect newly created PO
+    this.selectDetailedPo(newDetailedPo);
+    this.activeTab = 'viewer';
+    this.state.notify(`Purchase Order ${nextPoNum} generated successfully!`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACTIONS FOR SCREEN 2 (Purchase Order Viewer)
+  // ---------------------------------------------------------------------------
+  openPoSearchModal(): void {
+    this.poSearchQuery = '';
+    this.showPoSearchModal = true;
+  }
+
+  closePoSearchModal(): void {
+    this.showPoSearchModal = false;
+  }
+
+  filteredDetailedPos(): DetailedPurchaseOrder[] {
+    const q = this.poSearchQuery.trim().toLowerCase();
+    if (!q) return this.detailedPos;
+    return this.detailedPos.filter(po =>
+      po.purchaseOrderNumber.toLowerCase().includes(q) ||
+      po.vendorId.toLowerCase().includes(q) ||
+      po.vendorName.toLowerCase().includes(q) ||
+      po.description.toLowerCase().includes(q)
+    );
+  }
+
+  selectDetailedPo(po: DetailedPurchaseOrder): void {
+    this.currentPoNumber = po.purchaseOrderNumber;
+    this.currentPoVendorId = po.vendorId;
+    this.currentPoDate = po.purchaseOrderDate;
+    this.currentPoArrivalDate = po.arrivalDate;
+    this.currentPoPaymentTerm = po.paymentTerm;
+    this.currentPoDescription = po.description;
+    this.currentPoComments = po.comments;
+    this.currentPoItems = po.items.map(it => ({ ...it }));
+    this.closePoSearchModal();
+    this.state.notify(`Purchase Order ${po.purchaseOrderNumber} loaded.`);
+  }
+
+  inspectPo(poNumber: string): void {
+    const match = this.detailedPos.find(p => p.purchaseOrderNumber === poNumber);
+    if (match) {
+      this.selectDetailedPo(match);
+      this.activeTab = 'viewer';
+    } else {
+      this.state.notify(`Details for ${poNumber} loaded.`);
+    }
+  }
+
+  currentPoGrandTotal(): number {
+    return this.currentPoItems.reduce((sum, item) => sum + (item.cost * item.qty), 0);
+  }
+
+  currentPoStatus(): string {
+    const match = this.poList.find(p => p.id === this.currentPoNumber);
+    return match ? match.approval : 'Pending';
+  }
+
+  toggleCurrentPoApproval(): void {
+    this.toggleApproval(this.currentPoNumber);
+  }
+
+  isVendorAcknowledged(): boolean {
+    const match = this.poList.find(p => p.id === this.currentPoNumber);
+    return match ? match.approval === 'Approved' : false;
+  }
+
+  acknowledgeCurrentPo(): void {
+    const po = this.poList.find(p => p.id === this.currentPoNumber);
+    if (po) {
+      po.approval = 'Approved';
+    }
+    this.state.acknowledgePurchaseOrder(this.currentPoNumber);
+    this.state.notify(`Purchase Order ${this.currentPoNumber} accepted and acknowledged by Vendor.`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACTIONS FOR SCREEN 3 (PO Register)
+  // ---------------------------------------------------------------------------
   filteredPos(): PurchaseOrder[] {
     let list = this.poList;
     if (this.role() === 'vendor') {
@@ -682,20 +1447,6 @@ export class OrdersPageComponent {
     });
   }
 
-  filteredFinderPos(): SagePurchaseOrder[] {
-    let list = this.sagePos;
-    if (this.role() === 'vendor') {
-      list = list.filter(po => (po.vendor || '').includes('ABC Supplies'));
-    }
-    const q = this.finderQuery.trim().toLowerCase();
-    return list.filter(po =>
-      !q ||
-      (po.purchaseOrderNumber || '').toLowerCase().includes(q) ||
-      (po.description || '').toLowerCase().includes(q) ||
-      (po.vendor || '').toLowerCase().includes(q)
-    );
-  }
-
   totalValue(): number {
     return this.poList.reduce((acc, po) => acc + (po.amount || 0), 0);
   }
@@ -704,111 +1455,21 @@ export class OrdersPageComponent {
     return this.poList.filter(po => po.approval === 'Pending').length;
   }
 
-  grandTotal(): number {
-    return this.selectedLines.reduce(
-      (sum, line) => sum + (Number(line.total) || 0) + (Number(line.vat) || 0),
-      0
-    );
-  }
-
-  formatDate(date: string): string {
-    const parsedDate = new Date(date);
-    if (Number.isNaN(parsedDate.getTime())) return date;
-    return `${String(parsedDate.getDate()).padStart(2, '0')}/${String(parsedDate.getMonth() + 1).padStart(2, '0')}/${parsedDate.getFullYear()}`;
-  }
-
-  makeLine(itemDescription: string, quantityOrdered: number, unitOfMeasure: string, currency: string, unitCost: number): PoLine {
-    const total = +(unitCost * quantityOrdered).toFixed(2);
-    const vat = +(total * 0.17).toFixed(2);
-    return { itemDescription, quantityOrdered, unitOfMeasure, currency, unitCost, vat, total };
-  }
-
-  recalcLine(line: PoLine): void {
-    line.total = +((Number(line.unitCost) || 0) * (Number(line.quantityOrdered) || 0)).toFixed(2);
-    line.vat = +(line.total * 0.17).toFixed(2);
-  }
-
-  loadPo(poNumber: string): void {
-    const po = this.sagePos.find(p => p.purchaseOrderNumber === poNumber);
-    if (!po) {
-      this.state.notify(`No line items found for ${poNumber}.`);
-      return;
-    }
-    this.selectedPoNumber = po.purchaseOrderNumber;
-    this.selectedPoDate = this.formatDate(po.purchaseOrderDate);
-    this.selectedCurrency = po.currency;
-    this.selectedLines = po.lines.map(line => ({ ...line }));
-    this.state.notify(`Purchase Order ${po.purchaseOrderNumber} loaded.`);
-  }
-
-  openFinder(): void {
-    this.finderQuery = '';
-    this.pendingFinderPo = this.selectedPoNumber;
-    this.showFinder = true;
-  }
-
-  closeFinder(): void {
-    this.showFinder = false;
-  }
-
-  highlightFinderPo(poNumber: string): void {
-    this.pendingFinderPo = poNumber;
-  }
-
-  confirmFinderPo(): void {
-    if (!this.pendingFinderPo) {
-      this.state.notify('Select a purchase order first.');
-      return;
-    }
-    this.loadPo(this.pendingFinderPo);
-    this.closeFinder();
-  }
-
-  createPo(): void {
-    if (!this.newPo.id || !this.newPo.vendor || !this.newPo.amount) {
-      this.state.notify('Error: PO number, vendor, and amount are required.');
-      return;
-    }
-    const created: PurchaseOrder = { ...this.newPo };
-    this.poList = [created, ...this.poList];
-    this.state.notify(`Purchase Order ${created.id} created and routed for approval.`);
-    this.resetPoForm();
-    this.showNewPo = false;
-  }
-
-  resetPoForm(): void {
-    this.newPo = {
-      id: `PO-00${Math.floor(2350 + Math.random() * 50)}`,
-      vendor: 'ABC Supplies Pvt. Ltd.',
-      category: 'Electrical',
-      amount: 45000,
-      requiredDate: '2026-09-25',
-      arrivalDate: '2026-09-22',
-      approval: 'Pending',
-      grn: 'Pending',
-      qc: 'Pending'
-    };
-  }
-
   toggleApproval(id: string): void {
     const po = this.poList.find(p => p.id === id);
     if (!po) return;
 
     if (po.approval === 'Pending') {
       po.approval = 'Approved';
-      this.state.notify(`Purchase Order ${id} approved and released to vendor.`);
+      this.state.notify(`Purchase Order ${id} approved and released.`);
     } else {
       po.approval = 'Pending';
-      this.state.notify(`Purchase Order ${id} approval revoked (reverted to Pending).`);
+      this.state.notify(`Purchase Order ${id} reverted to Pending.`);
     }
   }
 
-  approvePo(id: string): void {
-    this.toggleApproval(id);
-  }
-
   savePo(po: PurchaseOrder): void {
-    this.state.notify(`PO ${po.id} changes saved.`);
+    this.state.notify(`PO ${po.id} saved.`);
   }
 
   deletePo(id: string): void {
@@ -817,6 +1478,6 @@ export class OrdersPageComponent {
   }
 
   exportPos(): void {
-    this.state.notify('Exporting Purchase Order register (Excel)...');
+    this.state.notify('Exporting Purchase Order register to Excel...');
   }
 }

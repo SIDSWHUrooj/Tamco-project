@@ -29,6 +29,9 @@ import { Component, Input } from '@angular/core';
         @case ('profile') {
           <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
         }
+        @case ('requisition') {
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        }
         @case ('rfqs') {
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
         }
@@ -77,6 +80,9 @@ import { Component, Input } from '@angular/core';
         @case ('roles') {
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         }
+        @case ('logistic-cost') {
+          <rect width="16" height="13" x="1" y="5" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+        }
         @case ('bid-comparison') {
           <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
         }
@@ -103,6 +109,9 @@ import { Component, Input } from '@angular/core';
         }
         @case ('approval-matrix') {
           <path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+        }
+        @case ('management') {
+          <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>
         }
         @case ('master-data') {
           <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>
@@ -133,6 +142,39 @@ import { Component, Input } from '@angular/core';
         }
         @case ('menu') {
           <line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/>
+        }
+        @case ('vendor-registration-req') {
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+        }
+        @case ('mail') {
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+        }
+        @case ('refresh') {
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        }
+        @case ('sun') {
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        }
+        @case ('moon') {
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        }
+        @case ('monitor') {
+          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        }
+        @case ('chevron-left') {
+          <polyline points="15 18 9 12 15 6"/>
+        }
+        @case ('chevron-right') {
+          <polyline points="9 18 15 12 9 6"/>
+        }
+        @case ('chevron-down') {
+          <polyline points="6 9 12 15 18 9"/>
+        }
+        @case ('x') {
+          <path d="M18 6 6 18M6 6l12 12"/>
+        }
+        @case ('check') {
+          <polyline points="20 6 9 17 4 12"/>
         }
         @default {
           <circle cx="12" cy="12" r="4"/>

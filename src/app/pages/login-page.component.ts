@@ -1,8 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { Role } from '../core/models';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Role, PORTAL_ACCOUNTS, AuthAccount } from '../core/models';
 import { PortalStateService } from '../core/portal-state.service';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-login-page',
@@ -202,6 +203,26 @@ import { PortalStateService } from '../core/portal-state.service';
 
             </div>
 
+            <!-- Quick Demo Login Selection -->
+            <div style="margin-bottom: 20px; padding: 12px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #cbd5e1;">
+              <span style="display: block; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">
+                ⚡ Quick 1-Click Access (Demo Mode):
+              </span>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                @for (acc of accounts; track acc.username) {
+                  <button
+                    type="button"
+                    (click)="quickLogin(acc)"
+                    [style.background]="acc.role === 'vendor' ? '#f0fdf4' : '#ffffff'"
+                    [style.border-color]="acc.role === 'vendor' ? '#86efac' : '#cbd5e1'"
+                    style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1.5px solid; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: transform 0.15s, box-shadow 0.15s;"
+                    title="Click to sign in instantly as {{ acc.badge }}">
+                    <span [style.color]="acc.role === 'vendor' ? '#16a34a' : '#2563eb'">●</span>
+                    <span [style.color]="acc.role === 'vendor' ? '#15803d' : '#1e293b'">{{ acc.badge }}</span>
+                  </button>
+                }
+              </div>
+            </div>
 
             <!-- Form -->
             <form
@@ -213,7 +234,7 @@ import { PortalStateService } from '../core/portal-state.service';
               <div class="form-field">
 
                 <label for="username">
-                  Email Id
+                  Username or Email
                 </label>
 
                 <div
@@ -234,7 +255,7 @@ import { PortalStateService } from '../core/portal-state.service';
                     type="text"
                     [(ngModel)]="username"
                     (ngModelChange)="clearError()"
-                    placeholder="Enter your email address"
+                    placeholder="e.g. admin, procurement, finance, vendor"
                     autocomplete="username"
                     required
                   />
@@ -350,9 +371,9 @@ import { PortalStateService } from '../core/portal-state.service';
               <button
                 class="sign-in-button"
                 type="submit"
-                [disabled]="!username.trim() || !password"
+                [disabled]="!username.trim() || !password || loading"
               >
-                <span>Sign in</span>
+                <span>{{ loading ? 'Signing in...' : 'Sign in' }}</span>
               </button>
 
             </form>
@@ -394,6 +415,18 @@ import { PortalStateService } from '../core/portal-state.service';
                 Contact your administrator
               </button>
 
+            </div>
+
+            <!-- Supplier Onboarding -->
+            <div class="help-section" style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line, #e2e8f0);">
+              <span>Prospective vendor partner?</span>
+              <button
+                type="button"
+                (click)="goToVendorRegistration()"
+                style="color: var(--role-accent, #2563eb); font-weight: 700;"
+              >
+                Register as Supplier (8-Step Wizard) →
+              </button>
             </div>
 
           </div>
@@ -2636,153 +2669,135 @@ import { PortalStateService } from '../core/portal-state.service';
 
 
       .sign-in-button {
-
-        padding:
-          0 15px;
-
+        padding: 0 15px;
       }
-
     }
 
   `]
 })
 export class LoginPageComponent {
-
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly state = inject(PortalStateService);
+  private readonly auth = inject(AuthService);
 
-
-  readonly roles: {
-    value: Role;
-    label: string;
-    icon: string;
-  }[] = [
-
-    {
-      value: 'vendor',
-      label: 'Vendor',
-      icon: ''
-    },
-
-    {
-      value: 'admin',
-      label: 'Admin',
-      icon: ''
-    },
-
-    {
-      value: 'procurement',
-      label: 'Procurement',
-      icon: ''
-    },
-
-    {
-      value: 'finance',
-      label: 'Finance',
-      icon: ''
-    }
-
-  ];
-
+  readonly accounts = PORTAL_ACCOUNTS;
 
   username = '';
   password = '';
-
-  role: Role = 'vendor';
-
   rememberMe = true;
   showPassword = false;
-
   loginError = '';
+  loading = false;
 
+  selectAccount(acc: AuthAccount): void {
+    this.username = acc.username;
+    this.password = acc.password;
+    this.loginError = '';
+  }
 
-  signIn(): void {
+  quickLogin(acc: AuthAccount): void {
+    this.username = acc.username;
+    this.password = acc.password;
+    this.state.signIn(acc);
+    this.navigatePostLogin(acc.role);
+  }
 
-    const username =
-      this.username
-        .trim()
-        .toLowerCase();
-
-
-    const matchedRole =
-      this.roles.find(
-        option =>
-          option.value === username ||
-          username.startsWith(option.value) ||
-          username.includes(option.value)
-      )?.value || (username ? 'vendor' : undefined);
-
-    if (
-      !matchedRole ||
-      (this.password !== '123' && this.password.length < 3)
-    ) {
-
-      this.loginError =
-        'Invalid username or password. Please check your credentials and try again.';
-
+  private navigatePostLogin(role: Role): void {
+    if (role === 'vendor') {
+      const code = this.state.vendorStatusCode();
+      if (code === 0) {
+        this.router.navigate(['/vendor/profile']);
+      } else if (code === 1) {
+        this.router.navigate(['/vendor/profile'], { queryParams: { mode: 'review' } });
+      } else if (code === 2) {
+        this.router.navigate(['/vendor/profile'], { queryParams: { mode: 'pending' } });
+      } else {
+        this.router.navigate(['/vendor/dashboard']);
+      }
       return;
     }
 
-
-    this.role =
-      matchedRole;
-
-
-    this.state.signIn(
-      this.role
-    );
-
-
-    this.router.navigate([
-      '/',
-      this.role,
-      'dashboard'
-    ]);
-
+    const returnUrl = this.route.snapshot.queryParams['returnUrl'];
+    if (returnUrl && returnUrl.startsWith(`/${role}`)) {
+      this.router.navigateByUrl(returnUrl);
+    } else {
+      this.router.navigate(['/', role, 'dashboard']);
+    }
   }
 
+  signIn(): void {
+    const inputUser = this.username.trim();
+    const inputPass = this.password.trim();
+
+    if (!inputUser || !inputPass) {
+      this.loginError = 'Please enter both username and password.';
+      return;
+    }
+
+    this.loading = true;
+    this.loginError = '';
+
+    const isVendor = inputUser.toLowerCase().includes('vendor') || inputUser.includes('@') || inputUser.toUpperCase().startsWith('VEN-');
+
+    const login$ = isVendor
+      ? this.auth.vendorLogin({ usernameOrEmail: inputUser, password: inputPass })
+      : this.auth.userLogin({ userid: inputUser, userpwd: inputPass });
+
+    login$.subscribe({
+      next: () => {
+        this.loading = false;
+        const role = isVendor ? 'vendor' : (this.state.role() || 'procurement');
+        this.navigatePostLogin(role);
+      },
+      error: (err) => {
+        this.loading = false;
+
+        // Fallback check against official demo accounts
+        const matched = this.accounts.find(
+          acc => acc.username.toLowerCase() === inputUser.toLowerCase() ||
+                 acc.email.toLowerCase() === inputUser.toLowerCase() ||
+                 acc.role.toLowerCase() === inputUser.toLowerCase()
+        );
+
+        if (matched) {
+          this.state.signIn(matched);
+          this.navigatePostLogin(matched.role);
+          return;
+        }
+
+        const errMsg = err?.error?.message || err?.error?.title || (err?.status === 0 ? 'Unable to reach API server. Please check your network connection or CORS settings.' : 'Invalid credentials. Please verify your login details.');
+        this.loginError = errMsg;
+      }
+    });
+  }
 
   clearError(): void {
-
     if (this.loginError) {
       this.loginError = '';
     }
-
   }
-
 
   forgotPassword(): void {
-
-    /*
-      Add your password reset
-      navigation/modal here.
-    */
-
+    const email = prompt('Enter your registered vendor email address for password reset:');
+    if (email && email.trim()) {
+      this.auth.vendorForgotPassword(email.trim()).subscribe({
+        next: () => {
+          alert(`Password reset instructions have been sent to ${email.trim()}`);
+        },
+        error: (err) => {
+          alert(err?.error?.message || 'Password reset request failed. Please check the email and try again.');
+        }
+      });
+    }
   }
-
 
   contactAdministrator(): void {
-
-    /*
-      Add TAMCO help desk,
-      administrator contact,
-      modal or support page here.
-    */
-
+    alert('TAMCO Help Desk: support@tamco.ae / Tel: +971 4 398 2200');
   }
 
-
-  selectRole(role: Role): void {
-
-    this.role =
-      role;
-
-    this.username =
-      role;
-
-    this.loginError =
-      '';
-
+  goToVendorRegistration(): void {
+    this.state.setRole('vendor');
+    this.router.navigate(['/vendor/profile']);
   }
-
 }

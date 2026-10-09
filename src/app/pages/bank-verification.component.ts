@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
+import { VendorApiService } from '../core/vendor-api.service';
 import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
@@ -36,7 +37,7 @@ export interface BankRecord {
     <section class="stats-grid compact">
       <div class="stat-card">
         <span>Total Bank Records</span>
-        <strong>{{ bankRecords.length }}</strong>
+        <strong>{{ totalCount() }}</strong>
         <small>Active banking profiles</small>
       </div>
       <div class="stat-card">
@@ -224,8 +225,9 @@ export interface BankRecord {
     }
   `]
 })
-export class BankVerificationComponent {
+export class BankVerificationComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
 
   showAddForm = true;
   searchQuery = '';
@@ -251,25 +253,69 @@ export class BankVerificationComponent {
     notes: 'Awaiting original bank letter scan'
   };
 
-  bankRecords: BankRecord[] = [
-    { id: 'BNK-2026-011', vendorId: 'VEN-10024', vendorName: 'ABC Supplies Pvt. Ltd.', bankName: 'Habib Bank Limited', iban: 'PK36 HABB 0000 1234 5678 9012', accountTitle: 'ABC Supplies Pvt. Ltd.', branchCode: 'Korangi Main · 0892', verificationStatus: 'Approved', verifiedDate: '18 May 2026', notes: 'IBAN matched to SECP title' },
-    { id: 'BNK-2026-012', vendorId: 'VEN-10025', vendorName: 'Global Traders', bankName: 'MCB Bank', iban: 'PK55 MUCB 0000 9988 7766 5544', accountTitle: 'Global Traders', branchCode: 'Gulberg · 0211', verificationStatus: 'Approved', verifiedDate: '16 May 2026', notes: 'Verified via bank certificate' },
-    { id: 'BNK-2026-013', vendorId: 'VEN-10026', vendorName: 'Perfect Industrial', bankName: 'Allied Bank', iban: 'PK77 ABPA 0000 1122 3344 5566', accountTitle: 'Perfect Industrial', branchCode: 'SITE Karachi · 0308', verificationStatus: 'Pending', verifiedDate: '', notes: 'Title mismatch under review' },
-    { id: 'BNK-2026-014', vendorId: 'VEN-10027', vendorName: 'Tech Solutions', bankName: 'HBL', iban: 'PK21 HABB 0000 6677 8899 0011', accountTitle: 'Tech Solutions (Pvt) Ltd.', branchCode: 'Blue Area · 0155', verificationStatus: 'Rejected', verifiedDate: '15 May 2026', notes: 'Account title does not match NTN' }
-  ];
+  ngOnInit(): void {
+    this.loadBackendBankData();
+  }
+
+  loadBackendBankData(): void {
+    // 1. Fetch live bank accounts submitted by vendors
+    this.vendorApi.getAllVendorBanks().subscribe(res => {
+      const list = res?.vbank_List || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const b of list) {
+          const reqNo = b.reqno || b.reQ_NO || '';
+          if (!reqNo) continue;
+          const status: 'Approved' | 'Pending' | 'Rejected' =
+            (b.status === 'Approved' || b.isactive === 1) ? 'Approved' : (b.status === 'Rejected' ? 'Rejected' : 'Pending');
+          const existing = this.state.bankRecords().find(r => r.vendorId === reqNo || r.iban === (b.accounT_IBAN || b.accounT_NO));
+          if (!existing) {
+            this.state.addBankRecord({
+              id: `BNK-${reqNo}-${b.linenum || 1}`,
+              vendorId: reqNo,
+              vendorName: b.vendoR_NAME || reqNo,
+              bankName: b.banK_NAME || 'Commercial Bank',
+              iban: b.accounT_IBAN || b.accounT_NO || '',
+              accountTitle: b.titlE_ACC || b.vendoR_NAME || '',
+              branchCode: b.banK_ADRESS || b.swifT_CODE || 'Main Branch',
+              verificationStatus: status,
+              verifiedDate: status === 'Approved' ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+              notes: `Registered via portal Step 8 (Currency: ${b.currency || 'AED'})`
+            });
+          }
+        }
+      }
+    });
+
+    // 2. Fetch live bank validation audit records
+    this.vendorApi.getBankValidations().subscribe(res => {
+      const list = res?.bankvalidation_List || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const val of list) {
+          const reqNo = val.reqno || '';
+          if (!reqNo) continue;
+          const status = val.status || (val.action === 1 ? 'Approved' : (val.action === 2 ? 'Rejected' : 'Pending'));
+          const rec = this.state.bankRecords().find(r => r.vendorId === reqNo);
+          if (rec) {
+            this.state.setBankVerificationStatus(rec.id, status as any);
+          }
+        }
+      }
+    });
+  }
 
   filteredRecords(): BankRecord[] {
     const q = this.searchQuery.trim().toLowerCase();
     const st = this.statusFilter;
-    return this.bankRecords.filter(r => {
+    return this.state.bankRecords().filter(r => {
       const matchQuery = !q || (r.vendorName || '').toLowerCase().includes(q) || (r.vendorId || '').toLowerCase().includes(q) || (r.iban || '').toLowerCase().includes(q) || (r.bankName || '').toLowerCase().includes(q) || (r.accountTitle || '').toLowerCase().includes(q) || (r.branchCode || '').toLowerCase().includes(q);
       const matchStatus = !st || r.verificationStatus === st;
       return matchQuery && matchStatus;
     });
   }
 
-  pendingCount(): number { return this.bankRecords.filter(r => r.verificationStatus === 'Pending').length; }
-  verifiedCount(): number { return this.bankRecords.filter(r => r.verificationStatus === 'Approved').length; }
+  totalCount(): number { return this.state.bankRecords().length; }
+  pendingCount(): number { return this.state.bankRecords().filter(r => r.verificationStatus === 'Pending').length; }
+  verifiedCount(): number { return this.state.bankRecords().filter(r => r.verificationStatus === 'Approved').length; }
 
   addRecord(): void {
     if (!this.newRecord.vendorId || !this.newRecord.iban || !this.newRecord.bankName) {
@@ -277,8 +323,30 @@ export class BankVerificationComponent {
       return;
     }
     const added: BankRecord = { ...this.newRecord, id: `BNK-2026-${Math.floor(100 + Math.random() * 900)}` };
-    this.bankRecords = [added, ...this.bankRecords];
-    this.state.notify(`Bank record for "${added.vendorName || added.vendorId}" submitted for verification.`);
+    this.state.addBankRecord(added);
+
+    // Sync to live backend APIs
+    this.vendorApi.saveVendorBank({
+      coperation: 2,
+      reqno: added.vendorId,
+      vendoR_NAME: added.vendorName,
+      banK_NAME: added.bankName,
+      accounT_IBAN: added.iban,
+      titlE_ACC: added.accountTitle,
+      status: added.verificationStatus
+    }).subscribe();
+
+    this.vendorApi.saveBankValidation({
+      coperation: 2,
+      reqno: added.vendorId,
+      vendoR_NAME: added.vendorName,
+      bankname: added.bankName,
+      status: added.verificationStatus,
+      action: added.verificationStatus === 'Approved' ? 1 : (added.verificationStatus === 'Rejected' ? 2 : 0),
+      remarks: added.notes,
+      letteR_DATE: new Date().toISOString()
+    }).subscribe();
+
     this.resetForm();
   }
 
@@ -298,32 +366,82 @@ export class BankVerificationComponent {
   }
 
   setStatus(rec: BankRecord, status: 'Approved' | 'Rejected'): void {
-    rec.verificationStatus = status;
-    if (status === 'Approved') {
-      this.state.approveVendor(rec.vendorId, 'finance');
-      this.state.notify(`Bank verification approved for ${rec.vendorName || rec.vendorId}.`);
-    } else {
-      this.state.notify(`Bank verification rejected for ${rec.vendorName || rec.vendorId}.`);
-    }
+    this.state.setBankVerificationStatus(rec.id, status);
+
+    // Sync to live backend API: AUBANKVALIDATION
+    this.vendorApi.saveBankValidation({
+      coperation: 2,
+      reqno: rec.vendorId,
+      vendoR_NAME: rec.vendorName,
+      bankname: rec.bankName,
+      status: status,
+      action: status === 'Approved' ? 1 : 2,
+      remarks: rec.notes || `Finance verification: ${status}`,
+      letteR_DATE: new Date().toISOString()
+    }).subscribe({
+      next: () => this.state.notify(`✓ Backend: Bank verification for ${rec.vendorName} saved as ${status}.`),
+      error: () => this.state.notify(`Local bank status updated to ${status}.`)
+    });
+
+    // Also sync AUDVendorBank
+    this.vendorApi.saveVendorBank({
+      coperation: 2,
+      reqno: rec.vendorId,
+      vendoR_NAME: rec.vendorName,
+      banK_NAME: rec.bankName,
+      accounT_IBAN: rec.iban,
+      titlE_ACC: rec.accountTitle,
+      status: status,
+      isactive: status === 'Approved' ? 1 : 0
+    }).subscribe();
   }
 
   toggleStatus(rec: BankRecord): void {
-    if (rec.verificationStatus === 'Approved' || rec.verificationStatus === 'Rejected') {
-      rec.verificationStatus = 'Pending';
-      this.state.notify(`Bank verification status reverted to Pending for ${rec.vendorName || rec.vendorId}.`);
+    const nextStatus = rec.verificationStatus === 'Approved' || rec.verificationStatus === 'Rejected' ? 'Pending' : 'Approved';
+    if (nextStatus === 'Pending') {
+      this.state.setBankVerificationStatus(rec.id, 'Pending');
+      this.vendorApi.saveBankValidation({
+        coperation: 2,
+        reqno: rec.vendorId,
+        vendoR_NAME: rec.vendorName,
+        bankname: rec.bankName,
+        status: 'Pending',
+        action: 0,
+        remarks: 'Verification status reopened',
+        letteR_DATE: new Date().toISOString()
+      }).subscribe();
     } else {
       this.setStatus(rec, 'Approved');
     }
   }
 
   updateRecord(rec: BankRecord): void {
-    this.state.notify(`Bank details for ${rec.vendorName || rec.vendorId} updated.`);
+    this.vendorApi.saveBankValidation({
+      coperation: 2,
+      reqno: rec.vendorId,
+      vendoR_NAME: rec.vendorName,
+      bankname: rec.bankName,
+      status: rec.verificationStatus,
+      action: rec.verificationStatus === 'Approved' ? 1 : (rec.verificationStatus === 'Rejected' ? 2 : 0),
+      remarks: rec.notes,
+      letteR_DATE: new Date().toISOString()
+    }).subscribe();
+
+    this.vendorApi.saveVendorBank({
+      coperation: 2,
+      reqno: rec.vendorId,
+      vendoR_NAME: rec.vendorName,
+      banK_NAME: rec.bankName,
+      accounT_IBAN: rec.iban,
+      titlE_ACC: rec.accountTitle,
+      status: rec.verificationStatus
+    }).subscribe();
+
+    this.state.notify(`Bank details for ${rec.vendorName || rec.vendorId} saved.`);
   }
 
   deleteRecord(id: string): void {
-    const item = this.bankRecords.find(r => r.id === id);
-    this.bankRecords = this.bankRecords.filter(r => r.id !== id);
-    this.state.notify(`Bank record for ${item ? item.vendorName : id} deleted.`);
+    this.state.deleteBankRecord(id);
   }
 
   exportList(): void {

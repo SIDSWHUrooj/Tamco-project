@@ -515,23 +515,26 @@ interface ReceiptRecord {
       </article>
     }
 
-    <!-- Goods Receipt & Invoice Record Panel -->
+    <!-- Goods Receipt & Invoice Record Panel (Matches Management/invoiceRecord.cshtml) -->
     <article class="panel invoice-record" style="margin-bottom: 18px;">
-      <div class="panel-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <h2>Goods Receipt & Invoice Record</h2>
-          <span class="mono po-active-badge">{{ selectedReceipt().invoiceNumber }}</span>
-          <span class="po-date-badge">Receipt: {{ selectedReceipt().receiptNumber }}</span>
-          <span class="po-date-badge">Date: {{ formatDate(selectedReceipt().receiptDate) }}</span>
-        </div>
-        <button type="button" class="po-browse-btn" (click)="openReceiptFinder()" title="Browse all goods receipts directory">
-          <span class="browse-icon-wrap">
-            <app-icon name="search" [size]="14" />
+      <div style="background-color: #00778c; padding: 10px 16px; border-radius: 5px; box-shadow: 0px 4px 8px rgba(0,0,0,0.1); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+        <h5 style="color: white; margin: 0; font-weight: 600; font-size: 15px; letter-spacing: -0.01em;">
+          Invoice Record
+        </h5>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; background: rgba(255,255,255,0.25); color: white; padding: 2px 8px; border-radius: 12px; font-weight: 600;">
+            Receipt: {{ selectedReceipt().receiptNumber }}
           </span>
-          <span class="browse-text">Browse Receipts</span>
-          <span class="browse-pill">{{ receipts.length }}</span>
-        </button>
+          <button type="button" class="po-browse-btn" (click)="openReceiptFinder()" title="Browse all goods receipts directory" style="height: 30px; padding: 0 10px; font-size: 12px;">
+            <span class="browse-icon-wrap" style="width: 20px; height: 20px;">
+              <app-icon name="search" [size]="12" />
+            </span>
+            <span class="browse-text">Browse Receipts</span>
+            <span class="browse-pill">{{ receipts.length }}</span>
+          </button>
+        </div>
       </div>
+      <hr style="margin: 0 0 14px 0; border: none; border-top: 1.5px solid forestgreen;" />
 
       <div class="form-grid four-col" style="margin-top: 14px;">
         <label>Invoice Reference #
