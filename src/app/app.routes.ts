@@ -9,12 +9,9 @@ import { BidComparisonComponent } from './pages/bid-comparison.component';
 import { LogisticCostComponent } from './pages/logistic-cost.component';
 import { OrdersPageComponent } from './pages/orders-page.component';
 import { InvoicePageComponent } from './pages/invoice-page.component';
-import { ReportsComponent } from './pages/reports.component';
 import { UsersComponent } from './pages/users.component';
 import { RolesComponent } from './pages/roles.component';
 import { WorkflowsComponent } from './pages/workflows.component';
-import { DocumentsComponent } from './pages/documents.component';
-import { AttachmentsComponent } from './pages/attachments.component';
 import { BanksComponent } from './pages/banks.component';
 import { LoginPageComponent } from './pages/login-page.component';
 import { RequisitionComponent } from './pages/requisition.component';
@@ -54,7 +51,6 @@ export const routes: Routes = [
       { path: 'comparison', component: BidComparisonComponent },
       { path: 'orders', component: OrdersPageComponent },
       { path: 'invoices', component: InvoicePageComponent },
-      { path: 'three-way-match', component: InvoicePageComponent },
       { path: 'bank-verification', component: BankVerificationComponent },
       { path: 'finance-vendors', component: FinanceVendorsComponent },
       { path: 'management', component: ManagementComponent },
@@ -62,11 +58,8 @@ export const routes: Routes = [
       { path: 'roles', component: RolesComponent },
       { path: 'workflows', component: WorkflowsComponent },
       { path: 'banks', component: BanksComponent },
-      { path: 'documents', component: DocumentsComponent },
-      { path: 'attachments', component: AttachmentsComponent },
       { path: 'bidding', component: BiddingComponent },
       { path: 'profile', component: VendorProfileComponent },
-      { path: 'reports', component: ReportsComponent },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' }
     ]
   },

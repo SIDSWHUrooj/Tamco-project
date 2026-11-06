@@ -399,7 +399,7 @@ export class DashboardComponent {
           { label: 'Approved vendors', value: ok, note: `of ${vendors.length} vendors on record`, icon: 'vendors', tone: 'good', route: 'vendors', cta: 'Vendor master', pct: pct(ok, vendors.length), barLabel: `${pct(ok, vendors.length)}% fully approved` },
           { label: 'Requisitions', value: this.state.requisitions().length, note: `${this.openRequisitions().length} still in progress`, icon: 'requisition', route: 'requisition', cta: 'Requisitions' },
           { label: 'Purchase orders', value: this.pos().length, note: `${approved} approved`, icon: 'orders', tone: 'info', route: 'orders', cta: 'PO list', pct: pct(approved, this.pos().length), barLabel: `${pct(approved, this.pos().length)}% approved` },
-          { label: 'PO value', value: this.poValue(), prefix: '$', note: 'Across all purchase orders', icon: 'analytics', tone: 'violet', route: 'reports', cta: 'Reports' },
+          { label: 'PO value', value: this.poValue(), prefix: '$', note: 'Across all purchase orders', icon: 'analytics', tone: 'violet', route: 'orders', cta: 'POs' },
           { label: 'Open RFQs', value: this.state.rfqs().filter(r => r.status === 'Open').length, note: `${this.state.rfqs().reduce((a, r) => a + r.bids.length, 0)} bids received`, icon: 'bid-comparison', tone: 'warn', route: 'bid-comparison', cta: 'Compare bids' }];
       }
       case 'finance': {
@@ -412,7 +412,7 @@ export class DashboardComponent {
           { label: 'Verified accounts', value: verified, note: `of ${banks.length} bank records`, icon: 'banks', tone: 'good', route: 'finance-vendors', cta: 'Vendor banks', pct: pct(verified, banks.length), barLabel: `${pct(verified, banks.length)}% verified` },
           { label: 'Pending invoices', value: pendInv.length, note: `$${pendInv.reduce((a, i) => a + i.amount, 0).toLocaleString('en-US')} awaiting approval`, icon: 'invoices', tone: 'warn', route: 'invoices', cta: 'Review invoices' },
           { label: 'Invoice value', value: total, prefix: '$', note: `${this.inv().length} invoices on record`, icon: 'payments', tone: 'violet', route: 'invoices', cta: 'All invoices' },
-          { label: 'Licences expiring', value: this.expiring().length, note: 'Trade licence ≤ 90 days', icon: 'documents', tone: this.expiring().length ? 'bad' : 'good', route: 'reports', cta: 'Expiry report' }];
+          { label: 'Licences expiring', value: this.expiring().length, note: 'Trade licence ≤ 90 days', icon: 'documents', tone: this.expiring().length ? 'bad' : 'good', route: 'finance-vendors', cta: 'Vendors' }];
       }
       case 'admin': {
         const users = this.state.legacyUsers(), mv = this.state.masterVendors();
@@ -455,11 +455,10 @@ export class DashboardComponent {
         add(this.state.requisitions().filter(r => r.header.status === 'Draft').length, { sev: 'info', title: 'Draft requisitions', detail: 'Complete and submit for sourcing', route: 'requisition', cta: 'Open' });
         break;
       case 'finance':
-        add(this.inv().filter(i => i.match === 'Mismatch').length, { sev: 'critical', title: 'Invoices failing 3-way match', detail: 'PO, GRN/QC and invoice do not agree', route: 'three-way-match', cta: 'Investigate' });
-        add(exp30, { sev: 'critical', title: 'Trade licences expiring within 30 days', detail: 'Vendor documents need renewal', route: 'reports', cta: 'View' });
+        add(exp30, { sev: 'critical', title: 'Trade licences expiring within 30 days', detail: 'Vendor documents need renewal', route: 'finance-vendors', cta: 'View' });
         add(this.state.bankRecords().filter(b => b.verificationStatus === 'Pending').length, { sev: 'warning', title: 'Bank accounts awaiting verification', detail: 'Payments are blocked until verified', route: 'bank-verification', cta: 'Verify' });
         add(this.inv().filter(i => i.status === 'Pending').length, { sev: 'warning', title: 'Invoices awaiting approval', detail: 'Review and approve for payment', route: 'invoices', cta: 'Review' });
-        add(exp.length - exp30, { sev: 'info', title: 'Licences expiring within 90 days', detail: 'Plan renewals with vendors', route: 'reports', cta: 'View' });
+        add(exp.length - exp30, { sev: 'info', title: 'Licences expiring within 90 days', detail: 'Plan renewals with vendors', route: 'finance-vendors', cta: 'View' });
         add(this.state.pendingFinance().length, { sev: 'info', title: 'Vendors awaiting finance sign-off', detail: 'Finance verification outstanding', route: 'finance-vendors', cta: 'Open' });
         break;
       case 'admin':
@@ -489,21 +488,17 @@ export class DashboardComponent {
         { label: 'Create PO', desc: 'Issue a purchase order', icon: 'orders', route: 'orders' },
         { label: 'Compare bids', desc: 'Evaluate vendor quotes', icon: 'bid-comparison', route: 'bid-comparison' },
         { label: 'Vendors', desc: 'Verify and manage vendors', icon: 'vendors', route: 'vendors' },
-        { label: 'Logistics costs', desc: 'Freight & insurance', icon: 'logistic-cost', route: 'logistic-cost' },
-        { label: 'Reports', desc: 'Procurement reporting', icon: 'reports', route: 'reports' }];
+        { label: 'Logistics costs', desc: 'Freight & insurance', icon: 'logistic-cost', route: 'logistic-cost' }];
       case 'finance': return [
         { label: 'Verify banks', desc: 'Review vendor IBANs', icon: 'bank-verification', route: 'bank-verification' },
         { label: 'Review invoices', desc: 'Approve for payment', icon: 'invoices', route: 'invoices' },
-        { label: '3-way match', desc: 'PO · GRN · invoice', icon: 'three-way-match', route: 'three-way-match' },
-        { label: 'Vendor banks', desc: 'Finance vendor list', icon: 'finance-vendors', route: 'finance-vendors' },
-        { label: 'Reports', desc: 'Finance reporting', icon: 'reports', route: 'reports' }];
+        { label: 'Vendor banks', desc: 'Finance vendor list', icon: 'finance-vendors', route: 'finance-vendors' }];
       case 'admin': return [
         { label: 'Manage users', desc: 'Accounts and access', icon: 'users', route: 'users' },
         { label: 'Security groups', desc: 'Roles & permissions', icon: 'roles', route: 'roles' },
         { label: 'Work flows', desc: 'Approval routing', icon: 'workflows', route: 'workflows' },
         { label: 'Vendors', desc: 'Vendor control hub', icon: 'vendors', route: 'vendors' },
-        { label: 'UAE banks', desc: 'Bank master data', icon: 'banks', route: 'banks' },
-        { label: 'Reports', desc: 'Audit & reports', icon: 'reports', route: 'reports' }];
+        { label: 'UAE banks', desc: 'Bank master data', icon: 'banks', route: 'banks' }];
       default: return [
         { label: 'Company profile', desc: 'Update your 8-step profile', icon: 'profile', route: 'profile' }];
     }

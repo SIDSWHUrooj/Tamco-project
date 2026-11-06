@@ -10,9 +10,15 @@ export const VENDOR_ACTIVE_MENU: MenuItem[] = [
   { label: 'Company Profile', icon: 'profile', route: 'profile' }
 ];
 
-export const VENDOR_ONBOARDING_MENU: MenuItem[] = [
-  { label: 'Registration Profile', icon: 'profile', route: 'profile' }
+export const VENDOR_DRAFT_MENU: MenuItem[] = [
+  { label: 'Complete Registration', icon: 'profile', route: 'profile' }
 ];
+
+export const VENDOR_REVIEW_MENU: MenuItem[] = [
+  { label: 'Application Status', icon: 'profile', route: 'profile' }
+];
+
+export const VENDOR_ONBOARDING_MENU: MenuItem[] = VENDOR_DRAFT_MENU;
 
 export const ROLE_MENUS: Record<Role, MenuItem[]> = {
   vendor: VENDOR_ACTIVE_MENU,
@@ -23,14 +29,12 @@ export const ROLE_MENUS: Record<Role, MenuItem[]> = {
     { label: 'Requisition', icon: '▧', route: 'requisition' },
     { label: 'Logistic Cost', icon: 'logistic-cost', route: 'logistic-cost' },
     { label: 'Bid Comparison', icon: '≋', route: 'bid-comparison' },
-    { label: 'Purchase Orders', icon: '▣', route: 'orders' },
-    { label: 'Reports', icon: '▥', route: 'reports' }
+    { label: 'Purchase Orders', icon: '▣', route: 'orders' }
   ],
   finance: [
     { label: 'Dashboard', icon: '⌂', route: 'dashboard' },
     { label: 'Vendors (Finance)', icon: '♙', route: 'finance-vendors' },
-    { label: 'Bank Verification', icon: '▦', route: 'bank-verification' },
-    { label: 'Reports', icon: '▥', route: 'reports' }
+    { label: 'Bank Verification', icon: '▦', route: 'bank-verification' }
   ],
   admin: [
     { label: 'Dashboard', icon: '⌂', route: 'dashboard' },
@@ -40,25 +44,12 @@ export const ROLE_MENUS: Record<Role, MenuItem[]> = {
     { label: 'User Management', icon: '♙', route: 'users' },
     { label: 'Security Groups', icon: '♧', route: 'roles' },
     { label: 'Work Flow Setup', icon: '⇄', route: 'workflows' },
-    { label: 'UAE Banks', icon: '$', route: 'banks' },
-    { label: 'Reports', icon: '▥', route: 'reports' }
+    { label: 'UAE Banks', icon: '$', route: 'banks' }
   ]
 };
 
-// Hidden pages preserved for direct access or future roadmap activation
-export const HIDDEN_PAGES = [
-  'three-way-match',
-  'performance',
-  'analytics',
-  'contracts',
-  'deliveries',
+// Direct accessible secondary pages
+export const HIDDEN_PAGES: string[] = [
   'bidding',
-  'payments',
-  'invoices',
-  'rfqs',
-  'audit',
-  'integrations',
-  'security',
-  'approval-matrix',
-  'notifications'
+  'invoices'
 ];

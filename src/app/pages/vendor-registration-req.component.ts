@@ -3,26 +3,20 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
 import { VendorApiService } from '../core/vendor-api.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { VendorRegistrationReq } from '../core/models';
 
 @Component({
   selector: 'app-vendor-registration-req',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeadingComponent, StatusComponent, IconComponent],
+  imports: [FormsModule, RouterLink, StatusComponent, IconComponent],
   template: `
-    <app-page-heading
-      eyebrow="Procurement Management"
-      title="Vendor Registration Request"
-      subtitle="Initiate vendor onboarding, assign initial credentials, and dispatch registration portal access links."
-    >
-      <div class="heading-actions">
-        <a class="btn secondary" [routerLink]="['/', role(), 'vendors']">
-          ← Back to Vendors
-        </a>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+      <a class="btn secondary" [routerLink]="['/', role(), 'vendors']">
+        ← Back to Vendors
+      </a>
+    </div>
 
     <!-- Main Form Card (Mirrors legacy Vendor Registration) -->
     <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
@@ -355,6 +349,10 @@ import { VendorRegistrationReq } from '../core/models';
             <div class="cred-header">
               <span>Vendor Access Credentials</span>
               <span class="copy-pill" (click)="copyCredentials()">Copy</span>
+            </div>
+            <div class="cred-row">
+              <span class="cred-label">Vendor ID:</span>
+              <span class="cred-value"><strong>{{ vendorId }}</strong></span>
             </div>
             <div class="cred-row">
               <span class="cred-label">Portal URL:</span>
@@ -1261,6 +1259,21 @@ export class VendorRegistrationReqComponent {
     this.emailError = '';
   }
 
+  private refreshRequestsFromApi(list: any[]): void {
+    if (Array.isArray(list) && list.length > 0) {
+      const mapped: VendorRegistrationReq[] = list.map((v: any) => ({
+        id: v.reQ_NO || '',
+        vendorName: v.vendoR_NAME || 'Unknown Vendor',
+        email: v.email || '',
+        phone: v.contact || '',
+        contactPerson: v.cT_PERSON || '',
+        status: v.active === 0 ? 'Email Sent' : 'Profile Completed',
+        createdAt: v.auddate ? String(v.auddate).substring(0, 16).replace('T', ' ') : ''
+      }));
+      this.state.vendorRegistrationRequests.set(mapped);
+    }
+  }
+
   saveRecord(): void {
     if (!this.vendorName.trim()) {
       this.nameError = true;
@@ -1274,25 +1287,54 @@ export class VendorRegistrationReqComponent {
       return;
     }
 
-    const saved = this.state.saveVendorRegistrationReq({
-      id: this.vendorId === '*** NEW ***' ? undefined : this.vendorId,
-      vendorName: this.vendorName.trim(),
+    const isNew = !this.vendorId || this.vendorId === '*** NEW ***' || this.vendorId.startsWith('REQ-');
+    const existingVendor = this.requests().find(r =>
+      r.email.toLowerCase() === this.vendorEmail.trim().toLowerCase() ||
+      (this.vendorId && r.id === this.vendorId && !r.id.startsWith('REQ-'))
+    );
+    const op = (isNew && !existingVendor) ? 2 : 3;
+    const reqNo = existingVendor?.id || (!isNew ? this.vendorId : undefined);
+
+    const biPayload: any = {
+      coperation: op,
+      vendoR_NAME: this.vendorName.trim(),
       email: this.vendorEmail.trim(),
-      phone: this.vendorContact.trim(),
-      contactPerson: this.contactPerson.trim()
+      contact: this.vendorContact.trim(),
+      cT_PERSON: this.contactPerson.trim(),
+      active: 0
+    };
+    if (reqNo) {
+      biPayload.reQ_NO = reqNo;
+      biPayload.vendorid = reqNo;
+    }
+
+    this.vendorApi.saveVendorBasicInfo(biPayload).subscribe({
+      next: () => {
+        // Keep AUDVendorRegistration in sync
+        this.vendorApi.saveVendorRegistration({
+          coperation: 1,
+          reqno: reqNo || '',
+          vendoR_NAME: this.vendorName.trim(),
+          email: this.vendorEmail.trim(),
+          tel: this.vendorContact.trim(),
+          isactive: 0
+        }).subscribe();
+
+        // Refresh live vendor records from API
+        this.vendorApi.getVendorBasicInfo().subscribe(res => {
+          const list = res?.vendorBI_List || [];
+          const match = list.find((v: any) => v.email?.toLowerCase() === this.vendorEmail.trim().toLowerCase());
+          const assignedId = match?.reQ_NO || reqNo || this.vendorId;
+          this.vendorId = assignedId;
+          this.isSaved = true;
+          this.refreshRequestsFromApi(list);
+          this.state.notify(`Vendor draft saved successfully! ID: ${assignedId}`);
+        });
+      },
+      error: (err) => {
+        this.state.notify('Error saving vendor: ' + (err?.error?.message || err?.message || 'Server error'));
+      }
     });
-
-    this.vendorApi.saveVendorRegistration({
-      coperation: 1,
-      reqno: saved.id,
-      vendoR_NAME: saved.vendorName,
-      email: saved.email,
-      tel: saved.phone,
-      isactive: 0
-    }).subscribe();
-
-    this.vendorId = saved.id;
-    this.isSaved = true;
   }
 
   initiateSendEmail(): void {
@@ -1308,22 +1350,67 @@ export class VendorRegistrationReqComponent {
       return;
     }
 
-    if (this.vendorId === '*** NEW ***') {
-      this.saveRecord();
-      if (this.vendorId === '*** NEW ***') {
-        return;
-      }
-    }
-
     this.isSendingEmail = true;
 
-    // Simulate sending email via backend (like legacy loader)
-    setTimeout(() => {
-      this.isSendingEmail = false;
-      const res = this.state.sendVendorInvitationEmail(this.vendorId);
-      this.lastGeneratedPassword = res.password;
-      this.showSuccessModal = true;
-    }, 900);
+    // Generate temporary 6-character password (e.g., 5207Lv)
+    const numberPart = Math.floor(1000 + Math.random() * 9000);
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+    const letterPart = chars.charAt(Math.floor(Math.random() * chars.length)) + chars.charAt(Math.floor(Math.random() * chars.length));
+    const tempPassword = `${numberPart}${letterPart}`;
+
+    const isNew = !this.vendorId || this.vendorId === '*** NEW ***' || this.vendorId.startsWith('REQ-');
+    const existingVendor = this.requests().find(r =>
+      r.email.toLowerCase() === this.vendorEmail.trim().toLowerCase() ||
+      (this.vendorId && r.id === this.vendorId && !r.id.startsWith('REQ-'))
+    );
+    const op = (isNew && !existingVendor) ? 2 : 3;
+    const reqNo = existingVendor?.id || (!isNew ? this.vendorId : undefined);
+
+    const biPayload: any = {
+      coperation: op,
+      vendoR_NAME: this.vendorName.trim(),
+      email: this.vendorEmail.trim(),
+      contact: this.vendorContact.trim(),
+      cT_PERSON: this.contactPerson.trim(),
+      password: tempPassword,
+      active: 0
+    };
+    if (reqNo) {
+      biPayload.reQ_NO = reqNo;
+      biPayload.vendorid = reqNo;
+    }
+
+    this.vendorApi.saveVendorBasicInfo(biPayload).subscribe({
+      next: () => {
+        // Keep AUDVendorRegistration in sync
+        this.vendorApi.saveVendorRegistration({
+          coperation: 1,
+          reqno: reqNo || '',
+          vendoR_NAME: this.vendorName.trim(),
+          email: this.vendorEmail.trim(),
+          tel: this.vendorContact.trim(),
+          isactive: 0
+        }).subscribe();
+
+        // Refresh live vendor records from API
+        this.vendorApi.getVendorBasicInfo().subscribe(res => {
+          this.isSendingEmail = false;
+          const list = res?.vendorBI_List || [];
+          const match = list.find((v: any) => v.email?.toLowerCase() === this.vendorEmail.trim().toLowerCase());
+          const assignedId = match?.reQ_NO || reqNo || this.vendorId;
+          this.vendorId = assignedId;
+          this.isSaved = true;
+          this.lastGeneratedPassword = tempPassword;
+          this.showSuccessModal = true;
+          this.refreshRequestsFromApi(list);
+          this.state.notify(`Invitation credentials created and saved for ${this.vendorEmail}!`);
+        });
+      },
+      error: (err) => {
+        this.isSendingEmail = false;
+        this.state.notify('Error saving vendor credentials: ' + (err?.error?.message || err?.message || 'Server error'));
+      }
+    });
   }
 
   skipEmail(): void {
@@ -1339,14 +1426,7 @@ export class VendorRegistrationReqComponent {
       return;
     }
 
-    if (this.vendorId === '*** NEW ***') {
-      this.saveRecord();
-      if (this.vendorId === '*** NEW ***') {
-        return;
-      }
-    }
-
-    this.state.skipVendorInvitation(this.vendorId);
+    this.saveRecord();
     this.resetForm();
   }
 
@@ -1392,7 +1472,7 @@ export class VendorRegistrationReqComponent {
   }
 
   copyCredentials(): void {
-    const text = `TAMCO Vendor Portal Credentials\nURL: http://localhost:4200/login\nEmail: ${this.vendorEmail}\nPassword: ${this.lastGeneratedPassword}`;
+    const text = `TAMCO Vendor Portal Credentials\nURL: http://localhost:4200/login\nVendor ID: ${this.vendorId}\nEmail: ${this.vendorEmail}\nPassword: ${this.lastGeneratedPassword}`;
     navigator.clipboard.writeText(text);
     this.state.notify('Credentials copied to clipboard!');
   }

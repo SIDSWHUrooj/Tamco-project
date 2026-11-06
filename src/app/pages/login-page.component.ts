@@ -1,7 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Role, PORTAL_ACCOUNTS, AuthAccount } from '../core/models';
+import { Role } from '../core/models';
 import { PortalStateService } from '../core/portal-state.service';
 import { AuthService } from '../core/auth.service';
 
@@ -203,27 +203,6 @@ import { AuthService } from '../core/auth.service';
 
             </div>
 
-            <!-- Quick Demo Login Selection -->
-            <div style="margin-bottom: 20px; padding: 12px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #cbd5e1;">
-              <span style="display: block; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">
-                ⚡ Quick 1-Click Access (Demo Mode):
-              </span>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                @for (acc of accounts; track acc.username) {
-                  <button
-                    type="button"
-                    (click)="quickLogin(acc)"
-                    [style.background]="acc.role === 'vendor' ? '#f0fdf4' : '#ffffff'"
-                    [style.border-color]="acc.role === 'vendor' ? '#86efac' : '#cbd5e1'"
-                    style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1.5px solid; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: transform 0.15s, box-shadow 0.15s;"
-                    title="Click to sign in instantly as {{ acc.badge }}">
-                    <span [style.color]="acc.role === 'vendor' ? '#16a34a' : '#2563eb'">●</span>
-                    <span [style.color]="acc.role === 'vendor' ? '#15803d' : '#1e293b'">{{ acc.badge }}</span>
-                  </button>
-                }
-              </div>
-            </div>
-
             <!-- Form -->
             <form
               #loginForm="ngForm"
@@ -350,6 +329,21 @@ import { AuthService } from '../core/auth.service';
               </div>
 
 
+              <!-- Success -->
+              @if (loginSuccess) {
+                <div
+                  class="login-success-banner"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  <span>{{ loginSuccess }}</span>
+                </div>
+              }
+
               <!-- Error -->
               @if (loginError) {
                 <div
@@ -464,6 +458,384 @@ import { AuthService } from '../core/auth.service';
         </footer>
 
       </section>
+
+      <!-- =====================================================
+           VENDOR FORGOT PASSWORD / OTP MODAL
+      ====================================================== -->
+      @if (showForgotModal) {
+        <div class="modal-backdrop" (click)="closeForgotModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            
+            <!-- Modal Header -->
+            <div class="modal-header">
+              <div class="modal-steps-indicator">
+                <span class="step-pill" [class.active]="forgotStep === 'email'" [class.done]="forgotStep !== 'email'">
+                  1. Email
+                </span>
+                <span class="step-arrow">→</span>
+                <span class="step-pill" [class.active]="forgotStep === 'otp'" [class.done]="forgotStep === 'reset' || forgotStep === 'success'">
+                  2. OTP
+                </span>
+                <span class="step-arrow">→</span>
+                <span class="step-pill" [class.active]="forgotStep === 'reset'" [class.done]="forgotStep === 'success'">
+                  3. Password
+                </span>
+              </div>
+              <button type="button" class="modal-close-btn" (click)="closeForgotModal()" aria-label="Close modal">
+                ✕
+              </button>
+            </div>
+
+            <!-- STEP 1: REQUEST OTP (EMAIL) -->
+            @if (forgotStep === 'email') {
+              <div class="modal-body">
+                <div class="modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                  </svg>
+                </div>
+
+                <h2 id="modalTitle" class="modal-title">Reset Vendor Password</h2>
+                <p class="modal-subtitle">
+                  Enter your registered vendor email address. We will transmit a 6-digit One-Time Password (OTP) to verify your identity.
+                </p>
+
+                @if (forgotError) {
+                  <div class="modal-alert error" role="alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>{{ forgotError }}</span>
+                  </div>
+                }
+
+                <div class="modal-form-group">
+                  <label for="forgotEmailInput">Registered Vendor Email *</label>
+                  <div class="modal-input-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                    </svg>
+                    <input
+                      id="forgotEmailInput"
+                      type="email"
+                      [(ngModel)]="forgotEmail"
+                      (ngModelChange)="forgotError = ''"
+                      (keydown.enter)="requestOtp()"
+                      placeholder="e.g. vendor@tamco.ae"
+                      autocomplete="email"
+                      autofocus
+                    />
+                  </div>
+                  <span class="field-hint">Must match the email address associated with your vendor account.</span>
+                </div>
+
+                <div class="modal-actions">
+                  <button type="button" class="btn-modal secondary" (click)="closeForgotModal()">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-modal primary"
+                    [disabled]="!forgotEmail.trim() || forgotLoading"
+                    (click)="requestOtp()"
+                  >
+                    @if (forgotLoading) {
+                      <span class="btn-spinner"></span>
+                      <span>Sending Code...</span>
+                    } @else {
+                      <span>Send Verification Code →</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- STEP 2: VERIFY OTP -->
+            @if (forgotStep === 'otp') {
+              <div class="modal-body">
+                <div class="modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <path d="m9 12 2 2 4-4"></path>
+                  </svg>
+                </div>
+
+                <h2 id="modalTitle" class="modal-title">Verify One-Time Password</h2>
+                <p class="modal-subtitle">
+                  Enter the 6-digit verification code sent to
+                  <strong class="highlight-email">{{ forgotEmail }}</strong>
+                </p>
+
+                <div class="change-email-row">
+                  <button type="button" class="btn-text-link" (click)="forgotStep = 'email'">
+                    ← Change Email Address
+                  </button>
+                </div>
+
+                @if (forgotSuccessMsg) {
+                  <div class="modal-alert info" role="status">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span>{{ forgotSuccessMsg }}</span>
+                  </div>
+                }
+
+                @if (forgotError) {
+                  <div class="modal-alert error" role="alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>{{ forgotError }}</span>
+                  </div>
+                }
+
+                <div class="modal-form-group">
+                  <label for="forgotOtpInput">6-Digit Verification Code</label>
+                  <div class="otp-input-wrapper">
+                    <input
+                      id="forgotOtpInput"
+                      type="text"
+                      class="otp-hidden-input"
+                      [(ngModel)]="forgotOtp"
+                      (ngModelChange)="onOtpChange()"
+                      (keydown.enter)="verifyOtp()"
+                      maxlength="6"
+                      inputmode="numeric"
+                      autocomplete="one-time-code"
+                      autofocus
+                    />
+                    <div class="otp-boxes" aria-hidden="true">
+                      @for (idx of [0, 1, 2, 3, 4, 5]; track idx) {
+                        <div
+                          class="otp-box"
+                          [class.filled]="forgotOtp.length > idx"
+                          [class.active]="forgotOtp.length === idx"
+                        >
+                          {{ forgotOtp[idx] || '' }}
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <div class="resend-row">
+                  @if (resendCountdown > 0) {
+                    <span class="resend-countdown">
+                      Resend code available in <strong>{{ resendCountdown }}s</strong>
+                    </span>
+                  } @else {
+                    <button type="button" class="btn-resend" [disabled]="forgotLoading" (click)="resendOtp()">
+                      ↻ Didn't receive code? Resend Code
+                    </button>
+                  }
+                </div>
+
+                <div class="modal-actions">
+                  <button type="button" class="btn-modal secondary" (click)="forgotStep = 'email'">
+                    ← Back
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-modal primary"
+                    [disabled]="forgotOtp.length < 6 || forgotLoading"
+                    (click)="verifyOtp()"
+                  >
+                    @if (forgotLoading) {
+                      <span class="btn-spinner"></span>
+                      <span>Verifying Code...</span>
+                    } @else {
+                      <span>Verify Code →</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- STEP 3: RESET PASSWORD -->
+            @if (forgotStep === 'reset') {
+              <div class="modal-body">
+                <div class="modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+
+                <h2 id="modalTitle" class="modal-title">Create New Password</h2>
+                <p class="modal-subtitle">
+                  Your identity has been verified. Enter a secure new password for vendor account
+                  <strong class="highlight-email">{{ forgotEmail }}</strong>.
+                </p>
+
+                @if (forgotError) {
+                  <div class="modal-alert error" role="alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>{{ forgotError }}</span>
+                  </div>
+                }
+
+                <!-- New Password -->
+                <div class="modal-form-group">
+                  <label for="forgotNewPass">New Password *</label>
+                  <div class="modal-input-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <input
+                      id="forgotNewPass"
+                      [type]="forgotShowNewPassword ? 'text' : 'password'"
+                      [(ngModel)]="forgotNewPassword"
+                      (ngModelChange)="forgotError = ''"
+                      placeholder="Enter at least 6 characters"
+                      autocomplete="new-password"
+                      autofocus
+                    />
+                    <button
+                      type="button"
+                      class="field-toggle-btn"
+                      (click)="forgotShowNewPassword = !forgotShowNewPassword"
+                      [attr.aria-label]="forgotShowNewPassword ? 'Hide password' : 'Show password'"
+                    >
+                      @if (forgotShowNewPassword) {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+                          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+                          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+                          <line x1="2" y1="2" x2="22" y2="22"></line>
+                        </svg>
+                      } @else {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      }
+                    </button>
+                  </div>
+
+                  <!-- Password strength bar -->
+                  @if (forgotNewPassword) {
+                    <div class="strength-meter">
+                      <div class="strength-bar-track">
+                        <div
+                          class="strength-bar-fill"
+                          [style.width.%]="passwordStrength.score"
+                          [style.background-color]="passwordStrength.color"
+                        ></div>
+                      </div>
+                      <span class="strength-label" [style.color]="passwordStrength.color">
+                        {{ passwordStrength.label }}
+                      </span>
+                    </div>
+                  }
+                </div>
+
+                <!-- Confirm New Password -->
+                <div class="modal-form-group">
+                  <label for="forgotConfirmPass">Confirm New Password *</label>
+                  <div class="modal-input-wrap">
+                    <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <input
+                      id="forgotConfirmPass"
+                      [type]="forgotShowConfirmPassword ? 'text' : 'password'"
+                      [(ngModel)]="forgotConfirmPassword"
+                      (ngModelChange)="forgotError = ''"
+                      (keydown.enter)="resetPassword()"
+                      placeholder="Re-enter your new password"
+                      autocomplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      class="field-toggle-btn"
+                      (click)="forgotShowConfirmPassword = !forgotShowConfirmPassword"
+                      [attr.aria-label]="forgotShowConfirmPassword ? 'Hide password' : 'Show password'"
+                    >
+                      @if (forgotShowConfirmPassword) {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+                          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+                          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+                          <line x1="2" y1="2" x2="22" y2="22"></line>
+                        </svg>
+                      } @else {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      }
+                    </button>
+                  </div>
+
+                  @if (forgotConfirmPassword && forgotNewPassword !== forgotConfirmPassword) {
+                    <span class="field-error-text">Passwords do not match</span>
+                  } @else if (forgotConfirmPassword && forgotNewPassword === forgotConfirmPassword) {
+                    <span class="field-match-text">✓ Passwords match</span>
+                  }
+                </div>
+
+                <div class="modal-actions">
+                  <button type="button" class="btn-modal secondary" (click)="closeForgotModal()">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-modal primary"
+                    [disabled]="!forgotNewPassword || forgotNewPassword.length < 6 || forgotNewPassword !== forgotConfirmPassword || forgotLoading"
+                    (click)="resetPassword()"
+                  >
+                    @if (forgotLoading) {
+                      <span class="btn-spinner"></span>
+                      <span>Updating Password...</span>
+                    } @else {
+                      <span>Reset Password & Sign In →</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- STEP 4: SUCCESS -->
+            @if (forgotStep === 'success') {
+              <div class="modal-body text-center">
+                <div class="modal-success-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                </div>
+
+                <h2 id="modalTitle" class="modal-title">Password Reset Complete!</h2>
+                <p class="modal-subtitle">
+                  Your vendor password has been securely updated. You can now sign in immediately using your new password.
+                </p>
+
+                <div class="modal-actions-centered">
+                  <button type="button" class="btn-modal primary full-width" (click)="finishReset()">
+                    Sign in to Vendor Portal →
+                  </button>
+                </div>
+              </div>
+            }
+
+          </div>
+        </div>
+      }
 
     </main>
   `,
@@ -2673,35 +3045,552 @@ import { AuthService } from '../core/auth.service';
       }
     }
 
+    /* =========================================================
+       LOGIN SUCCESS BANNER
+    ========================================================== */
+    .login-success-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .login-success-banner svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      color: #059669;
+    }
+
+    /* =========================================================
+       VENDOR FORGOT PASSWORD / OTP MODAL
+    ========================================================== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .modal-card {
+      position: relative;
+      background: #ffffff;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      background: #fafbfc;
+    }
+
+    .modal-steps-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+      color: #64748b;
+      background: #e2e8f0;
+      transition: all 0.2s ease;
+    }
+
+    .step-pill.active {
+      background: #fff0eb;
+      color: #f05a24;
+      border: 1px solid rgba(240, 90, 36, 0.25);
+    }
+
+    .step-pill.done {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .step-arrow {
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .modal-close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .modal-close-btn:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+
+    .modal-body {
+      padding: 24px 28px 28px;
+    }
+
+    .modal-body.text-center {
+      text-align: center;
+      padding: 36px 28px;
+    }
+
+    .modal-icon-badge {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: #fff0eb;
+      color: #f05a24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      border: 1px solid rgba(240, 90, 36, 0.2);
+    }
+
+    .modal-icon-badge svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .modal-success-badge {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #d1fae5;
+      color: #059669;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      border: 2px solid #a7f3d0;
+    }
+
+    .modal-success-badge svg {
+      width: 34px;
+      height: 34px;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 6px;
+    }
+
+    .modal-subtitle {
+      font-size: 13.5px;
+      color: #64748b;
+      line-height: 1.5;
+      margin: 0 0 18px;
+    }
+
+    .highlight-email {
+      color: #0f172a;
+      font-weight: 600;
+      word-break: break-all;
+    }
+
+    .change-email-row {
+      margin-top: -10px;
+      margin-bottom: 16px;
+    }
+
+    .btn-text-link {
+      background: none;
+      border: none;
+      color: #f05a24;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .modal-alert {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+
+    .modal-alert.error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+    }
+
+    .modal-alert.info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+
+    .modal-alert svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .modal-form-group {
+      margin-bottom: 18px;
+    }
+
+    .modal-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .modal-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .modal-input-wrap:focus-within {
+      border-color: #f05a24;
+      box-shadow: 0 0 0 3px rgba(240, 90, 36, 0.15);
+    }
+
+    .modal-input-wrap .field-icon {
+      width: 18px;
+      height: 18px;
+      color: #94a3b8;
+      margin-left: 14px;
+      flex-shrink: 0;
+    }
+
+    .modal-input-wrap input {
+      width: 100%;
+      padding: 12px 14px;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .field-toggle-btn {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .field-toggle-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .field-hint {
+      display: block;
+      font-size: 11.5px;
+      color: #64748b;
+      margin-top: 5px;
+    }
+
+    .field-error-text {
+      display: block;
+      font-size: 12px;
+      color: #dc2626;
+      margin-top: 5px;
+      font-weight: 500;
+    }
+
+    .field-match-text {
+      display: block;
+      font-size: 12px;
+      color: #059669;
+      margin-top: 5px;
+      font-weight: 500;
+    }
+
+    /* 6-DIGIT OTP BOXES */
+    .otp-input-wrapper {
+      position: relative;
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    .otp-hidden-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .otp-boxes {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      width: 100%;
+    }
+
+    .otp-box {
+      height: 56px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fafbfc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #0f172a;
+      font-family: monospace;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .otp-box.filled {
+      border-color: #0876b9;
+      background: #ffffff;
+      color: #0876b9;
+    }
+
+    .otp-box.active {
+      border-color: #f05a24;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(240, 90, 36, 0.15);
+    }
+
+    .resend-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+
+    .resend-countdown {
+      color: #64748b;
+    }
+
+    .resend-countdown strong {
+      color: #0f172a;
+    }
+
+    .btn-resend {
+      background: none;
+      border: none;
+      color: #f05a24;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .btn-resend:hover {
+      background: #fff0eb;
+    }
+
+    /* PASSWORD STRENGTH */
+    .strength-meter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .strength-bar-track {
+      flex: 1;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .strength-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    .strength-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    /* MODAL ACTIONS */
+    .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .modal-actions-centered {
+      margin-top: 24px;
+    }
+
+    .btn-modal {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-modal.primary {
+      background: #f05a24;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(240, 90, 36, 0.25);
+    }
+
+    .btn-modal.primary:hover:not(:disabled) {
+      background: #d94914;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(240, 90, 36, 0.35);
+    }
+
+    .btn-modal.primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-modal.secondary {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .btn-modal.secondary:hover {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+
+    .btn-modal.full-width {
+      width: 100%;
+      padding: 13px 20px;
+      font-size: 15px;
+    }
+
+    .btn-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
   `]
 })
-export class LoginPageComponent {
+export class LoginPageComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly state = inject(PortalStateService);
   private readonly auth = inject(AuthService);
-
-  readonly accounts = PORTAL_ACCOUNTS;
 
   username = '';
   password = '';
   rememberMe = true;
   showPassword = false;
   loginError = '';
+  loginSuccess = '';
   loading = false;
 
-  selectAccount(acc: AuthAccount): void {
-    this.username = acc.username;
-    this.password = acc.password;
-    this.loginError = '';
-  }
-
-  quickLogin(acc: AuthAccount): void {
-    this.username = acc.username;
-    this.password = acc.password;
-    this.state.signIn(acc);
-    this.navigatePostLogin(acc.role);
-  }
+  // Forgot Password / OTP Flow State
+  showForgotModal = false;
+  forgotStep: 'email' | 'otp' | 'reset' | 'success' = 'email';
+  forgotEmail = '';
+  forgotOtp = '';
+  forgotResetToken = '';
+  forgotNewPassword = '';
+  forgotConfirmPassword = '';
+  forgotShowNewPassword = false;
+  forgotShowConfirmPassword = false;
+  forgotLoading = false;
+  forgotError = '';
+  forgotSuccessMsg = '';
+  resendCountdown = 0;
+  private resendTimer: any = null;
 
   private navigatePostLogin(role: Role): void {
     if (role === 'vendor') {
@@ -2738,35 +3627,45 @@ export class LoginPageComponent {
     this.loading = true;
     this.loginError = '';
 
-    const isVendor = inputUser.toLowerCase().includes('vendor') || inputUser.includes('@') || inputUser.toUpperCase().startsWith('VEN-');
+    const isExplicitVendor = inputUser.toLowerCase().includes('vendor') || inputUser.toUpperCase().startsWith('VEN-');
+    const hasEmail = inputUser.includes('@');
 
-    const login$ = isVendor
+    // If an email was entered, try VendorLogin first; if not found, fall back to UserLogin for staff
+    if (hasEmail && !isExplicitVendor) {
+      this.auth.vendorLogin({ usernameOrEmail: inputUser, password: inputPass }).subscribe({
+        next: () => {
+          this.loading = false;
+          this.navigatePostLogin('vendor');
+        },
+        error: () => {
+          this.auth.userLogin({ userid: inputUser, userpwd: inputPass }).subscribe({
+            next: () => {
+              this.loading = false;
+              this.navigatePostLogin(this.state.role());
+            },
+            error: () => {
+              this.loading = false;
+              this.loginError = 'Login failed. If you are an internal staff member (Procurement, Finance, or Admin), please sign in using your User ID (e.g. PRO001) instead of your email address.';
+            }
+          });
+        }
+      });
+      return;
+    }
+
+    const login$ = isExplicitVendor
       ? this.auth.vendorLogin({ usernameOrEmail: inputUser, password: inputPass })
       : this.auth.userLogin({ userid: inputUser, userpwd: inputPass });
 
     login$.subscribe({
       next: () => {
         this.loading = false;
-        const role = isVendor ? 'vendor' : (this.state.role() || 'procurement');
+        const role = isExplicitVendor ? 'vendor' : this.state.role();
         this.navigatePostLogin(role);
       },
       error: (err) => {
         this.loading = false;
-
-        // Fallback check against official demo accounts
-        const matched = this.accounts.find(
-          acc => acc.username.toLowerCase() === inputUser.toLowerCase() ||
-                 acc.email.toLowerCase() === inputUser.toLowerCase() ||
-                 acc.role.toLowerCase() === inputUser.toLowerCase()
-        );
-
-        if (matched) {
-          this.state.signIn(matched);
-          this.navigatePostLogin(matched.role);
-          return;
-        }
-
-        const errMsg = err?.error?.message || err?.error?.title || (err?.status === 0 ? 'Unable to reach API server. Please check your network connection or CORS settings.' : 'Invalid credentials. Please verify your login details.');
+        const errMsg = err?.message || err?.error?.message || err?.error?.title || (err?.status === 0 ? 'Unable to reach API server. Please check your network connection or CORS settings.' : 'Invalid credentials. Please verify your login details.');
         this.loginError = errMsg;
       }
     });
@@ -2779,17 +3678,188 @@ export class LoginPageComponent {
   }
 
   forgotPassword(): void {
-    const email = prompt('Enter your registered vendor email address for password reset:');
-    if (email && email.trim()) {
-      this.auth.vendorForgotPassword(email.trim()).subscribe({
-        next: () => {
-          alert(`Password reset instructions have been sent to ${email.trim()}`);
-        },
-        error: (err) => {
-          alert(err?.error?.message || 'Password reset request failed. Please check the email and try again.');
-        }
-      });
+    const trimmedUser = this.username.trim();
+    if (trimmedUser.includes('@')) {
+      this.forgotEmail = trimmedUser;
+    
+    } else {
+      this.forgotEmail = '';
     }
+    this.forgotStep = 'email';
+    this.forgotOtp = '';
+    this.forgotResetToken = '';
+    this.forgotNewPassword = '';
+    this.forgotConfirmPassword = '';
+    this.forgotShowNewPassword = false;
+    this.forgotShowConfirmPassword = false;
+    this.forgotError = '';
+    this.forgotSuccessMsg = '';
+    this.clearResendTimer();
+    this.showForgotModal = true;
+  }
+
+  closeForgotModal(): void {
+    this.showForgotModal = false;
+    this.clearResendTimer();
+  }
+
+  requestOtp(): void {
+    const email = this.forgotEmail.trim();
+    if (!email || !email.includes('@')) {
+      this.forgotError = 'Please enter a valid vendor email address.';
+      return;
+    }
+
+    this.forgotLoading = true;
+    this.forgotError = '';
+    this.forgotSuccessMsg = '';
+
+    this.auth.vendorForgotPassword(email).subscribe({
+      next: (res) => {
+        this.forgotLoading = false;
+        if (res?.status === '2' || res?.status === 2) {
+          this.forgotError = res?.message || 'No registered vendor found with this email.';
+          return;
+        }
+        this.forgotResetToken = res?.resetToken || res?.reseT_TOKEN || '';
+        this.forgotSuccessMsg = res?.message || `A 6-digit verification code has been transmitted to ${email}.`;
+        this.forgotStep = 'otp';
+        this.startResendCountdown(60);
+      },
+      error: (err) => {
+        this.forgotLoading = false;
+        this.forgotError = err?.error?.message || 'Failed to send OTP code. Please check your email and network connection.';
+      }
+    });
+  }
+
+  onOtpChange(): void {
+    this.forgotOtp = this.forgotOtp.replace(/[^0-9]/g, '');
+    this.forgotError = '';
+    if (this.forgotOtp.length === 6) {
+      this.verifyOtp();
+    }
+  }
+
+  verifyOtp(): void {
+    const otp = this.forgotOtp.trim();
+    if (otp.length < 6) {
+      this.forgotError = 'Please enter the complete 6-digit verification code.';
+      return;
+    }
+
+    this.forgotLoading = true;
+    this.forgotError = '';
+
+    this.auth.vendorVerifyOtp(this.forgotEmail.trim(), otp).subscribe({
+      next: (res) => {
+        this.forgotLoading = false;
+        if (res?.status === '2' || res?.status === 2) {
+          this.forgotError = res?.message || 'Invalid or expired OTP. Please verify the code and try again.';
+          return;
+        }
+        if (res?.resetToken || res?.reseT_TOKEN) {
+          this.forgotResetToken = res?.resetToken || res?.reseT_TOKEN;
+        }
+        this.forgotStep = 'reset';
+        this.clearResendTimer();
+      },
+      error: (err) => {
+        this.forgotLoading = false;
+        this.forgotError = err?.error?.message || 'Invalid or expired OTP code.';
+      }
+    });
+  }
+
+  resendOtp(): void {
+    if (this.resendCountdown > 0 || this.forgotLoading) return;
+    this.forgotOtp = '';
+    this.requestOtp();
+  }
+
+  resetPassword(): void {
+    const p1 = this.forgotNewPassword;
+    const p2 = this.forgotConfirmPassword;
+
+    if (!p1 || p1.length < 6) {
+      this.forgotError = 'Password must be at least 6 characters.';
+      return;
+    }
+    if (p1 !== p2) {
+      this.forgotError = 'Passwords do not match.';
+      return;
+    }
+
+    this.forgotLoading = true;
+    this.forgotError = '';
+
+    this.auth.vendorResetPassword({
+      email: this.forgotEmail.trim(),
+      otp: this.forgotOtp.trim(),
+      password: p1,
+      reseT_TOKEN: this.forgotResetToken,
+      resetToken: this.forgotResetToken
+    }).subscribe({
+      next: (res) => {
+        this.forgotLoading = false;
+        if (res?.status === '2' || res?.status === 2) {
+          this.forgotError = res?.message || 'Password reset session expired. Please request a new OTP.';
+          return;
+        }
+        this.forgotStep = 'success';
+        this.username = this.forgotEmail;
+        this.password = p1;
+      },
+      error: (err) => {
+        this.forgotLoading = false;
+        this.forgotError = err?.error?.message || 'Password reset failed. Please try again.';
+      }
+    });
+  }
+
+  finishReset(): void {
+    this.showForgotModal = false;
+    this.clearResendTimer();
+    this.loginSuccess = 'Password updated successfully! Please sign in with your new credentials.';
+    this.loginError = '';
+  }
+
+  startResendCountdown(seconds: number = 60): void {
+    this.clearResendTimer();
+    this.resendCountdown = seconds;
+    this.resendTimer = setInterval(() => {
+      if (this.resendCountdown > 0) {
+        this.resendCountdown--;
+      } else {
+        this.clearResendTimer();
+      }
+    }, 1000);
+  }
+
+  clearResendTimer(): void {
+    if (this.resendTimer) {
+      clearInterval(this.resendTimer);
+      this.resendTimer = null;
+    }
+  }
+
+  get passwordStrength(): { score: number; label: string; color: string } {
+    const p = this.forgotNewPassword;
+    if (!p) return { score: 0, label: '', color: '#d9e2e9' };
+    let score = 0;
+    if (p.length >= 8) score++;
+    if (/[A-Z]/.test(p)) score++;
+    if (/[0-9]/.test(p)) score++;
+    if (/[^A-Za-z0-9]/.test(p)) score++;
+
+    if (score <= 1) return { score: 25, label: 'Weak', color: '#dc2626' };
+    if (score === 2) return { score: 50, label: 'Fair', color: '#f59e0b' };
+    if (score === 3) return { score: 75, label: 'Good', color: '#10b981' };
+    return { score: 100, label: 'Strong', color: '#059669' };
+  }
+
+  ngOnDestroy(): void {
+    this.clearResendTimer();
   }
 
   contactAdministrator(): void {

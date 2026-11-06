@@ -2,31 +2,26 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent } from '../shared/ui.component';
+import { VendorApiService, USERModel } from '../core/vendor-api.service';
 import { IconComponent } from '../shared/icon.component';
+import { CustomSelectComponent } from '../shared/custom-select.component';
 import { LegacyUserItem, DepartmentItem } from '../core/models';
 
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeadingComponent, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent, CustomSelectComponent],
   template: `
-    <app-page-heading
-      eyebrow="Setup & Administration"
-      title="User Management (/Setup/Users)"
-      subtitle="Provision internal team members, set security groups, configure contact details, and assign departmental roles."
-    >
-      <div class="heading-actions">
-        <button
-          type="button"
-          class="btn"
-          style="background-color: var(--role-accent, #50ae9b); border-color: var(--role-accent, #50ae9b); display: inline-flex; align-items: center; gap: 6px;"
-          (click)="resetUserForm()"
-        >
-          + New User Record
-        </button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
+      <button
+        type="button"
+        class="btn"
+        style="background-color: var(--role-accent, #50ae9b); border-color: var(--role-accent, #50ae9b); display: inline-flex; align-items: center; gap: 6px;"
+        (click)="resetUserForm()"
+      >
+        + New User Record
+      </button>
+    </div>
 
     <!-- USERS DETAILS CARD (Matches Screenshot media_1790932261121.jpg & /Setup/Users) -->
     <article class="panel main-card">
@@ -93,7 +88,7 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
               <input
                 [type]="showPassword ? 'text' : 'password'"
                 [(ngModel)]="userForm.password"
-                placeholder="Enter Password"
+                [placeholder]="userEditMode ? 'Leave blank to keep existing password' : 'Enter Password'"
                 class="form-control"
               />
               <button
@@ -113,24 +108,20 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
         <div class="form-row four-col">
           <div class="col">
             <label>Country</label>
-            <select [(ngModel)]="userForm.country" class="form-control form-select">
-              <option value="United Arab Emirates">United Arab Emirates</option>
-              <option value="Saudi Arabia">Saudi Arabia</option>
-              <option value="Qatar">Qatar</option>
-              <option value="Oman">Oman</option>
-              <option value="Bahrain">Bahrain</option>
-            </select>
+            <app-custom-select
+              [(ngModel)]="userForm.country"
+              [options]="countryOptions"
+              placeholder="Select Country"
+            />
           </div>
 
           <div class="col">
             <label>City</label>
-            <select [(ngModel)]="userForm.city" class="form-control form-select">
-              <option value="Dubai">Dubai</option>
-              <option value="Abu Dhabi">Abu Dhabi</option>
-              <option value="Sharjah">Sharjah</option>
-              <option value="Ajman">Ajman</option>
-              <option value="Ras Al Khaimah">Ras Al Khaimah</option>
-            </select>
+            <app-custom-select
+              [(ngModel)]="userForm.city"
+              [options]="cityOptions"
+              placeholder="Select City"
+            />
           </div>
 
           <div class="col">
@@ -202,12 +193,11 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
         <div class="form-row two-col" style="align-items: center;">
           <div class="col">
             <label>Security Group</label>
-            <select [(ngModel)]="userForm.securityGroup" class="form-control form-select">
-              <option value="Admin">Admin (Full System Master)</option>
-              <option value="Procurement">Procurement (Buyers & Sourcing)</option>
-              <option value="Finance">Finance (Accounts Payable & Banks)</option>
-              <option value="Vendor">Vendor (External Partner)</option>
-            </select>
+            <app-custom-select
+              [(ngModel)]="userForm.securityGroup"
+              [options]="rolesList"
+              placeholder="Select Security Group"
+            />
           </div>
 
           <div class="col">
@@ -230,7 +220,7 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
           <button
             type="button"
             class="btn btn-primary"
-            style="background-color: #007bff; border-color: #007bff; color: white; padding: 9px 24px;"
+            style="background-color: var(--role-accent, #50ae9b); border-color: var(--role-accent, #50ae9b); color: white; padding: 9px 24px; font-weight: 600;"
             (click)="submitUserForm()"
           >
             {{ userEditMode ? 'Update' : 'Submit' }}
@@ -291,10 +281,10 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
                 <td>{{ u.department }}</td>
                 <td>{{ u.designation }}</td>
                 <td class="mono-email">{{ u.email }}</td>
-                <td><span class="badge-role">{{ u.securityGroup }}</span></td>
+                <td><span class="badge-role">{{ getRoleLabel(u.securityGroup) }}</span></td>
                 <td style="text-align: center;">
-                  <span class="badge" [class.badge-yes]="u.status === 'Active'" [class.badge-no]="u.status !== 'Active'">
-                    {{ u.status }}
+                  <span class="user-status-badge" [class.status-active]="(u.status || 'Active') === 'Active'" [class.status-inactive]="u.status === 'Inactive'">
+                    {{ u.status || 'Active' }}
                   </span>
                 </td>
                 <td style="text-align: center;">
@@ -340,7 +330,7 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
                     <td>{{ u.firstName }} {{ u.lastName }}</td>
                     <td>{{ u.department }}</td>
                     <td>{{ u.designation }}</td>
-                    <td>{{ u.securityGroup }}</td>
+                    <td>{{ getRoleLabel(u.securityGroup) }}</td>
                   </tr>
                 }
               </tbody>
@@ -392,7 +382,11 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       border: 1px solid #e2e8f0;
-      overflow: hidden;
+      overflow: visible !important;
+
+      &.table-card {
+        overflow: hidden !important;
+      }
     }
 
     .main-heading-banner {
@@ -401,6 +395,8 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
       padding: 9px 16px;
       text-align: center;
       width: 100%;
+      border-top-left-radius: 7px;
+      border-top-right-radius: 7px;
 
       h5 {
         margin: 0;
@@ -412,6 +408,7 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
 
     .form-body {
       padding: 20px 22px;
+      overflow: visible !important;
     }
 
     .form-row {
@@ -470,29 +467,64 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
     }
 
     .input-with-actions {
-      display: flex;
+      display: flex !important;
+      align-items: stretch !important;
       width: 100%;
+      height: 38px !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 6px !important;
+      background: #ffffff !important;
+      overflow: hidden !important;
+      box-sizing: border-box !important;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-      input {
-        border-top-right-radius: 0;
-        border-bottom-right-radius: 0;
+      &:focus-within {
+        border-color: var(--role-accent, #50ae9b) !important;
+        box-shadow: 0 0 0 2px var(--role-glow, rgba(80, 174, 155, 0.2)) !important;
+      }
+
+      input,
+      .form-control {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        border: none !important;
+        border-radius: 0 !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        padding: 0 12px !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        font-size: 13.5px;
+        color: #0f172a;
       }
 
       .btn-attached {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        border: none;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        max-height: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
         color: white;
         cursor: pointer;
+        box-sizing: border-box !important;
+        vertical-align: middle;
         transition: opacity 0.2s;
 
         &:hover { opacity: 0.9; }
 
-        &.refresh-btn {
-          border-top-right-radius: 5px;
-          border-bottom-right-radius: 5px;
+        &:focus-visible {
+          outline: 2px solid var(--role-accent, #50ae9b);
+          outline-offset: -2px;
         }
       }
     }
@@ -566,21 +598,25 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
       color: #475569;
     }
 
-    .badge {
-      display: inline-block;
-      padding: 3px 9px;
-      border-radius: 4px;
-      font-size: 11.5px;
-      font-weight: 700;
+    .user-status-badge {
+      display: inline-block !important;
+      position: static !important;
+      padding: 3px 9px !important;
+      border-radius: 4px !important;
+      font-size: 11.5px !important;
+      font-weight: 700 !important;
+      line-height: 1.4 !important;
 
-      &.badge-yes {
-        background: #dcfce7;
-        color: #15803d;
+      &.status-active {
+        background: #dcfce7 !important;
+        color: #15803d !important;
+        border: 1px solid #bbf7d0 !important;
       }
 
-      &.badge-no {
-        background: #f1f5f9;
-        color: #64748b;
+      &.status-inactive {
+        background: #f1f5f9 !important;
+        color: #64748b !important;
+        border: 1px solid #e2e8f0 !important;
       }
     }
 
@@ -709,11 +745,33 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
 })
 export class UsersComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
 
   userEditMode = false;
   editingUserId = '';
   showPassword = false;
   searchQuery = '';
+
+  countryOptions = ['United Arab Emirates', 'Saudi Arabia', 'Qatar', 'Oman', 'Bahrain'];
+  cityOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah'];
+
+  rolesList = [
+    { label: 'Admin', value: '1' },
+    { label: 'Manager', value: '4' },
+    { label: 'Editor', value: '2' },
+    { label: 'Viewer', value: '3' }
+  ];
+
+  getRoleLabel(role: string): string {
+    if (!role) return 'Unassigned';
+    const match = this.rolesList.find(x => String(x.value).toLowerCase() === String(role).toLowerCase() || x.label.toLowerCase() === String(role).toLowerCase());
+    if (match) return match.label;
+    if (role === '1') return 'Admin';
+    if (role === '2') return 'Editor';
+    if (role === '3') return 'Viewer';
+    if (role === '4') return 'Manager';
+    return role;
+  }
 
   userForm: {
     userId: string;
@@ -741,14 +799,94 @@ export class UsersComponent implements OnInit {
     department: 'Procurement & Sourcing',
     designation: 'Senior Sourcing Buyer',
     email: '',
-    securityGroup: 'Procurement',
+    securityGroup: '1',
     status: 'Active'
   };
 
   showUserModal = false;
   showDeptModal = false;
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.loadBackendData();
+  }
+
+  loadBackendData(): void {
+    // 1. Fetch live user accounts from backend
+    this.vendorApi.getUsers().subscribe({
+      next: (res) => {
+        console.log('[GetUSERList live response]:', res);
+        const list = res?.useR_List || res?.user_List || res?.userList || res?.users || res?.data || (Array.isArray(res) ? res : null);
+        console.log('[GetUSERList parsed list]:', list);
+        if (Array.isArray(list) && list.length > 0) {
+          const liveUsers: LegacyUserItem[] = list.map((u: any, idx: number) => {
+            const uid = u.userid || u.useR_ID || u.userID || u.userId || `USER_${idx + 1}`;
+            const status: 'Active' | 'Inactive' = (u.isactive === 0 || u.isActive === 0) ? 'Inactive' : 'Active';
+            return {
+              id: `usr_${uid}`,
+              userId: uid,
+              firstName: u.fname || u.firstName || uid,
+              lastName: u.lname || u.lastName || '',
+              password: u.userpwd || u.password || '',
+              country: u.country || 'United Arab Emirates',
+              city: u.city || 'Dubai',
+              phoneNo: u.phone || u.contactno || '',
+              cellNo: u.contactno || u.phone || '',
+              department: u.deptid || u.department || 'Procurement & Sourcing',
+              designation: u.desid || u.designation || 'Staff',
+              email: u.email || `${uid.toLowerCase()}@tamco.ae`,
+              securityGroup: u.securitygroup || u.securityGroup || 'Procurement',
+              status
+            };
+          });
+
+          // Merge with any local users to ensure no data is lost
+          const existingList = this.state.legacyUsers();
+          const merged = [...liveUsers];
+          for (const localUser of existingList) {
+            if (!merged.some(x => x.userId.toLowerCase() === localUser.userId.toLowerCase())) {
+              merged.push(localUser);
+            }
+          }
+          this.state.legacyUsers.set(merged);
+        }
+      },
+      error: (err) => console.warn('[GetUSERList error]:', err)
+    });
+
+    // 2. Fetch live roles / security groups from GetROLEList API
+    this.vendorApi.getRoles().subscribe({
+      next: (res) => {
+        console.log('[GetROLEList live response]:', res);
+        const list = res?.rolE_List || res?.role_List || res?.roles || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const liveRoles = list.map((r: any) => ({
+            label: r.rolename || r.roleshortname || `Role ${r.rolE_ID}`,
+            value: String(r.rolE_ID !== undefined ? r.rolE_ID : r.rolename)
+          }));
+          if (liveRoles.length > 0) {
+            this.rolesList = liveRoles;
+          }
+        }
+      },
+      error: (err) => console.warn('[GetROLEList error]:', err)
+    });
+
+    // 3. Fetch departments
+    this.vendorApi.getDepartments().subscribe(res => {
+      const list = res?.department_List || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const d of list) {
+          const did = d.deP_ID || '';
+          const dname = d.deP_NAME || did;
+          if (!dname) continue;
+          const existing = this.state.departments().find(x => x.deptId === did || x.deptName.toLowerCase() === dname.toLowerCase());
+          if (!existing) {
+            this.state.departments.update(prev => [...prev, { id: `dep-${did || Date.now()}`, deptId: did, deptName: dname }]);
+          }
+        }
+      }
+    });
+  }
 
   filteredUsers(): LegacyUserItem[] {
     const q = this.searchQuery.trim().toLowerCase();
@@ -766,6 +904,10 @@ export class UsersComponent implements OnInit {
   submitUserForm(): void {
     if (!this.userForm.userId.trim() || !this.userForm.firstName.trim() || !this.userForm.email.trim()) {
       this.state.notify('Error: User ID, First Name, and Email Address are required.');
+      return;
+    }
+    if (!this.userEditMode && !this.userForm.password?.trim()) {
+      this.state.notify('Error: Password is required for new user.');
       return;
     }
 
@@ -787,6 +929,34 @@ export class UsersComponent implements OnInit {
     };
 
     this.state.saveLegacyUser(usr);
+
+    // Sync to live backend API: AUDUSER
+    const payload: Partial<USERModel> = {
+      coperation: this.userEditMode ? 3 : 2,
+      userid: this.userForm.userId.trim(),
+      fname: this.userForm.firstName.trim(),
+      lname: this.userForm.lastName.trim(),
+      userpwd: this.userForm.password && !this.userForm.password.includes('•') ? this.userForm.password.trim() : (this.userEditMode ? undefined : this.userForm.password?.trim()),
+      email: this.userForm.email.trim(),
+      contactno: this.userForm.cellNo || this.userForm.phoneNo,
+      phone: this.userForm.phoneNo,
+      gender: 'Male',
+      country: this.userForm.country,
+      city: this.userForm.city,
+      deptid: this.userForm.department,
+      desid: this.userForm.designation,
+      securitygroup: this.userForm.securityGroup,
+      isactive: this.userForm.status === 'Active' ? 1 : 0
+    };
+
+    this.vendorApi.saveUser(payload, this.userEditMode ? 3 : 2).subscribe({
+      next: () => {
+        this.state.notify(`✓ Backend: User record ${this.userForm.userId} synchronized.`);
+        setTimeout(() => this.loadBackendData(), 400);
+      },
+      error: () => this.state.notify(`User record ${this.userForm.userId} saved locally.`)
+    });
+
     this.resetUserForm();
   }
 
@@ -797,7 +967,7 @@ export class UsersComponent implements OnInit {
       userId: u.userId,
       firstName: u.firstName,
       lastName: u.lastName,
-      password: u.password || '••••••••',
+      password: '',
       country: u.country,
       city: u.city,
       phoneNo: u.phoneNo,
@@ -812,6 +982,14 @@ export class UsersComponent implements OnInit {
   }
 
   deleteUser(id: string): void {
+    const item = this.state.legacyUsers().find(x => x.id === id);
+    if (item) {
+      this.vendorApi.deleteUser(item.userId).subscribe({
+        next: () => this.state.notify(`✓ Backend: User ${item.userId} deleted.`),
+        error: () => console.warn('User deletion local fallback')
+      });
+    }
+
     this.state.deleteLegacyUser(id);
     if (this.editingUserId === id) this.resetUserForm();
   }
@@ -831,7 +1009,7 @@ export class UsersComponent implements OnInit {
       department: 'Procurement & Sourcing',
       designation: 'Senior Sourcing Buyer',
       email: '',
-      securityGroup: 'Procurement',
+      securityGroup: '1',
       status: 'Active'
     };
   }

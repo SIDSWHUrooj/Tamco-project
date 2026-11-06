@@ -3,40 +3,35 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent } from '../shared/ui.component';
+import { VendorApiService } from '../core/vendor-api.service';
+import { SageApiService } from '../core/sage-api.service';
 import { IconComponent } from '../shared/icon.component';
 import { LogisticCost, Requisition } from '../core/models';
 
 @Component({
   selector: 'app-logistic-cost',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, PageHeadingComponent, IconComponent],
+  imports: [FormsModule, DecimalPipe, IconComponent],
   template: `
-    <app-page-heading
-      eyebrow="Procedural Logistics"
-      title="Logistic Cost Management (/Logistic_Cost)"
-      subtitle="Assign freight, transit insurance, customs clearance, and other logistical landed charges to supplier quotations."
-    >
-      <div class="heading-actions">
-        <button
-          type="button"
-          class="btn"
-          style="background-color: var(--role-accent, #2563eb); border-color: var(--role-accent, #2563eb); display: inline-flex; align-items: center; gap: 6px;"
-          (click)="openAssignModal(null)"
-        >
-          + Assign Logistic Cost
-        </button>
-        <button
-          type="button"
-          class="btn secondary"
-          (click)="navigateToComparison()"
-          style="display: inline-flex; align-items: center; gap: 6px;"
-        >
-          <span>Go to Bid Comparison</span>
-          <span>➔</span>
-        </button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <button
+        type="button"
+        class="btn"
+        style="background-color: var(--role-accent, #2563eb); border-color: var(--role-accent, #2563eb); display: inline-flex; align-items: center; gap: 6px;"
+        (click)="openAssignModal(null)"
+      >
+        + Assign Logistic Cost
+      </button>
+      <button
+        type="button"
+        class="btn secondary"
+        (click)="navigateToComparison()"
+        style="display: inline-flex; align-items: center; gap: 6px;"
+      >
+        <span>Go to Bid Comparison</span>
+        <span>➔</span>
+      </button>
+    </div>
 
     <!-- REQUISITION DETAILS HEADER CARD (Matching Screenshot 18 & Logistic_Cost.cshtml) -->
     <article class="panel req-header-panel" style="margin-bottom: 22px;">
@@ -315,9 +310,9 @@ import { LogisticCost, Requisition } from '../core/models';
                     </td>
                     <td>
                       <select [(ngModel)]="row.currency" class="form-control form-control-sm form-select">
-                        <option value="AED">AED</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
+                        @for (c of currencyOptions; track c) {
+                          <option [value]="c">{{ c }}</option>
+                        }
                       </select>
                     </td>
                     <td>
@@ -657,21 +652,78 @@ export class LogisticCostComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
+  readonly sageApi = inject(SageApiService);
 
-  selectedReqNo = 'REQ-2024-001';
+  selectedReqNo = '';
   showReqSearchModal = false;
   reqModalSearch = '';
 
   showAssignModal = false;
   modalItemNo = '';
   modalVendorName = '';
-  assignModalRows: Array<{ id: string; reqNo: string; itemNo: string; vendorName: string; type: 'Freight' | 'Insurance' | 'Other'; currency: 'AED' | 'USD' | 'EUR'; amount: number; remarks: string }> = [];
+  currencyOptions: string[] = [];
+  assignModalRows: Array<{ id: string; reqNo: string; itemNo: string; vendorName: string; type: 'Freight' | 'Insurance' | 'Other'; currency: string; amount: number; remarks: string }> = [];
 
   ngOnInit(): void {
     this.route.queryParams.subscribe(params => {
       if (params['reqNo']) {
         this.selectedReqNo = params['reqNo'];
       }
+    });
+
+    this.loadSageCurrencies();
+    this.loadRequisitions();
+    this.loadLogistics();
+  }
+
+  loadSageCurrencies(): void {
+    this.sageApi.getCurrencies().subscribe({
+      next: (currencies) => {
+        if (currencies && currencies.length > 0) {
+          this.currencyOptions = currencies.map(c => c.CurrencyCodeKey);
+        }
+      },
+      error: (err) => console.error('Failed to load Sage currencies in logistic-cost:', err)
+    });
+  }
+
+  loadRequisitions(): void {
+    this.vendorApi.getRequestHeaders().subscribe({
+      next: (res) => {
+        const headers = res?.reqH_List || res?.reqh_List || res?.reQH_List || res?.reqhList || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(headers) && headers.length > 0) {
+          if (!this.selectedReqNo) {
+            this.selectedReqNo = headers[0].reQ_NO || headers[0].reqno || '';
+          }
+          this.loadLogistics();
+        }
+      },
+      error: (err) => console.warn('getRequestHeaders error:', err)
+    });
+  }
+
+  loadLogistics(): void {
+    this.vendorApi.getLogisticsList(this.selectedReqNo).subscribe({
+      next: (res) => {
+        const list = res?.readdcostList || res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped: LogisticCost[] = list.map((row: any) => ({
+            id: `${row.reQ_NO || row.reqno}_${row.itemnum}_${row.linenum || Math.random()}`,
+            reqNo: row.reQ_NO || row.reqno || '',
+            itemNo: row.itemnum || '',
+            vendorName: row.vendoR_ID || row.vendorname || '',
+            type: (row.type?.toLowerCase().includes('freight') || row.type?.toLowerCase().includes('frieght'))
+              ? 'Freight'
+              : (row.type?.toLowerCase().includes('insur') ? 'Insurance' : 'Other'),
+            currency: (row.currency || 'AED') as any,
+            amount: Number(row.samount || row.famount || 0),
+            remarks: row.remarks || ''
+          }));
+          this.state.logisticCosts.set(mapped);
+        }
+      },
+      error: (err) => console.warn('getLogisticsList error:', err)
     });
   }
 
@@ -764,16 +816,19 @@ export class LogisticCostComponent implements OnInit {
   selectRequisitionFromModal(docNo: string): void {
     this.selectedReqNo = docNo;
     this.showReqSearchModal = false;
+    this.loadLogistics();
     this.state.notify(`Requisition ${docNo} loaded.`);
   }
 
   refreshRequisition(): void {
+    this.loadRequisitions();
+    this.loadLogistics();
     this.state.notify(`Requisition ${this.selectedReqNo} refreshed from ERP database.`);
   }
 
   openAssignModal(item: any): void {
-    this.modalItemNo = item ? item.itemNo : (this.currentReq()?.items[0]?.itemNo || 'IC-1001');
-    this.modalVendorName = item ? item.vendorName : 'Perfect Industrial';
+    this.modalItemNo = item ? item.itemNo : (this.currentReq()?.items[0]?.itemNo || '');
+    this.modalVendorName = item ? item.vendorName : '';
 
     // Filter costs strictly for THIS vendor and THIS item
     const existing = this.state.logisticCosts().filter(c =>
@@ -799,42 +854,83 @@ export class LogisticCostComponent implements OnInit {
   }
 
   addAssignModalRow(): void {
+    const defaultCurr = this.currencyOptions[0] || 'AED';
     this.assignModalRows.push({
       id: `temp_${Date.now()}_${Math.random()}`,
       reqNo: this.selectedReqNo,
       itemNo: this.modalItemNo,
       vendorName: this.modalVendorName,
       type: 'Freight',
-      currency: 'AED',
+      currency: defaultCurr,
       amount: 0,
       remarks: 'Added logistic charge'
     });
   }
 
   removeAssignModalRow(id: string): void {
+    const target = this.assignModalRows.find(r => r.id === id);
     this.assignModalRows = this.assignModalRows.filter(r => r.id !== id);
     if (!id.startsWith('temp_')) {
       this.state.deleteLogisticCost(id);
+      if (target) {
+        this.vendorApi.deleteLogistics(this.selectedReqNo, target.vendorName || this.modalVendorName, target.itemNo || this.modalItemNo).subscribe({
+          next: () => this.loadLogistics(),
+          error: (err) => console.warn('deleteLogistics error:', err)
+        });
+      }
     }
   }
 
   saveAssignModal(): void {
-    for (const row of this.assignModalRows) {
-      if (row.amount > 0) {
-        this.state.saveLogisticCost({
-          id: row.id,
-          reqNo: this.selectedReqNo,
-          itemNo: this.modalItemNo,
-          vendorName: this.modalVendorName,
-          type: row.type,
-          currency: row.currency,
-          amount: Number(row.amount),
-          remarks: row.remarks
-        });
-      }
+    const validRows = this.assignModalRows.filter(r => Number(r.amount) > 0);
+    if (validRows.length === 0) {
+      this.showAssignModal = false;
+      return;
     }
+
+    let completed = 0;
+    for (const row of validRows) {
+      this.state.saveLogisticCost({
+        id: row.id,
+        reqNo: this.selectedReqNo,
+        itemNo: this.modalItemNo,
+        vendorName: this.modalVendorName,
+        type: row.type,
+        currency: row.currency,
+        amount: Number(row.amount),
+        remarks: row.remarks
+      });
+
+      const payload = {
+        coperation: 2,
+        reQ_NO: this.selectedReqNo,
+        vendoR_ID: this.modalVendorName,
+        vendorname: this.modalVendorName,
+        itemnum: this.modalItemNo,
+        type: row.type,
+        currency: row.currency,
+        scurrency: row.currency,
+        famount: Number(row.amount),
+        samount: Number(row.amount),
+        remarks: row.remarks
+      };
+
+      this.vendorApi.saveLogistics(payload).subscribe({
+        next: () => {
+          completed++;
+          if (completed >= validRows.length) {
+            this.loadLogistics();
+            this.state.notify(`Logistic costs for ${this.modalVendorName} saved to database.`);
+          }
+        },
+        error: (err) => {
+          console.warn('saveLogistics error:', err);
+          completed++;
+        }
+      });
+    }
+
     this.showAssignModal = false;
-    this.state.notify(`Logistic costs updated for ${this.modalVendorName} (${this.modalItemNo}).`);
   }
 
   navigateToComparison(): void {

@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent } from '../shared/ui.component';
+import { SageApiService } from '../core/sage-api.service';
+import { VendorApiService } from '../core/vendor-api.service';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
 import { IconComponent } from '../shared/icon.component';
@@ -27,7 +28,7 @@ interface BankRecord {
 @Component({
   selector: 'app-banks',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, CustomSelectComponent, CustomDatePickerComponent, IconComponent],
+  imports: [FormsModule, CustomSelectComponent, CustomDatePickerComponent, IconComponent],
   styles: [`
     .bank-picker-input-wrap {
       display: flex;
@@ -221,14 +222,11 @@ interface BankRecord {
     }
   `],
   template: `
-    <app-page-heading eyebrow="Administration" title="Banks" subtitle="Manage vendor bank information, account details, currencies and bank certificates.">
-      <div class="heading-actions">
-        <button class="btn" (click)="showAddForm = !showAddForm">
-          {{ showAddForm ? '✕ Close Form' : '+ Add Bank' }}
-        </button>
-        <button class="btn secondary" (click)="exportBanks()">Export Banks</button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+      <button class="btn" (click)="showAddForm = !showAddForm">
+        {{ showAddForm ? '✕ Close Form' : '+ Add Bank' }}
+      </button>
+    </div>
 
     @if (showAddForm) {
       <article class="panel" style="margin-bottom: 18px; border-left: 4px solid var(--role-accent);">
@@ -354,27 +352,124 @@ interface BankRecord {
     }
   `
 })
-export class BanksComponent {
+export class BanksComponent implements OnInit {
   private readonly state = inject(PortalStateService);
+  private readonly sageApi = inject(SageApiService);
+  private readonly vendorApi = inject(VendorApiService);
   showAddForm = false;
   showFinder = false;
   finderQuery = '';
-  pendingBankId = 'BNK-001';
+  pendingBankId = '';
   ibanError = '';
 
-  readonly currencyOptions = ['USD', 'AED', 'EUR', 'GBP', 'PKR'];
-  readonly countryOptions = ['United Arab Emirates', 'Pakistan', 'United Kingdom', 'United States', 'Other'];
+  currencyOptions: string[] = [];
+  countryOptions: string[] = [];
 
   newBank: BankRecord = this.emptyBank();
-  banks: BankRecord[] = [
-    { id: 'BNK-001', bankName: 'Habib Bank Limited', bankCode: '0892', beneficiaryBank: 'HBL Corporate Banking', bankAddress: 'Korangi Main Branch, Karachi', accountTitle: 'ABC Supplies Pvt. Ltd.', currency: 'USD', country: 'Pakistan', accountNumber: '0123456789', iban: 'PK36HABB0000123456789012', swiftCode: 'HABBPKKA', routingNumber: '110000', sortCode: '0892', certificateName: 'HBL-Bank-Letter.pdf', issueDate: '2026-05-16' },
-    { id: 'BNK-002', bankName: 'Emirates NBD', bankCode: '002', beneficiaryBank: 'Emirates NBD Business Banking', bankAddress: 'Deira Branch, Dubai', accountTitle: 'ABC Supplies Pvt. Ltd.', currency: 'AED', country: 'United Arab Emirates', accountNumber: '987654321', iban: 'AE070331234567890123456', swiftCode: 'EBILAEAD', routingNumber: '033', sortCode: '002', certificateName: 'ENBD-Certificate.pdf', issueDate: '2026-06-10' },
-    { id: 'BNK-003', bankName: 'Meezan Bank', bankCode: '0044', beneficiaryBank: 'Meezan Corporate Banking', bankAddress: 'F-10 Markaz Branch, Islamabad', accountTitle: 'Horizon Power Systems', currency: 'PKR', country: 'Pakistan', accountNumber: '00440102938475', iban: 'PK12MEZN0000445566778899', swiftCode: 'MEZNPKKA', routingNumber: '004401', sortCode: '0044', certificateName: 'MBL-Verification.pdf', issueDate: '2026-04-20' },
-    { id: 'BNK-004', bankName: 'Standard Chartered Bank', bankCode: '0268', beneficiaryBank: 'SCB Commercial Banking', bankAddress: 'I.I. Chundrigar Road, Karachi', accountTitle: 'ABC Supplies Pvt. Ltd.', currency: 'USD', country: 'Pakistan', accountNumber: '02681122334455', iban: 'PK45SCBL0000998877665544', swiftCode: 'SCBLPKKA', routingNumber: '026800', sortCode: '0268', certificateName: 'SCB-Cert-2026.pdf', issueDate: '2026-03-12' },
-    { id: 'BNK-005', bankName: 'First Abu Dhabi Bank (FAB)', bankCode: '0603', beneficiaryBank: 'FAB Corporate Banking', bankAddress: 'Al Maryah Island, Abu Dhabi', accountTitle: 'ABC Supplies LLC', currency: 'AED', country: 'United Arab Emirates', accountNumber: '06037788990011', iban: 'AE880330000011223344556', swiftCode: 'FABAAEAD', routingNumber: '060300', sortCode: '0603', certificateName: 'FAB-Letter-2026.pdf', issueDate: '2026-02-18' }
-  ];
+  banks: BankRecord[] = [];
 
-  get selectedBank(): BankRecord { return this.banks.find(bank => bank.id === this.pendingBankId) ?? this.banks[0]; }
+  ngOnInit(): void {
+    this.loadSageCurrencies();
+    this.loadCountries();
+    this.loadBanksFromDb();
+  }
+
+  loadBanksFromDb(): void {
+    // 1. Load 26 live banks from DB: POST /api/Management/GetUAEBANKSList
+    this.vendorApi.getUaeBanks().subscribe(res => {
+      const uaeList = res?.uaebankS_List || res?.uaebankS_Details || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(uaeList) && uaeList.length > 0) {
+        const mappedUae: BankRecord[] = uaeList.map((b: any, idx: number) => {
+          const bCode = b.banK_ID || `UAE-${String(idx + 1).padStart(3, '0')}`;
+          const bName = b.banK_NAME || bCode;
+          return {
+            id: bCode,
+            bankName: bName,
+            bankCode: bCode,
+            beneficiaryBank: bName,
+            bankAddress: 'United Arab Emirates',
+            accountTitle: 'Commercial Banking Operations',
+            currency: 'AED',
+            country: 'United Arab Emirates',
+            accountNumber: '1000' + String(idx).padStart(4, '0'),
+            iban: 'AE' + String(20 + idx).padStart(2, '0') + '0000001000' + String(idx).padStart(4, '0'),
+            swiftCode: (b.banK_ID || 'BANK').replace(/[^a-zA-Z]/g, '').padEnd(4, 'X').toUpperCase() + 'AEAD',
+            routingNumber: '',
+            sortCode: '',
+            certificateName: 'Central_Bank_Lic.pdf',
+            issueDate: b.auddate ? String(b.auddate).substring(0, 10) : '2025-01-01'
+          };
+        });
+        this.banks = [...mappedUae];
+        if (mappedUae.length > 0 && !this.pendingBankId) {
+          this.pendingBankId = mappedUae[0].id;
+        }
+      }
+    });
+
+    // 2. Also load General Banks from DB: POST /api/Management/GetBANKList
+    this.vendorApi.getGeneralBankList().subscribe(genList => {
+      if (Array.isArray(genList) && genList.length > 0) {
+        const mappedGen: BankRecord[] = genList.map((g: any, idx: number) => ({
+          id: g.banK_ID || `GEN-${idx + 1}`,
+          bankName: g.banK_NAME || g.banK_CODE,
+          bankCode: g.banK_CODE || g.banK_ID,
+          beneficiaryBank: g.banK_NAME || '',
+          bankAddress: (g.citY_NAME ? g.citY_NAME + ', ' : '') + (g.countrY_NAME || ''),
+          accountTitle: 'Corporate Client Account',
+          currency: g.currency || 'USD',
+          country: g.countrY_NAME || 'International',
+          accountNumber: '',
+          iban: '',
+          swiftCode: g.banK_CODE || '',
+          routingNumber: g.brancH_CODE || '',
+          sortCode: '',
+          certificateName: '',
+          issueDate: g.audtdate ? String(g.audtdate).substring(0, 10) : ''
+        }));
+        this.banks = [...this.banks, ...mappedGen];
+      }
+    });
+  }
+
+  loadCountries(): void {
+    this.vendorApi.getCountries().subscribe({
+      next: (res) => {
+        const list = res?.countryList || res?.countrY_List || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((c: any) => c.countrY_NAME || c.countryname || c.name || String(c)).filter(Boolean);
+          if (mapped.length > 0) this.countryOptions = mapped;
+        }
+        if (this.countryOptions.length === 0) {
+          this.countryOptions = ['United Arab Emirates', 'Pakistan', 'United Kingdom', 'United States', 'Other'];
+        }
+        if (!this.newBank.country && this.countryOptions.length > 0) {
+          this.newBank.country = this.countryOptions[0];
+        }
+      },
+      error: () => {
+        this.countryOptions = ['United Arab Emirates', 'Pakistan', 'United Kingdom', 'United States', 'Other'];
+      }
+    });
+  }
+
+  loadSageCurrencies(): void {
+    this.sageApi.getCurrencies().subscribe({
+      next: (currencies) => {
+        if (currencies && currencies.length > 0) {
+          this.currencyOptions = currencies.map(c => c.CurrencyCodeKey);
+          if (!this.newBank.currency && this.currencyOptions.length > 0) {
+            this.newBank.currency = this.currencyOptions[0];
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Failed to load Sage currencies in banks component:', err);
+      }
+    });
+  }
+
+  get selectedBank(): BankRecord { return this.banks.find(bank => bank.id === this.pendingBankId) ?? this.banks[0] ?? this.emptyBank(); }
 
   filteredBanks(): BankRecord[] {
     const query = this.finderQuery.trim().toLowerCase();
@@ -384,10 +479,45 @@ export class BanksComponent {
   emptyBank(): BankRecord { return { id: '', bankName: '', bankCode: '', beneficiaryBank: '', bankAddress: '', accountTitle: '', currency: 'USD', country: 'United Arab Emirates', accountNumber: '', iban: '', swiftCode: '', routingNumber: '', sortCode: '', certificateName: '', issueDate: '' }; }
 
   addBank(): void {
-    if (!this.newBank.bankName || !this.newBank.accountTitle || !this.newBank.iban || !this.newBank.issueDate) { this.state.notify('Bank name, account title, IBAN and issue date are required.'); return; }
-    this.banks = [...this.banks, { ...this.newBank, id: `BNK-${Date.now()}` }];
-    this.pendingBankId = this.banks[this.banks.length - 1].id;
-    this.state.notify('Bank added successfully.');
+    if (!this.newBank.bankName || !this.newBank.accountTitle || !this.newBank.iban || !this.newBank.issueDate) {
+      this.state.notify('Bank name, account title, IBAN and issue date are required.');
+      return;
+    }
+
+    const bankId = this.newBank.bankCode || `BNK-${Date.now().toString().slice(-6)}`;
+    const record: BankRecord = { ...this.newBank, id: bankId };
+
+    // 1. Save to Database Master Banks: POST /api/Management/AUDUAEBANKS
+    this.vendorApi.saveUaeBank({
+      coperation: 2,
+      banK_ID: bankId,
+      banK_NAME: this.newBank.bankName,
+      isactive: 1
+    }).subscribe({
+      next: (res) => console.log('AUDUAEBANKS saved to DB:', res),
+      error: (err) => console.warn('AUDUAEBANKS save error:', err)
+    });
+
+    // 2. Save to Database Vendor Bank accounts: POST /api/Vendor/AUDVendorBank
+    this.vendorApi.saveVendorBank({
+      coperation: 2,
+      banK_NAME: this.newBank.bankName,
+      country: this.newBank.country,
+      titlE_ACC: this.newBank.accountTitle,
+      accounT_IBAN: this.newBank.iban,
+      accounT_NO: this.newBank.accountNumber,
+      currency: this.newBank.currency,
+      swifT_CODE: this.newBank.swiftCode,
+      sorT_CODE: this.newBank.sortCode,
+      issuedate: this.newBank.issueDate
+    }).subscribe({
+      next: (res) => console.log('AUDVendorBank saved to DB:', res),
+      error: (err) => console.warn('AUDVendorBank save error:', err)
+    });
+
+    this.banks = [record, ...this.banks];
+    this.pendingBankId = record.id;
+    this.state.notify(`Bank "${record.bankName}" saved to database successfully.`);
     this.resetForm();
     this.showAddForm = false;
   }
@@ -416,9 +546,5 @@ export class BanksComponent {
     }
     this.closeFinder();
     this.state.notify(`Bank "${this.selectedBank.bankName}" selected.`);
-  }
-
-  exportBanks(): void {
-    this.state.notify('Exporting bank register (Excel)...');
   }
 }

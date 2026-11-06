@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
@@ -9,7 +9,7 @@ import { CustomDatePickerComponent } from '../shared/custom-date-picker.componen
 @Component({
   selector: 'app-rfq-page',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
   styles: [`
     .rfq-grid {
       display: grid;
@@ -303,36 +303,23 @@ import { CustomDatePickerComponent } from '../shared/custom-date-picker.componen
     }
   `],
   template: `
-    <app-page-heading
-      eyebrow="Sourcing & e-Bidding"
-      [title]="role()==='vendor' ? 'Open Quotations & RFQ Bidding' : 'RFQ Sourcing & Event Management'"
-      [subtitle]="role()==='vendor' ? 'View and bid on qualified RFQs matching your approved categories. Submit prices and lead times.' : 'Publish tenders, invite verified suppliers, review competitive quotations and award contracts.'">
-      <div class="heading-actions">
-        @if (role() !== 'vendor') {
-          <button class="btn" (click)="showNewRfqForm = !showNewRfqForm" style="display: inline-flex; align-items: center; gap: 6px;">
-            @if (showNewRfqForm) {
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-              <span>Close Form</span>
-            } @else {
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span>Publish New RFQ</span>
-            }
-          </button>
-        }
-        <button class="btn secondary" (click)="exportRfqs()" style="display: inline-flex; align-items: center; gap: 6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          <span>Export RFQ Log</span>
+    @if (role() !== 'vendor') {
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+        <button class="btn" (click)="showNewRfqForm = !showNewRfqForm" style="display: inline-flex; align-items: center; gap: 6px;">
+          @if (showNewRfqForm) {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            <span>Close Form</span>
+          } @else {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>Publish New RFQ</span>
+          }
         </button>
       </div>
-    </app-page-heading>
+    }
 
     <!-- Stats Overview -->
     <section class="dash-kpis three">
@@ -590,23 +577,18 @@ export class RfqPageComponent {
   ];
 
   newRfq: any = {
-    id: 'RFQ-2026-062',
-    title: '11kV Gas-Insulated Switchgear Supply',
+    id: '',
+    title: '',
     category: 'Electrical',
-    budget: 85000,
-    deliveryDays: 21,
-    deadline: '2026-09-18',
-    specs: 'GIS panels, SF6-free preference, IEC 62271 compliance, FAT at OEM works.',
+    budget: 0,
+    deliveryDays: 14,
+    deadline: '',
+    specs: '',
     status: 'Open',
     bidsCount: 0
   };
 
-  rfqsList: any[] = [
-    { id: 'RFQ-2026-061', title: 'Electrical Items — LV Switchgear', category: 'Electrical', budget: 52000, deliveryDays: 14, deadline: '2026-09-05', specs: 'MCCBs, busbar trunking and panel accessories.', status: 'Open', bidsCount: 4, myBidPrice: 49800, myBidDays: 12 },
-    { id: 'RFQ-2026-060', title: 'Safety Equipment — PPE Lot', category: 'Safety Equipment', budget: 18600, deliveryDays: 10, deadline: '2026-08-30', specs: 'Helmets, FR coveralls, insulated gloves Class 2.', status: 'Open', bidsCount: 3, myBidPrice: 17250, myBidDays: 8 },
-    { id: 'RFQ-2026-059', title: 'Mechanical Parts — Pump Spares', category: 'Mechanical', budget: 43800, deliveryDays: 18, deadline: '2026-08-22', specs: 'Mechanical seals, impellers and coupling kits.', status: 'Under Evaluation', bidsCount: 5, myBidPrice: 42100, myBidDays: 16 },
-    { id: 'RFQ-2026-058', title: 'Raw Materials — Copper Cable', category: 'Raw Materials', budget: 31500, deliveryDays: 12, deadline: '2026-08-15', specs: 'XLPE 4-core 120mm² copper, 2 km drums.', status: 'Closed', bidsCount: 6, myBidPrice: 30800, myBidDays: 11 }
-  ];
+  rfqsList: any[] = [];
 
   filteredRfqs(): any[] {
     const q = this.searchQuery.trim().toLowerCase();
@@ -676,9 +658,5 @@ export class RfqPageComponent {
   deleteRfq(id: string): void {
     this.rfqsList = this.rfqsList.filter(r => r.id !== id);
     this.state.notify(`RFQ ${id} deleted.`);
-  }
-
-  exportRfqs(): void {
-    this.state.notify('Exporting RFQ summary log (Excel format)...');
   }
 }

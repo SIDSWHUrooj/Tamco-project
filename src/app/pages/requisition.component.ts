@@ -1,8 +1,11 @@
 import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { VendorApiService, REQHModel, REQDModel } from '../core/vendor-api.service';
+import { SageApiService } from '../core/sage-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { Requisition, RequisitionHeader, RequisitionLineItem, RequisitionAssignedVendor, Vendor } from '../core/models';
 
@@ -17,33 +20,14 @@ interface BrandItem {
   name: string;
 }
 
-interface ProjectItem {
-  id: string;
-  name: string;
-}
-
 @Component({
   selector: 'app-requisition',
   standalone: true,
-  imports: [FormsModule, RouterLink, PageHeadingComponent, StatusComponent, IconComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, SlicePipe],
   template: `
-    <app-page-heading
-      eyebrow="Procurement Management"
-      title="Requisitions & Sourcing Workflow"
-      subtitle="Create material requisitions, correct line items, assign approved vendors, and authorize RFQ dispatch."
-    >
-      <div class="heading-actions">
-        <a class="btn secondary" [routerLink]="['/', role(), 'dashboard']">
-          ← Back to Dashboard
-        </a>
-        <button class="btn" (click)="startNewRequisition()">
-          + New Requisition
-        </button>
-      </div>
-    </app-page-heading>
-
-    <!-- Option 6 Pill Capsule Tabs Navigation -->
-    <div class="profile-tabs">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap;">
+      <!-- Option 6 Pill Capsule Tabs Navigation -->
+      <div class="profile-tabs" style="margin-bottom: 0;">
       <button
         type="button"
         [class.active]="activeTab === 'entry'"
@@ -80,6 +64,11 @@ interface ProjectItem {
         <span>Vendor Approval</span>
       </button>
     </div>
+
+    <button class="btn" (click)="startNewRequisition()">
+      + New Requisition
+    </button>
+  </div>
 
     <!-- ========================================================================= -->
     <!-- TAB 1: REQUISITION ENTRY & ITEMS (Requistion.cshtml & Select_correct_item) -->
@@ -200,12 +189,9 @@ interface ProjectItem {
                 class="form-select form-control"
               >
                 <option value="" disabled>---Select---</option>
-                <option value="By Air">By Air</option>
-                <option value="By Sea">By Sea</option>
-                <option value="By Cargo">By Cargo</option>
-                <option value="By Land">By Land</option>
-                <option value="Courier">Courier</option>
-                <option value="Vendor Delivery">Vendor Delivery</option>
+                @for (opt of shipViaOptions; track opt) {
+                  <option [value]="opt">{{ opt }}</option>
+                }
               </select>
             </div>
 
@@ -364,24 +350,14 @@ interface ProjectItem {
                     </select>
                   </td>
 
-                  <!-- Project with Lookup Modal -->
+                  <!-- Project Input -->
                   <td>
-                    <div class="cell-input-group">
-                      <input
-                        type="text"
-                        [(ngModel)]="row.projectId"
-                        placeholder="Project ID"
-                        class="cell-control"
-                      />
-                      <button
-                        type="button"
-                        class="btn-cell-search"
-                        (click)="openProjectModal(idx)"
-                        title="Search Project"
-                      >
-                        <app-icon name="search" [size]="14" />
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      [(ngModel)]="row.projectId"
+                      placeholder="Project ID"
+                      class="cell-control"
+                    />
                   </td>
 
                   <!-- Inco Term (11 Legacy Incoterms) -->
@@ -398,12 +374,9 @@ interface ProjectItem {
                   <td>
                     <select [(ngModel)]="row.shipVia" class="cell-control select">
                       <option value="" disabled>--Select--</option>
-                      <option value="By Air">By Air</option>
-                      <option value="By Sea">By Sea</option>
-                      <option value="By Cargo">By Cargo</option>
-                      <option value="By Land">By Land</option>
-                      <option value="Courier">Courier</option>
-                      <option value="Vendor Delivery">Vendor Delivery</option>
+                      @for (opt of shipViaOptions; track opt) {
+                        <option [value]="opt">{{ opt }}</option>
+                      }
                     </select>
                   </td>
 
@@ -572,6 +545,15 @@ interface ProjectItem {
                   <td class="actions-cell" style="text-align: right;">
                     <button
                       class="table-btn-edit"
+                      style="background: #0284c7; border-color: #0284c7; color: white;"
+                      (click)="openAuditHistoryModal(req.header.documentNumber)"
+                      title="View Lifecycle Timeline & Audit Log"
+                    >
+                      <app-icon name="clock" [size]="12" />
+                      <span>Audit Log</span>
+                    </button>
+                    <button
+                      class="table-btn-edit"
                       (click)="editRequisition(req)"
                       title="Item Correction & Header Edit (Select_correct_item.cshtml)"
                     >
@@ -643,6 +625,17 @@ interface ProjectItem {
                   </option>
                 }
               </select>
+              @if (sourcingRequisition?.header?.documentNumber) {
+                <button
+                  type="button"
+                  class="btn secondary small"
+                  style="height: 36px;"
+                  (click)="openAuditHistoryModal(sourcingRequisition!.header.documentNumber)"
+                >
+                  <app-icon name="clock" [size]="13" />
+                  <span>Audit Trail</span>
+                </button>
+              }
             </div>
           </div>
 
@@ -819,6 +812,17 @@ interface ProjectItem {
                   </option>
                 }
               </select>
+              @if (sourcingRequisition?.header?.documentNumber) {
+                <button
+                  type="button"
+                  class="btn secondary small"
+                  style="height: 36px;"
+                  (click)="openAuditHistoryModal(sourcingRequisition!.header.documentNumber)"
+                >
+                  <app-icon name="clock" [size]="13" />
+                  <span>Audit Trail</span>
+                </button>
+              }
             </div>
           </div>
 
@@ -997,9 +1001,16 @@ interface ProjectItem {
             <input
               type="text"
               [(ngModel)]="itemSearchQuery"
-              placeholder="Search by Item Number or Description..."
+              (keyup.enter)="loadSageItems(1)"
+              placeholder="Search by Item Number or Description (Press Enter)..."
               autofocus
             />
+            <button
+              type="button"
+              class="btn-pager-sm"
+              (click)="loadSageItems(1)"
+              title="Search Sage 300"
+            >Search</button>
           </div>
           <div class="modal-table-wrap">
             <table class="modal-table">
@@ -1011,22 +1022,42 @@ interface ProjectItem {
                 </tr>
               </thead>
               <tbody>
-                @for (item of filteredSageItems(); track item.itemNumber) {
-                  <tr (click)="selectItem(item)" class="clickable-row">
-                    <td><strong class="vendor-tag">{{ item.itemNumber }}</strong></td>
-                    <td class="font-medium">{{ item.description }}</td>
-                    <td class="text-center">{{ item.uom }}</td>
-                  </tr>
-                } @empty {
+                @if (isLoadingSageItems) {
                   <tr>
-                    <td colspan="3" class="empty-state">No matching items found in Sage catalog.</td>
+                    <td colspan="3" class="empty-state">Loading items from Sage 300 ERP...</td>
                   </tr>
+                } @else {
+                  @for (item of filteredSageItems(); track item.itemNumber) {
+                    <tr (click)="selectItem(item)" class="clickable-row">
+                      <td><strong class="vendor-tag">{{ item.itemNumber }}</strong></td>
+                      <td class="font-medium">{{ item.description }}</td>
+                      <td class="text-center">{{ item.uom }}</td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="3" class="empty-state">No matching items found in Sage catalog.</td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
           </div>
           <div class="modal-footer">
-            <span class="modal-hint">Click any row to select for Line {{ activeRowIndex + 1 }}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="modal-hint">Page {{ sageItemPage }} of {{ sageItemTotalPages }} ({{ sageItemTotalCount }} items)</span>
+              <button
+                type="button"
+                class="btn-pager-sm"
+                [disabled]="sageItemPage <= 1 || isLoadingSageItems"
+                (click)="prevSageItemPage()"
+              >◀ Prev</button>
+              <button
+                type="button"
+                class="btn-pager-sm"
+                [disabled]="sageItemPage >= sageItemTotalPages || isLoadingSageItems"
+                (click)="nextSageItemPage()"
+              >Next ▶</button>
+            </div>
             <button type="button" class="btn secondary" (click)="showItemModal = false">Close</button>
           </div>
         </div>
@@ -1077,55 +1108,6 @@ interface ProjectItem {
           <div class="modal-footer">
             <span class="modal-hint">Click row to set brand</span>
             <button type="button" class="btn secondary" (click)="showBrandModal = false">Close</button>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- ========================================================================= -->
-    <!-- MODAL 3: PROJECT LIST MODAL                                              -->
-    <!-- ========================================================================= -->
-    @if (showProjectModal) {
-      <div class="modal-backdrop" (click)="showProjectModal = false">
-        <div class="modal-window modal-sm" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h4>Project Master Directory</h4>
-            <button type="button" class="modal-close" (click)="showProjectModal = false">✕</button>
-          </div>
-          <div class="modal-search-bar">
-            <app-icon name="search" [size]="16" />
-            <input
-              type="text"
-              [(ngModel)]="projectSearchQuery"
-              placeholder="Search by Project Code or Title..."
-              autofocus
-            />
-          </div>
-          <div class="modal-table-wrap">
-            <table class="modal-table">
-              <thead>
-                <tr>
-                  <th style="width: 130px;">Project Code</th>
-                  <th>Project Name</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (proj of filteredProjects(); track proj.id) {
-                  <tr (click)="selectProject(proj)" class="clickable-row">
-                    <td><strong class="vendor-tag">{{ proj.id }}</strong></td>
-                    <td class="font-medium">{{ proj.name }}</td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="2" class="empty-state">No matching projects found.</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <div class="modal-footer">
-            <span class="modal-hint">Click row to set project code</span>
-            <button type="button" class="btn secondary" (click)="showProjectModal = false">Close</button>
           </div>
         </div>
       </div>
@@ -1303,6 +1285,149 @@ interface ProjectItem {
 
           <div class="modal-footer">
             <button type="button" class="btn secondary" (click)="showViewAssignedModal = false">Close</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- MODAL: REQUISITION LIFECYCLE AUDIT & ACTIVITY TIMELINE -->
+    @if (showAuditModal) {
+      <div class="modal-backdrop" (click)="showAuditModal = false">
+        <div class="modal-window modal-lg" (click)="$event.stopPropagation()" style="max-width: 850px;">
+          <div class="modal-header">
+            <div>
+              <h4 style="display: flex; align-items: center; gap: 8px;">
+                <app-icon name="clock" [size]="18" />
+                <span>Lifecycle History & Audit Trail (Req #{{ auditModalDocNo }})</span>
+              </h4>
+              <span style="font-size: 12px; color: var(--muted);">
+                Tracking current stage, change logs, and vendor milestones from database
+              </span>
+            </div>
+            <button type="button" class="modal-close" (click)="showAuditModal = false">✕</button>
+          </div>
+
+          <div style="padding: 12px 16px 0; border-bottom: 1px solid var(--line);">
+            <div style="display: flex; gap: 8px;">
+              <button
+                type="button"
+                class="btn small"
+                [style.background]="auditModalTab === 'curact' ? 'var(--role-accent, #50ae9b)' : '#f1f5f9'"
+                [style.color]="auditModalTab === 'curact' ? '#fff' : '#475569'"
+                (click)="auditModalTab = 'curact'"
+              >
+                Current Workflow Stage ({{ auditCuractList.length }})
+              </button>
+              <button
+                type="button"
+                class="btn small"
+                [style.background]="auditModalTab === 'log' ? 'var(--role-accent, #50ae9b)' : '#f1f5f9'"
+                [style.color]="auditModalTab === 'log' ? '#fff' : '#475569'"
+                (click)="auditModalTab = 'log'"
+              >
+                Change Log ({{ auditLogList.length }})
+              </button>
+              <button
+                type="button"
+                class="btn small"
+                [style.background]="auditModalTab === 'vendor' ? 'var(--role-accent, #50ae9b)' : '#f1f5f9'"
+                [style.color]="auditModalTab === 'vendor' ? '#fff' : '#475569'"
+                (click)="auditModalTab = 'vendor'"
+              >
+                Vendor Milestones ({{ auditVendorCuractList.length }})
+              </button>
+            </div>
+          </div>
+
+          <div class="modal-table-wrap" style="padding: 16px; max-height: 400px; overflow-y: auto;">
+            @if (auditModalTab === 'curact') {
+              <table class="modal-table">
+                <thead>
+                  <tr>
+                    <th>Req #</th>
+                    <th>Current Action</th>
+                    <th>User</th>
+                    <th>Date</th>
+                    <th>Final Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of auditCuractList; track $index) {
+                    <tr>
+                      <td><strong>{{ c.reQ_NO }}</strong></td>
+                      <td><span class="tag-assigned">{{ c.currenT_ACTION || 'In Progress' }}</span></td>
+                      <td>{{ c.auduser || 'System' }}</td>
+                      <td class="date-cell">{{ c.auddate ? (c.auddate | slice:0:19) : '' }}</td>
+                      <td>
+                        @if (c.isfinal === 1) {
+                          <span class="badge-status" style="background: #dcfce7; color: #166534;">Final</span>
+                        } @else {
+                          <span class="badge-status" style="background: #f1f5f9; color: #475569;">Active</span>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state">No workflow stage entries recorded.</td></tr>
+                  }
+                </tbody>
+              </table>
+            }
+
+            @if (auditModalTab === 'log') {
+              <table class="modal-table">
+                <thead>
+                  <tr>
+                    <th>#Line</th>
+                    <th>Action</th>
+                    <th>Stage</th>
+                    <th>User</th>
+                    <th>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (l of auditLogList; track $index) {
+                    <tr>
+                      <td>Line {{ l.linenum || 1 }}</td>
+                      <td><strong>Action {{ l.action }}</strong></td>
+                      <td><span class="tag-assigned">{{ l.currentaction }}</span></td>
+                      <td>{{ l.auduser || 'System' }}</td>
+                      <td class="date-cell">{{ l.auddate ? (l.auddate | slice:0:19) : '' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="empty-state">No audit log entries recorded.</td></tr>
+                  }
+                </tbody>
+              </table>
+            }
+
+            @if (auditModalTab === 'vendor') {
+              <table class="modal-table">
+                <thead>
+                  <tr>
+                    <th>Vendor ID</th>
+                    <th>Vendor Name</th>
+                    <th>Milestone</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (vc of auditVendorCuractList; track $index) {
+                    <tr>
+                      <td><strong>{{ vc.vendoR_ID }}</strong></td>
+                      <td>{{ vc.vendoR_NAME }}</td>
+                      <td><span class="tag-assigned">{{ vc.currentaction || 'RFQ Notification' }}</span></td>
+                      <td class="date-cell">{{ vc.auddate ? (vc.auddate | slice:0:19) : '' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="empty-state">No vendor milestone entries recorded.</td></tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn secondary" (click)="showAuditModal = false">Close</button>
           </div>
         </div>
       </div>
@@ -2120,6 +2245,26 @@ interface ProjectItem {
       }
     }
 
+    .btn-pager-sm {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--border, #cbd5e1);
+      background: white;
+      cursor: pointer;
+      color: var(--text, #1e293b);
+      transition: all 0.15s ease;
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      &:not(:disabled):hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+      }
+    }
+
     .vendor-tag {
       font-family: monospace;
       color: var(--role-accent, #2563eb);
@@ -2137,6 +2282,8 @@ interface ProjectItem {
 })
 export class RequisitionComponent implements OnInit {
   protected readonly state = inject(PortalStateService);
+  protected readonly vendorApi = inject(VendorApiService);
+  protected readonly sageApi = inject(SageApiService);
 
   readonly role = this.state.role;
   readonly requisitionsList = this.state.requisitions;
@@ -2149,7 +2296,7 @@ export class RequisitionComponent implements OnInit {
 
   // Header model (mirroring REQHModel)
   header: RequisitionHeader = {
-    documentNumber: 'REQ-2024-001',
+    documentNumber: '',
     requiredFor: 'Tender Bidding',
     enteredBy: 'Procurement Specialist',
     date: this.getTodayDate(),
@@ -2167,26 +2314,10 @@ export class RequisitionComponent implements OnInit {
   };
 
   // Line items (mirroring REQDModel)
-  items: RequisitionLineItem[] = [
-    {
-      sr: 1,
-      itemNo: 'IC-1001',
-      itemDesc: 'Copper Wiring Harness 12mm',
-      uom: 'MTR',
-      quantity: 100,
-      location: 'Dubai HQ - Main Warehouse',
-      projectId: 'PRJ-DXB-01',
-      incoTerm: 'FCA - Free Carrier',
-      shipVia: 'By Air',
-      brand: 'Schneider Electric',
-      country: 'United Arab Emirates',
-      dateRequired: this.getFutureDate(21),
-      comments: ''
-    }
-  ];
+  items: RequisitionLineItem[] = [];
 
   // Sage IC Locations
-  readonly locations = [
+  locations: string[] = [
     'Dubai HQ - Main Warehouse',
     'Abu Dhabi Logistics Hub',
     'Sharjah Depot Plant 3',
@@ -2207,6 +2338,15 @@ export class RequisitionComponent implements OnInit {
     'DAP - Delivered at Place',
     'DPU - Delivered at Place Unloaded',
     'DDP - Delivered Duty Paid'
+  ];
+
+  shipViaOptions: string[] = [
+    'By Air',
+    'By Sea',
+    'By Cargo',
+    'By Land',
+    'Courier',
+    'Vendor Delivery'
   ];
 
   // 28 Legacy Countries
@@ -2242,39 +2382,14 @@ export class RequisitionComponent implements OnInit {
   ];
 
   // Sage Item Master database
-  readonly sageItems: SageItem[] = [
-    { itemNumber: 'IC-1001', description: 'Copper Wiring Harness 12mm', uom: 'MTR' },
-    { itemNumber: 'IC-1002', description: 'Industrial Switchgear 400V', uom: 'SET' },
-    { itemNumber: 'IC-1003', description: 'Circuit Breaker 3-Phase 63A', uom: 'PCS' },
-    { itemNumber: 'IC-1004', description: 'Steel Conduit Pipe 2-inch', uom: 'MTR' },
-    { itemNumber: 'IC-1005', description: 'LED Industrial High Bay 150W', uom: 'PCS' },
-    { itemNumber: 'IC-1006', description: 'Hydraulic Pressure Valve', uom: 'PCS' },
-    { itemNumber: 'IC-1007', description: 'Safety Helmet with Visor', uom: 'PCS' },
-    { itemNumber: 'IC-1008', description: 'Welding Electrodes E7018', uom: 'KG' },
-    { itemNumber: 'IC-1009', description: 'Transformers Step-Down 11kV', uom: 'UNT' },
-    { itemNumber: 'IC-1010', description: 'Armored Power Cable 4-Core', uom: 'MTR' }
-  ];
+  readonly sageItems = signal<SageItem[]>([]);
+  isLoadingSageItems = false;
+  sageItemPage = 1;
+  sageItemTotalPages = 1;
+  sageItemTotalCount = 0;
 
   // Brand database
-  readonly brands: BrandItem[] = [
-    { id: 'BR-01', name: 'Schneider Electric' },
-    { id: 'BR-02', name: 'Siemens' },
-    { id: 'BR-03', name: 'ABB Group' },
-    { id: 'BR-04', name: '3M Safety' },
-    { id: 'BR-05', name: 'Bosch Industrial' },
-    { id: 'BR-06', name: 'General Electric' },
-    { id: 'BR-07', name: 'Eaton Power' },
-    { id: 'BR-08', name: 'Legrand Electric' }
-  ];
-
-  // Project database
-  readonly projects: ProjectItem[] = [
-    { id: 'PRJ-DXB-01', name: 'Dubai Airport Terminal Expansion' },
-    { id: 'PRJ-AUH-04', name: 'Abu Dhabi Solar Farm Phase 2' },
-    { id: 'PRJ-SHJ-09', name: 'Sharjah Logistics Warehouse' },
-    { id: 'PRJ-MAINT-24', name: 'Annual Plant Maintenance 2026' },
-    { id: 'PRJ-JAFZA-02', name: 'JAFZA Cold Chain Facility' }
-  ];
+  brands: BrandItem[] = [];
 
   // Modals state
   showItemModal = false;
@@ -2283,11 +2398,15 @@ export class RequisitionComponent implements OnInit {
   showBrandModal = false;
   brandSearchQuery = '';
 
-  showProjectModal = false;
-  projectSearchQuery = '';
-
   showVendorSelectionModal = false;
   showViewAssignedModal = false;
+
+  showAuditModal = false;
+  auditModalDocNo = '';
+  auditModalTab: 'curact' | 'log' | 'vendor' = 'curact';
+  auditCuractList: any[] = [];
+  auditLogList: any[] = [];
+  auditVendorCuractList: any[] = [];
 
   activeRowIndex = 0;
   activeSourcingItem: RequisitionLineItem | null = null;
@@ -2304,6 +2423,217 @@ export class RequisitionComponent implements OnInit {
     if (this.requisitionsList().length > 0) {
       this.sourcingRequisition = this.requisitionsList()[0];
     }
+    this.loadBackendRequisitions();
+    this.loadBackendBrands();
+    this.loadShipViaOptions();
+    this.loadSageItems();
+    this.loadSageVendors();
+    this.loadSageLocations();
+  }
+
+  loadShipViaOptions(): void {
+    this.vendorApi.getShipViaList().subscribe(res => {
+      const list = res?.shipviaList || res?.shipviA_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list.map((s: any) => s.shipviA_NAME || s.shipvia || s.name || String(s)).filter(Boolean);
+        if (mapped.length > 0) {
+          this.shipViaOptions = mapped;
+          if (!this.header.shipVia && this.shipViaOptions.length > 0) {
+            this.header.shipVia = this.shipViaOptions[0];
+          }
+        }
+      }
+    });
+  }
+
+  loadSageLocations(): void {
+    this.sageApi.getLocations().subscribe(list => {
+      if (Array.isArray(list) && list.length > 0) {
+        const liveLocs = list.map(l => `${l.LocationKey} - ${l.Name}`);
+        this.locations = liveLocs;
+        if (!this.header.location && liveLocs.length > 0) {
+          this.header.location = liveLocs[0];
+        }
+      }
+    });
+  }
+
+  loadSageVendors(): void {
+    this.sageApi.getVendors().subscribe(list => {
+      if (Array.isArray(list) && list.length > 0) {
+        for (const sv of list) {
+          this.state.saveMasterVendor({
+            vendorId: sv.VendorNumber,
+            vendorName: sv.VendorName || sv.ShortName || sv.VendorNumber,
+            shortName: sv.ShortName || '',
+            vendorGroup: sv.GroupCode || 'General',
+            status: sv.Status === 'Active' ? 'Active' : 'Inactive',
+            country: sv.Country || 'United States',
+            city: sv.City || '',
+            stateProvince: sv.StateProvince || '',
+            address: sv.AddressLine1 || '',
+            contact: sv.PhoneNumber1 || '',
+            telephone: sv.PhoneNumber1 || '',
+            email: sv.Email || '',
+            terms: 'Net 30 Days',
+            website: '',
+            contactName: sv.ShortName || '',
+            bankCode: '',
+            taxRegistrationCode: '',
+            startDate: '',
+            inactiveDate: ''
+          });
+        }
+      }
+    });
+  }
+
+  loadSageItems(page = 1): void {
+    this.isLoadingSageItems = true;
+    this.sageItemPage = page;
+    this.sageApi.getItemsPage(page, 25, this.itemSearchQuery).subscribe({
+      next: res => {
+        this.isLoadingSageItems = false;
+        this.sageItemTotalCount = res.total;
+        this.sageItemTotalPages = res.totalPages;
+        this.sageItemPage = res.page;
+        if (res.items && res.items.length > 0) {
+          this.sageItems.set(res.items.map(item => ({
+            itemNumber: item.ItemNumber,
+            description: item.Description,
+            uom: item.StockingUnitOfMeasure || 'EA'
+          })));
+        } else {
+          this.sageItems.set([]);
+        }
+      },
+      error: () => {
+        this.isLoadingSageItems = false;
+      }
+    });
+  }
+
+  nextSageItemPage(): void {
+    if (this.sageItemPage < this.sageItemTotalPages) {
+      this.loadSageItems(this.sageItemPage + 1);
+    }
+  }
+
+  prevSageItemPage(): void {
+    if (this.sageItemPage > 1) {
+      this.loadSageItems(this.sageItemPage - 1);
+    }
+  }
+
+  loadBackendBrands(): void {
+    this.vendorApi.getBrands().subscribe(res => {
+      const list = res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const brandItems: BrandItem[] = list.map((b: any) => ({
+          id: String(b.brandid || b.id || b.branD_ID || ''),
+          name: String(b.brandname || b.name || b.branD_NAME || '')
+        })).filter(b => b.name);
+        if (brandItems.length > 0) {
+          const existingNames = new Set(this.brands.map(b => b.name.toLowerCase()));
+          for (const bi of brandItems) {
+            if (!existingNames.has(bi.name.toLowerCase())) {
+              this.brands.push(bi);
+              existingNames.add(bi.name.toLowerCase());
+            }
+          }
+        }
+      }
+    });
+  }
+
+  loadBackendRequisitions(): void {
+    this.vendorApi.getRequestHeaders().subscribe(res => {
+      console.log('Requisition Headers API response:', res);
+      const list = res?.reqh_List
+        || res?.reqH_List
+        || res?.reQH_List
+        || res?.reqhList
+        || res?.reqHList
+        || res?.requestHeader_List
+        || res?.data
+        || (Array.isArray(res) ? res : null);
+
+      if (Array.isArray(list) && list.length > 0) {
+        for (const h of list) {
+          const reqNo = h.reQ_NO || h.reqno || h.reQ_No || '';
+          if (!reqNo) continue;
+          this.vendorApi.getRequestDetails(reqNo).subscribe(dRes => {
+            console.log(`Requisition Details API response for ${reqNo}:`, dRes);
+            const dList = dRes?.reqd_List
+              || dRes?.reqD_List
+              || dRes?.reQD_List
+              || dRes?.reqdList
+              || dRes?.reqDList
+              || dRes?.requestDetail_List
+              || dRes?.data
+              || (Array.isArray(dRes) ? dRes : []);
+
+            const mappedItems: RequisitionLineItem[] = Array.isArray(dList) && dList.length > 0
+              ? dList.map((d: any, idx: number) => ({
+                  sr: d.linenum || d.lineNum || idx + 1,
+                  lineNum: d.linenum || d.lineNum || idx + 1,
+                  itemNo: d.itemno || d.itemNo || '',
+                  itemDesc: d.itemdesc || d.itemDesc || '',
+                  uom: d.uom || 'EA',
+                  quantity: Number(d.qty || d.quantity) || 1,
+                  location: d.loc || h.loc || 'Dubai HQ - Main Warehouse',
+                  projectId: String(d.project || ''),
+                  incoTerm: d.incoterm || 'FCA - Free Carrier',
+                  shipVia: d.shipvia || h.shipvia || 'By Air',
+                  brand: d.brand || '',
+                  country: d.mcountry || 'United Arab Emirates',
+                  dateRequired: d.requiR_DATE ? String(d.requiR_DATE).substring(0, 10) : (h.requirE_DATE ? String(h.requirE_DATE).substring(0, 10) : ''),
+                  comments: d.comments || ''
+                }))
+              : [];
+
+            const existing = this.requisitionsList().find(r => r.header.documentNumber === reqNo);
+            const saved = this.state.saveRequisition({
+              header: {
+                documentNumber: reqNo,
+                requiredFor: h.reQ_FOR || h.reqfor || h.requiredFor || (existing?.header.requiredFor || 'Tender Bidding'),
+                enteredBy: h.reQ_ENTER_BY || h.enterby || h.enteredBy || (existing?.header.enteredBy || 'Procurement Specialist'),
+                date: h.reQ_DATE ? String(h.reQ_DATE).substring(0, 10) : (h.reqdate ? String(h.reqdate).substring(0, 10) : (existing?.header.date || new Date().toISOString().substring(0, 10))),
+                dateRequired: h.requirE_DATE ? String(h.requirE_DATE).substring(0, 10) : (h.requiredate ? String(h.requiredate).substring(0, 10) : (existing?.header.dateRequired || '')),
+                shipVia: h.shipvia || h.shipVia || (existing?.header.shipVia || 'By Air'),
+                location: h.loc || h.location || (existing?.header.location || 'Dubai HQ - Main Warehouse'),
+                requestDescription: h.reQ_DESC || h.reqdesc || h.requestDescription || (existing?.header.requestDescription || ''),
+                comments: h.comments || (existing?.header.comments || ''),
+                status: (h.action === 1 ? 'Approved' : (existing?.header.status || 'Submitted')) as any
+              },
+              items: mappedItems.length > 0 ? mappedItems : (existing?.items || []),
+              assignedVendors: existing?.assignedVendors
+            }, false);
+
+            if (!this.sourcingRequisition && saved) {
+              this.sourcingRequisition = saved;
+            }
+
+            // Load assigned vendors from backend DB via GetREVITEMSList
+            this.vendorApi.getREVITEMSList(reqNo).subscribe(revList => {
+              if (Array.isArray(revList) && revList.length > 0) {
+                const mappedVendors: RequisitionAssignedVendor[] = revList.map((r: any) => ({
+                  itemId: r.itemno || r.iteM_NO || '',
+                  itemDesc: r.itemdesc || r.iteM_DESC || '',
+                  lineNum: r.linenum || 1,
+                  vendorId: r.vendoR_ID || r.vendorid || '',
+                  vendorName: r.vendoR_NAME || r.vendorname || ''
+                }));
+                this.state.assignVendorsToRequisition(reqNo, mappedVendors);
+                if (this.sourcingRequisition && this.sourcingRequisition.header.documentNumber === reqNo) {
+                  this.sourcingRequisition.assignedVendors = mappedVendors;
+                }
+              }
+            });
+          });
+        }
+      }
+    });
   }
 
   // Option 6 Pill Navigation
@@ -2332,9 +2662,10 @@ export class RequisitionComponent implements OnInit {
   });
 
   readonly filteredSageItems = computed(() => {
+    const items = this.sageItems();
     const q = this.itemSearchQuery.trim().toLowerCase();
-    if (!q) return this.sageItems;
-    return this.sageItems.filter(i =>
+    if (!q) return items;
+    return items.filter(i =>
       i.itemNumber.toLowerCase().includes(q) ||
       i.description.toLowerCase().includes(q)
     );
@@ -2346,15 +2677,6 @@ export class RequisitionComponent implements OnInit {
     return this.brands.filter(b =>
       b.id.toLowerCase().includes(q) ||
       b.name.toLowerCase().includes(q)
-    );
-  });
-
-  readonly filteredProjects = computed(() => {
-    const q = this.projectSearchQuery.trim().toLowerCase();
-    if (!q) return this.projects;
-    return this.projects.filter(p =>
-      p.id.toLowerCase().includes(q) ||
-      p.name.toLowerCase().includes(q)
     );
   });
 
@@ -2401,6 +2723,13 @@ export class RequisitionComponent implements OnInit {
       this.state.notify('At least one line item is required.');
       return;
     }
+    const itemToRemove = this.items[index];
+    if (this.isEditMode && itemToRemove?.itemNo && this.header.documentNumber) {
+      this.vendorApi.deleteRequestDetail(this.header.documentNumber, itemToRemove.lineNum || itemToRemove.sr).subscribe({
+        next: () => {},
+        error: (err) => console.warn('deleteRequestDetail error:', err)
+      });
+    }
     this.items.splice(index, 1);
     this.items.forEach((row, i) => {
       row.sr = i + 1;
@@ -2440,6 +2769,9 @@ export class RequisitionComponent implements OnInit {
     this.activeRowIndex = index;
     this.itemSearchQuery = '';
     this.showItemModal = true;
+    if (this.sageItems().length === 0) {
+      this.loadSageItems(1);
+    }
   }
 
   selectItem(item: SageItem): void {
@@ -2463,19 +2795,6 @@ export class RequisitionComponent implements OnInit {
       this.items[this.activeRowIndex].brand = brand.name;
     }
     this.showBrandModal = false;
-  }
-
-  openProjectModal(index: number): void {
-    this.activeRowIndex = index;
-    this.projectSearchQuery = '';
-    this.showProjectModal = true;
-  }
-
-  selectProject(proj: ProjectItem): void {
-    if (this.items[this.activeRowIndex]) {
-      this.items[this.activeRowIndex].projectId = proj.id;
-    }
-    this.showProjectModal = false;
   }
 
   // Save / Update Requisition
@@ -2512,6 +2831,53 @@ export class RequisitionComponent implements OnInit {
         ? `Requisition ${saved.header.documentNumber} updated successfully!`
         : `Requisition ${saved.header.documentNumber} saved and submitted!`
     );
+
+    // Sync Header with Backend Request Controller (AUDRequestHeader)
+    const headerPayload: Partial<REQHModel> = {
+      reQ_NO: this.header.documentNumber,
+      reQ_FOR: this.header.requiredFor,
+      reQ_ENTER_BY: this.header.enteredBy || 'Procurement Specialist',
+      reQ_DATE: this.header.date ? new Date(this.header.date).toISOString() : new Date().toISOString(),
+      requirE_DATE: this.header.dateRequired ? new Date(this.header.dateRequired).toISOString() : new Date().toISOString(),
+      loc: this.header.location,
+      shipvia: this.header.shipVia,
+      reQ_DESC: this.header.requestDescription,
+      comments: this.header.comments || '',
+      action: statusToSet === 'Approved' ? 1 : 0
+    };
+
+    const headerOp = this.isEditMode ? 3 : 2;
+    this.vendorApi.saveRequestHeader(headerPayload, headerOp).subscribe({
+      next: (res) => {
+        console.log('AUDRequestHeader response:', res);
+      },
+      error: (err) => console.warn('AUDRequestHeader error:', err)
+    });
+
+    // Sync Details with Backend Request Controller (AUDRequestDetail)
+    validItems.forEach((item, index) => {
+      const itemPayload: Partial<REQDModel> = {
+        reQ_NO: this.header.documentNumber,
+        linenum: item.lineNum || item.sr || (index + 1),
+        itemno: item.itemNo,
+        itemdesc: item.itemDesc,
+        uom: item.uom || 'EA',
+        qty: Number(item.quantity) || 1,
+        project: item.projectId ? Number(item.projectId) : null,
+        loc: item.location || this.header.location,
+        incoterm: item.incoTerm,
+        shipvia: item.shipVia || this.header.shipVia,
+        requiR_DATE: item.dateRequired ? new Date(item.dateRequired).toISOString() : new Date().toISOString(),
+        comments: item.comments || '',
+        brand: item.brand || '',
+        mcountry: item.country || ''
+      };
+      const detailOp = this.isEditMode ? 3 : 2;
+      this.vendorApi.saveRequestDetail(itemPayload, detailOp).subscribe({
+        next: (dRes) => console.log('AUDRequestDetail response:', dRes),
+        error: (dErr) => console.warn('AUDRequestDetail error:', dErr)
+      });
+    });
   }
 
   proceedToSourcing(): void {
@@ -2569,6 +2935,10 @@ export class RequisitionComponent implements OnInit {
 
   deleteRequisition(docNo: string): void {
     if (confirm(`Are you sure you want to delete requisition ${docNo}?`)) {
+      this.vendorApi.deleteRequestHeader(docNo).subscribe({
+        next: (res) => console.log('Requisition deleted from backend:', res),
+        error: (err) => console.warn('deleteRequestHeader error:', err)
+      });
       this.state.deleteRequisition(docNo);
       if (this.sourcingRequisition?.header.documentNumber === docNo) {
         this.sourcingRequisition = this.requisitionsList()[0] || null;
@@ -2734,13 +3104,28 @@ export class RequisitionComponent implements OnInit {
 
     this.sourcingRequisition.assignedVendors = currentAssignments;
     this.showVendorSelectionModal = false;
+    this.saveCurrentAssignments();
   }
 
   removeVendorFromItem(item: RequisitionLineItem, vendorId: string): void {
     if (!this.sourcingRequisition?.assignedVendors) return;
+    const docNo = this.sourcingRequisition.header.documentNumber;
     this.sourcingRequisition.assignedVendors = this.sourcingRequisition.assignedVendors.filter(
       a => !( (a.itemId === item.itemNo || a.lineNum === item.sr) && a.vendorId === vendorId )
     );
+
+    // Persist deletion to Database: /api/Request/AUDVendorItems (coperation: 3)
+    this.vendorApi.saveVendorItems({
+      coperation: 3,
+      reQ_NO: docNo,
+      linenum: item.sr,
+      vendoR_ID: vendorId,
+      itemno: item.itemNo
+    }, 3).subscribe({
+      next: (res) => console.log('AUDVendorItems deleted from DB:', res),
+      error: (err) => console.warn('AUDVendorItems delete error:', err)
+    });
+
     this.state.notify(`Removed vendor assignment from Line ${item.sr}.`);
   }
 
@@ -2749,6 +3134,24 @@ export class RequisitionComponent implements OnInit {
     const docNo = this.sourcingRequisition.header.documentNumber;
     const assignments = this.sourcingRequisition.assignedVendors || [];
     this.state.assignVendorsToRequisition(docNo, assignments);
+
+    // Persist assignments to Database: /api/Request/AUDVendorItems (coperation: 2)
+    for (const a of assignments) {
+      this.vendorApi.saveVendorItems({
+        coperation: 2,
+        reQ_NO: docNo,
+        linenum: a.lineNum,
+        vendoR_ID: a.vendorId,
+        vendoR_NAME: a.vendorName,
+        itemno: a.itemId,
+        itemdesc: a.itemDesc,
+        qty: 1,
+        action: 2
+      }).subscribe({
+        next: (res) => console.log('AUDVendorItems saved to DB:', res),
+        error: (err) => console.warn('AUDVendorItems save error:', err)
+      });
+    }
   }
 
   submitSourcingForApproval(): void {
@@ -2762,12 +3165,51 @@ export class RequisitionComponent implements OnInit {
 
     const assignments = this.sourcingRequisition.assignedVendors || [];
     this.state.assignVendorsToRequisition(docNo, assignments);
+
+    // Audit logs to DB: AUDRequestCuract & AUDRequestLog
+    this.vendorApi.saveRequestCuract({
+      reQ_NO: docNo,
+      action: 2,
+      currenT_ACTION: 'Vendors Assigned',
+      auduser: 'ADMIN'
+    }).subscribe();
+
+    this.vendorApi.saveRequestLog({
+      reQ_NO: docNo,
+      linenum: 1,
+      action: 2,
+      currentaction: 'Vendors Assigned'
+    }).subscribe();
+
     this.state.notify(`Sourcing plan for ${docNo} submitted to Procurement Manager for sign-off!`);
   }
 
   rejectCurrentSourcing(): void {
     if (!this.sourcingRequisition) return;
     const docNo = this.sourcingRequisition.header.documentNumber;
+    this.vendorApi.saveRequestHeader({
+      reQ_NO: docNo,
+      action: 0
+    }, 3).subscribe({
+      next: (res) => console.log('Requisition status updated to Draft/Rejected in backend:', res),
+      error: (err) => console.warn('AUDRequestHeader reject error:', err)
+    });
+
+    // Audit logs to DB: AUDRequestCuract & AUDRequestLog
+    this.vendorApi.saveRequestCuract({
+      reQ_NO: docNo,
+      action: 3,
+      currenT_ACTION: 'Rejected',
+      auduser: 'ADMIN'
+    }).subscribe();
+
+    this.vendorApi.saveRequestLog({
+      reQ_NO: docNo,
+      linenum: 1,
+      action: 3,
+      currentaction: 'Sourcing Rejected'
+    }).subscribe();
+
     this.state.rejectRequisitionSourcing(docNo);
     const updated = this.requisitionsList().find(r => r.header.documentNumber === docNo);
     if (updated) {
@@ -2791,11 +3233,70 @@ export class RequisitionComponent implements OnInit {
     // Call Manager Approval and RFQ Dispatch
     this.state.approveRequisitionSourcing(docNo);
 
+    // Sync status to backend
+    this.vendorApi.saveRequestHeader({
+      reQ_NO: docNo,
+      action: 1
+    }, 3).subscribe({
+      next: (res) => console.log('Requisition approved in backend:', res),
+      error: (err) => console.warn('AUDRequestHeader approval error:', err)
+    });
+
+    // Audit logs to DB: AUDRequestCuract, AUDRequestLog, AUDVendorCuractItems
+    this.vendorApi.saveRequestCuract({
+      reQ_NO: docNo,
+      action: 4,
+      currenT_ACTION: 'Vendor Approval',
+      isfinal: 1,
+      auduser: 'ADMIN'
+    }).subscribe();
+
+    this.vendorApi.saveRequestLog({
+      reQ_NO: docNo,
+      linenum: 1,
+      action: 4,
+      currentaction: 'Approved & Dispatched'
+    }).subscribe();
+
+    for (const a of assignments) {
+      this.vendorApi.saveVendorCuractItems({
+        reQ_NO: docNo,
+        vendoR_ID: a.vendorId,
+        vendoR_NAME: a.vendorName,
+        action: 1,
+        currentaction: 'RFQ Dispatched'
+      }).subscribe();
+    }
+
     // Refresh local copy
     const updated = this.requisitionsList().find(r => r.header.documentNumber === docNo);
     if (updated) {
       this.sourcingRequisition = updated;
     }
+  }
+
+  openAuditHistoryModal(docNo: string): void {
+    this.auditModalDocNo = docNo;
+    this.auditModalTab = 'curact';
+    this.showAuditModal = true;
+    this.auditCuractList = [];
+    this.auditLogList = [];
+    this.auditVendorCuractList = [];
+
+    // 1. Fetch Current Action / Stage: POST /api/Request/GetRequestCuractList
+    this.vendorApi.getRequestCuractList(docNo).subscribe(res => {
+      this.auditCuractList = Array.isArray(res) ? res : (res?.reqcuracT_List || res?.reqcuracT_Details || []);
+    });
+
+    // 2. Fetch Change Log: POST /api/Request/GetRequestLogList
+    this.vendorApi.getRequestLogList(docNo).subscribe(res => {
+      this.auditLogList = Array.isArray(res) ? res : (res?.reqlogList || res?.reqlogDetails || []);
+    });
+
+    // 3. Fetch Vendor Milestones: POST /api/Request/GetVendorCuractList
+    this.vendorApi.getVendorCuractList(docNo).subscribe(res => {
+      this.auditVendorCuractList = Array.isArray(res) ? res : (res?.revcuracT_List || res?.revcuracT_Details || []);
+    });
   }
 
   private getTodayDate(): string {

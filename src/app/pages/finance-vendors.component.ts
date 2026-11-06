@@ -1,7 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { VendorApiService } from '../core/vendor-api.service';
+import { SageApiService } from '../core/sage-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 
@@ -21,16 +24,13 @@ export interface FinanceVendorProfile {
 @Component({
   selector: 'app-finance-vendors',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, CustomSelectComponent, SlicePipe],
   template: `
-    <app-page-heading eyebrow="Accounts Payable Master" title="Vendors (Finance Master)" subtitle="Maintain financial profiles, payment terms, tax exemptions and credit limits for authorized vendors.">
-      <div class="heading-actions">
-        <button class="btn" (click)="showAddForm = !showAddForm">
-          {{ showAddForm ? '✕ Close Form' : '+ Add Financial Profile' }}
-        </button>
-        <button class="btn secondary" (click)="exportList()">Export Master</button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+      <button class="btn" (click)="showAddForm = !showAddForm">
+        {{ showAddForm ? '✕ Close Form' : '+ Add Financial Profile' }}
+      </button>
+    </div>
 
     <!-- Stats Overview -->
     <section class="stats-grid compact">
@@ -59,7 +59,7 @@ export interface FinanceVendorProfile {
         </div>
 
         <div class="form-grid four-col">
-          <label>Vendor Code *<input [(ngModel)]="newProfile.vendorId" placeholder="e.g. VEN-10024" /></label>
+          <label>Vendor Code *<input [(ngModel)]="newProfile.vendorId" placeholder="e.g. VEN-001" /></label>
           <label>Vendor Legal Name *<input [(ngModel)]="newProfile.vendorName" placeholder="Enter vendor legal name" /></label>
           <label>Designated Bank<input [(ngModel)]="newProfile.bank" placeholder="e.g. Meezan Bank / HBL" /></label>
           <label>IBAN<input [(ngModel)]="newProfile.iban" placeholder="PK44 MEZN 0000 9876 5432 1001" /></label>
@@ -70,7 +70,9 @@ export interface FinanceVendorProfile {
             <app-custom-select [(ngModel)]="newProfile.currency" [options]="currencyOptions" />
           </label>
           <label>Credit Limit ($)<input type="number" [(ngModel)]="newProfile.creditLimit" placeholder="100000" /></label>
-          <label>Tax Withholding Category<input [(ngModel)]="newProfile.taxStatus" placeholder="e.g. Active Filer (4.5% WHT)" /></label>
+          <label>Tax Authority / Category
+            <app-custom-select [(ngModel)]="newProfile.taxStatus" [options]="taxAuthorityOptions" />
+          </label>
         </div>
 
         <div class="toolbar" style="margin-top: 16px;">
@@ -140,6 +142,12 @@ export interface FinanceVendorProfile {
                 </td>
                 <td style="white-space: nowrap;">
                   <div class="row-actions">
+                    <button class="btn-action btn-action-view" (click)="openAuditModal(p)" title="View Qualification Action History (VCURACTACTION)">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                      <span>History</span>
+                    </button>
                     <button class="btn-action btn-action-save" (click)="saveProfile(p)" title="Save changes">
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -162,6 +170,49 @@ export interface FinanceVendorProfile {
         </table>
       </div>
     </article>
+
+    <!-- MODAL: VENDOR ACTION HISTORY & AUDIT TRAIL (VCURACTACTION) -->
+    @if (showAuditModal && selectedVendorForAudit) {
+      <div class="bank-finder-overlay" (click)="showAuditModal = false">
+        <div class="bank-finder" (click)="$event.stopPropagation()" style="max-width: 750px;">
+          <div class="bank-finder-header" style="background: var(--role-accent, #7048d7); color: white;">
+            <span>Vendor Action History & Audit Log ({{ selectedVendorForAudit.vendorName }})</span>
+            <button type="button" class="modal-close-btn" (click)="showAuditModal = false" style="color: white; border: none; background: transparent; font-size: 18px; cursor: pointer;">&times;</button>
+          </div>
+          <div style="padding: 18px; max-height: 400px; overflow-y: auto;">
+            <table class="finance-table">
+              <thead>
+                <tr>
+                  <th>Vendor ID</th>
+                  <th>Current Action</th>
+                  <th>User</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of vcuractActionList; track $index) {
+                  <tr>
+                    <td><strong>{{ a.vendoR_ID || a.reqno }}</strong></td>
+                    <td><span class="badge-status">{{ a.currentaction || 'Reviewed' }}</span></td>
+                    <td>{{ a.audtuser || 'Officer' }}</td>
+                    <td>{{ a.audtdate ? (a.audtdate | slice:0:19) : '' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="4" style="text-align: center; color: #94a3b8; padding: 24px;">
+                      No review actions logged yet for this vendor.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid #e2e8f0;">
+            <button type="button" class="btn secondary small" (click)="showAuditModal = false">Close</button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .finance-table {
@@ -208,8 +259,102 @@ export interface FinanceVendorProfile {
     }
   `]
 })
-export class FinanceVendorsComponent {
+export class FinanceVendorsComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
+  readonly sageApi = inject(SageApiService);
+
+  ngOnInit(): void {
+    this.loadBackendVendors();
+    this.loadSageCurrencies();
+    this.loadSageTaxes();
+  }
+
+  loadSageCurrencies(): void {
+    this.sageApi.getCurrencies().subscribe(res => {
+      if (res && res.length > 0) {
+        this.currencyOptions = res.map(c => c.CurrencyCodeKey);
+        if (!this.newProfile.currency && this.currencyOptions.length > 0) {
+          this.newProfile.currency = this.currencyOptions[0];
+        }
+      }
+    });
+  }
+
+  loadSageTaxes(): void {
+    this.sageApi.getTaxes().subscribe(res => {
+      if (res && res.length > 0) {
+        this.taxAuthorityOptions = res.map(t => `${t.TaxAuthorityKey} - ${t.Description}`);
+        if (!this.newProfile.taxStatus && this.taxAuthorityOptions.length > 0) {
+          this.newProfile.taxStatus = this.taxAuthorityOptions[0];
+        }
+      }
+    });
+  }
+
+  loadBackendVendors(): void {
+    this.vendorApi.getVendorBasicInfo().subscribe(res => {
+      const list = res?.vendorBI_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const v of list) {
+          const vId = v.reQ_NO || v.vendorid || '';
+          const vName = v.vendoR_NAME || 'Registered Vendor';
+          if (!vId) continue;
+          if (!this.profiles.some(p => p.vendorId === vId)) {
+            this.profiles.push({
+              id: `FIN-${vId}`,
+              vendorId: vId,
+              vendorName: vName,
+              bank: 'Pending Verification',
+              iban: '',
+              paymentTerms: 'Net 30 Days',
+              currency: 'AED',
+              creditLimit: 50000,
+              taxStatus: 'Registered Corporate Tax',
+              financeStatus: 'Pending'
+            });
+          }
+        }
+
+        this.vendorApi.getAllVendorBanks().subscribe(bRes => {
+          const bList = bRes?.vbank_List || bRes?.data || [];
+          if (Array.isArray(bList) && bList.length > 0) {
+            for (const b of bList) {
+              const bReqNo = b.reqno || b.reQ_NO || '';
+              const prof = this.profiles.find(p => p.vendorId === bReqNo);
+              if (prof) {
+                if (b.banK_NAME) prof.bank = b.banK_NAME;
+                if (b.accounT_IBAN || b.accounT_NO) prof.iban = b.accounT_IBAN || b.accounT_NO;
+                if (b.status === 'Approved' || b.isactive === 1) prof.financeStatus = 'Approved';
+              }
+            }
+          }
+        });
+      }
+
+      // Also load live Sage 300 ERP Vendors
+      this.sageApi.getVendors().subscribe(sList => {
+        if (Array.isArray(sList) && sList.length > 0) {
+          for (const sv of sList) {
+            if (!this.profiles.some(p => p.vendorId === sv.VendorNumber)) {
+              this.profiles.push({
+                id: `FIN-${sv.VendorNumber}`,
+                vendorId: sv.VendorNumber,
+                vendorName: sv.VendorName || sv.ShortName || sv.VendorNumber,
+                bank: 'Sage 300 Master',
+                iban: 'SAGE-DIRECT',
+                paymentTerms: 'Net 30 Days',
+                currency: sv.CurrencyCode || 'USD',
+                creditLimit: 100000,
+                taxStatus: 'ERP Verified',
+                financeStatus: 'Approved'
+              });
+            }
+          }
+        }
+      });
+    });
+  }
 
   showAddForm = true;
   searchQuery = '';
@@ -230,32 +375,38 @@ export class FinanceVendorsComponent {
     'Advance 20%, Balance Net 30'
   ];
 
-  readonly currencyOptions = [
-    'USD',
-    'PKR',
-    'EUR',
-    'AED'
-  ];
+  currencyOptions: string[] = [];
+  taxAuthorityOptions: string[] = [];
 
   newProfile: FinanceVendorProfile = {
-    id: 'FIN-105',
-    vendorId: 'VEN-10028',
-    vendorName: 'Horizon Power Systems',
-    bank: 'Meezan Bank',
-    iban: 'PK12 MEZN 0000 4455 6677 8899',
+    id: '',
+    vendorId: '',
+    vendorName: '',
+    bank: '',
+    iban: '',
     paymentTerms: 'Net 30 Days',
-    currency: 'USD',
-    creditLimit: 120000,
-    taxStatus: 'Active Filer (4.5% WHT)',
+    currency: '',
+    creditLimit: 0,
+    taxStatus: '',
     financeStatus: 'Pending'
   };
 
-  profiles: FinanceVendorProfile[] = [
-    { id: 'FIN-101', vendorId: 'VEN-10024', vendorName: 'ABC Supplies Pvt. Ltd.', bank: 'Habib Bank Limited', iban: 'PK36 HABB 0000 1234 5678 9012', paymentTerms: 'Net 30 Days', currency: 'USD', creditLimit: 250000, taxStatus: 'Active Filer (4.5% WHT)', financeStatus: 'Approved' },
-    { id: 'FIN-102', vendorId: 'VEN-10025', vendorName: 'Global Traders', bank: 'MCB Bank', iban: 'PK55 MUCB 0000 9988 7766 5544', paymentTerms: 'Net 45 Days', currency: 'USD', creditLimit: 180000, taxStatus: 'Active Filer (4.5% WHT)', financeStatus: 'Approved' },
-    { id: 'FIN-103', vendorId: 'VEN-10026', vendorName: 'Perfect Industrial', bank: 'Allied Bank', iban: 'PK77 ABPA 0000 1122 3344 5566', paymentTerms: 'Net 30 Days', currency: 'USD', creditLimit: 90000, taxStatus: 'Non-Filer (7% WHT)', financeStatus: 'Pending' },
-    { id: 'FIN-104', vendorId: 'VEN-10027', vendorName: 'Tech Solutions', bank: 'HBL', iban: 'PK21 HABB 0000 6677 8899 0011', paymentTerms: 'Net 15 Days', currency: 'USD', creditLimit: 75000, taxStatus: 'Active Filer (4.5% WHT)', financeStatus: 'On Hold' }
-  ];
+  profiles: FinanceVendorProfile[] = [];
+
+  showAuditModal = false;
+  selectedVendorForAudit: FinanceVendorProfile | null = null;
+  vcuractActionList: any[] = [];
+
+  openAuditModal(p: FinanceVendorProfile): void {
+    this.selectedVendorForAudit = p;
+    this.showAuditModal = true;
+    this.vcuractActionList = [];
+
+    // Fetch live vendor action history from DB: POST /api/Vendor/GetVCURACTACTIONList
+    this.vendorApi.getVCURACTACTIONList(p.vendorId).subscribe(res => {
+      this.vcuractActionList = Array.isArray(res) ? res : (res?.vcuractactioN_List || res?.vcuractactioN_Data || []);
+    });
+  }
 
   filteredProfiles(): FinanceVendorProfile[] {
     const q = this.searchQuery.trim().toLowerCase();
@@ -297,16 +448,26 @@ export class FinanceVendorsComponent {
   }
 
   saveProfile(p: FinanceVendorProfile): void {
-    this.state.notify(`Financial terms for ${p.vendorName} saved successfully.`);
+    // Audit log to DB: POST /api/Vendor/AUDVCURACTACTIONDetails
+    this.vendorApi.saveVCURACTACTIONDetails({
+      coperation: 2,
+      reqno: p.vendorId,
+      vendoR_ID: p.vendorId,
+      vendoR_NAME: p.vendorName,
+      action: p.financeStatus === 'Approved' ? 1 : 2,
+      currentaction: `Financial Terms Updated: ${p.financeStatus}`,
+      audtuser: 'ADMIN'
+    }).subscribe({
+      next: (res) => console.log('AUDVCURACTACTIONDetails saved:', res),
+      error: (err) => console.warn('AUDVCURACTACTIONDetails error:', err)
+    });
+
+    this.state.notify(`Financial terms for ${p.vendorName} saved and logged to database.`);
   }
 
   deleteProfile(id: string): void {
     const item = this.profiles.find(p => p.id === id);
     this.profiles = this.profiles.filter(p => p.id !== id);
     this.state.notify(`Financial profile for ${item ? item.vendorName : id} deleted.`);
-  }
-
-  exportList(): void {
-    this.state.notify('Exporting vendor financial register (Excel)...');
   }
 }

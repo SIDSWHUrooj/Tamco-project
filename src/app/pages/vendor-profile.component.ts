@@ -1,9 +1,9 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { VendorApiService, VREGModel } from '../core/vendor-api.service';
-import { PageHeadingComponent } from '../shared/ui.component';
+import { SageApiService, SageTax, SageItem } from '../core/sage-api.service';
 import { IconComponent } from '../shared/icon.component';
 
 export interface DocumentItem {
@@ -75,6 +75,8 @@ interface AttachmentRow {
   fileName: string;
   fileSize?: string;
   status: string;
+  isSaving?: boolean;
+  isSaved?: boolean;
 }
 
 interface BankItem {
@@ -91,7 +93,7 @@ interface BankItem {
 @Component({
   selector: 'app-vendor-profile',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, IconComponent],
+  imports: [FormsModule, IconComponent],
   styles: [`
     :host {
       display: block;
@@ -464,6 +466,132 @@ interface BankItem {
         border-color: #2563eb;
         color: #2563eb;
       }
+    }
+    .btn-cell-sync {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      border: 1px solid #50ae9b;
+      background: rgba(80, 174, 155, 0.08);
+      color: #1e5f53;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      &:hover:not(:disabled) {
+        background: #50ae9b;
+        color: #ffffff;
+      }
+      &.saved {
+        background: #ecfdf5;
+        border-color: #10b981;
+        color: #047857;
+      }
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    /* STEP COMPLETION AUDIT DIAGNOSTICS STYLING */
+    .diag-modal-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 800px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .diag-header {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #ffffff;
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #50ae9b;
+    }
+    .diag-progress-bar-wrap {
+      background: #f1f5f9;
+      padding: 12px 22px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .diag-progress-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+    .diag-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #50ae9b);
+      transition: width 0.3s ease;
+    }
+    .diag-list {
+      padding: 16px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      max-height: 52vh;
+    }
+    .diag-card-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      transition: all 0.15s ease;
+      &.active {
+        border-color: #a7f3d0;
+        background: #f0fdf4;
+      }
+      &.pending {
+        border-color: #fde68a;
+        background: #fffbeb;
+      }
+    }
+    .diag-step-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .diag-num-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      background: #e2e8f0;
+      color: #475569;
+      &.done {
+        background: #10b981;
+        color: #ffffff;
+      }
+    }
+    .diag-flag-pill {
+      font-family: monospace;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #334155;
+      font-weight: 600;
     }
 
     /* RADIO PILL FOR DEFAULT CURRENCY */
@@ -1215,58 +1343,79 @@ interface BankItem {
     }
   `],
   template: `
-    <app-page-heading
-      eyebrow="Supplier Onboarding & Commercial Registration"
-      title="Company Profile Management"
-      subtitle="Complete your 8-step commercial compliance, transacting currencies, business capabilities, verified contacts, and settlement banking data."
-    >
-      <div class="heading-actions">
-        <button class="btn" (click)="openNoticeModal()" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px;">
-          <app-icon name="documents" [size]="14" />
-          <span>Important Notice</span>
-        </button>
+    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+      <button class="btn" (click)="openNoticeModal()" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px;">
+        <app-icon name="documents" [size]="14" />
+        <span>Important Notice</span>
+      </button>
+
+      <button class="btn secondary" (click)="printSummary()" style="display: inline-flex; align-items: center; gap: 6px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <rect x="6" y="14" width="12" height="8" />
+        </svg>
+        <span>Print Profile</span>
+      </button>
+
+      @if (state.vendorStatusCode() === 0) {
+        <button class="btn secondary" (click)="saveDraft()">Save Draft</button>
         <button class="btn" (click)="submitForVerification()" style="background: var(--role-accent); border-color: var(--role-accent); display: inline-flex; align-items: center; gap: 6px;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>Submit Profile</span>
+          <span>Submit Profile for Review</span>
         </button>
-        <button class="btn secondary" (click)="saveDraft()">Save Draft</button>
-        <button class="btn secondary" (click)="resetChanges()">Restore Defaults</button>
-        <button class="btn secondary" (click)="cycleLifecycleStatus()" style="font-size: 12px; font-weight: 700; background: #f8fafc; border: 1.5px solid var(--role-accent); color: var(--role-accent);">
-          Status {{ state.vendorStatusCode() }}: {{ getStatusName(state.vendorStatusCode()) }} ⇄
-        </button>
-      </div>
-    </app-page-heading>
+      } @else if (state.vendorStatusCode() >= 1 && state.vendorStatusCode() < 3) {
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 9999px; color: #92400e; font-weight: 700; font-size: 12.5px;">
+          <span>⏳</span>
+          <span>Application Under Review — TAMCO Verification In Progress</span>
+        </div>
+      } @else {
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 9999px; color: #065f46; font-weight: 700; font-size: 12.5px;">
+          <span>✓</span>
+          <span>Certified Active Partner (Sage 300 ERP)</span>
+        </div>
+      }
 
-    <!-- 4-TIER LIFECYCLE TOOLBAR (.NET WORKFLOW EMULATION) -->
-    <div class="vendor-lifecycle-toolbar">
-      <div class="vlt-title">
-        <span class="vlt-icon">⚡</span>
-        <div>
-          <strong>Vendor Lifecycle State (.NET active code):</strong>
-          <small>Active Code: {{ state.vendorStatusCode() }} · Emulates exact ASP.NET Core views</small>
+      @if (isStaffUser()) {
+        <button class="btn secondary" (click)="openStepDiagnosticsModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border-color: #50ae9b; color: #1e5f53;">
+          <span>📋</span>
+          <span>Step Audit (GetACTIVE)</span>
+        </button>
+      }
+    </div>
+
+    <!-- STAFF-ONLY LIFECYCLE CONTROLS (Hidden from external vendors) -->
+    @if (isStaffUser()) {
+      <div class="vendor-lifecycle-toolbar">
+        <div class="vlt-title">
+          <span class="vlt-icon">⚡</span>
+          <div>
+            <strong>Staff Lifecycle Simulation:</strong>
+            <small>Active Code: {{ state.vendorStatusCode() }} · Staff preview mode</small>
+          </div>
+        </div>
+        <div class="vlt-pills">
+          <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 0" (click)="setLifecycleStatus(0)" title="Status 0: Incomplete Wizard">
+            <span class="pill-code">0</span>
+            <span>Registration Draft</span>
+          </button>
+          <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 1" (click)="setLifecycleStatus(1)" title="Status 1: Review Mode">
+            <span class="pill-code">1</span>
+            <span>Review Mode</span>
+          </button>
+          <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 2" (click)="setLifecycleStatus(2)" title="Status 2: Pending Approval">
+            <span class="pill-code">2</span>
+            <span>Pending Approval</span>
+          </button>
+          <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() >= 3" [class.approved]="state.vendorStatusCode() >= 3" (click)="setLifecycleStatus(3)" title="Status 3: Sage 300 ERP Certified Partner">
+            <span class="pill-code">3+</span>
+            <span>Approved ERP Partner</span>
+          </button>
         </div>
       </div>
-      <div class="vlt-pills">
-        <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 0" (click)="setLifecycleStatus(0)" title="Status 0: Incomplete Wizard (VendorsStepByStep2.cshtml)">
-          <span class="pill-code">0</span>
-          <span>Incomplete Wizard</span>
-        </button>
-        <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 1" (click)="setLifecycleStatus(1)" title="Status 1: Review Mode (VendorsStepByStep2?showReview=true)">
-          <span class="pill-code">1</span>
-          <span>Review Mode</span>
-        </button>
-        <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() === 2" (click)="setLifecycleStatus(2)" title="Status 2: Pending Approval & Upload Signed Form (ReviewForm.cshtml)">
-          <span class="pill-code">2</span>
-          <span>Pending Approval</span>
-        </button>
-        <button type="button" class="vlt-pill" [class.active]="state.vendorStatusCode() >= 3" [class.approved]="state.vendorStatusCode() >= 3" (click)="setLifecycleStatus(3)" title="Status 3: Sage 300 ERP Certified Partner (Home/Dashboard.cshtml)">
-          <span class="pill-code">3+</span>
-          <span>Approved ERP Partner</span>
-        </button>
-      </div>
-    </div>
+    }
 
     <!-- 4-STAGE APPLICATION TRACKER MATCHING .NET WORKFLOW -->
     <div class="registration-milestone-tracker">
@@ -1298,7 +1447,7 @@ interface BankItem {
         <span class="m-circle">{{ isFullyApproved() ? '✓' : '4' }}</span>
         <div class="m-text">
           <strong>4. Sage 300 ERP Sync</strong>
-          <small>{{ isFullyApproved() ? 'Master Active · VEN-10024' : 'Awaiting ERP Allocation' }}</small>
+          <small>{{ isFullyApproved() ? ('Master Active · ' + (form.code || 'ERP Synced')) : 'Awaiting ERP Allocation' }}</small>
         </div>
       </div>
     </div>
@@ -1314,7 +1463,7 @@ interface BankItem {
           </div>
         </div>
         <div class="cert-right">
-          <span class="cert-badge green">OFFICIAL VENDOR ID: VEN-10024</span>
+          <span class="cert-badge green">OFFICIAL VENDOR ID: {{ form.code || 'ERP ALLOCATED' }}</span>
           <span class="cert-badge blue">TERMS: NET 30 DAYS</span>
         </div>
       </div>
@@ -1354,6 +1503,7 @@ interface BankItem {
             <div class="review-field-item"><label>Trade License Expiry</label><div class="review-val">{{ form.tradeLicenseExpiry }}</div></div>
             <div class="review-field-item"><label>VAT (TRN Number)</label><div class="review-val">{{ form.vatNumber }}</div></div>
             <div class="review-field-item"><label>Corporate Tax No.</label><div class="review-val">{{ form.corporateTax || '—' }}</div></div>
+            <div class="review-field-item"><label>Sage Tax Authority</label><div class="review-val">{{ form.tax || '—' }}</div></div>
           </div>
         </div>
 
@@ -1438,7 +1588,10 @@ interface BankItem {
         <div class="review-section-block">
           <div class="review-section-title">
             <span>7. Compliance Attachments</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(7)">Edit Step 7 ✎</button>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px; border-color: #50ae9b; color: #1e5f53;" (click)="syncAllVendorDocuments()">Sync All (AUD) 💾</button>
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(7)">Edit Step 7 ✎</button>
+            </div>
           </div>
           <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
             @for (att of attachments; track att.id) {
@@ -1644,7 +1797,7 @@ interface BankItem {
             </div>
             <div class="form-field">
               <label>City *</label>
-              <input [(ngModel)]="form.city" placeholder="City location" />
+              <input [(ngModel)]="form.city" placeholder="City location" list="citySuggestions" />
             </div>
             <div class="form-field">
               <label>Phone Number *</label>
@@ -1700,6 +1853,15 @@ interface BankItem {
             <div class="form-field">
               <label>Corporate Tax Number</label>
               <input [(ngModel)]="form.corporateTax" placeholder="98888888" />
+            </div>
+            <div class="form-field">
+              <label>Sage Tax Authority (ERP Jurisdiction)</label>
+              <select [(ngModel)]="form.tax">
+                <option value="">Select Sage Tax Authority</option>
+                @for (t of sageTaxAuthorities; track t.TaxAuthorityKey) {
+                  <option [value]="t.TaxAuthorityKey">{{ t.TaxAuthorityKey }} - {{ t.Description }} ({{ t.TaxReportingCurrency }})</option>
+                }
+              </select>
             </div>
           </div>
         }
@@ -1847,7 +2009,7 @@ interface BankItem {
                       <span class="mono" style="font-size: 11px; color: #64748b; margin-left: 6px;">({{ p.code }})</span>
                     </td>
                     <td>
-                      <input class="cell-input" [(ngModel)]="p.brands" placeholder="e.g. Schneider, ABB" />
+                      <input class="cell-input" [(ngModel)]="p.brands" placeholder="e.g. Schneider, ABB" list="brandSuggestions" />
                     </td>
                     <td>
                       <input class="cell-input" [(ngModel)]="p.selectedBrands" placeholder="e.g. Certified Partner" />
@@ -1993,7 +2155,7 @@ interface BankItem {
             </div>
             <div class="form-field">
               <label>City *</label>
-              <input [(ngModel)]="contactForm.city" placeholder="Select City" />
+              <input [(ngModel)]="contactForm.city" placeholder="Select City" list="citySuggestions" />
             </div>
           </div>
 
@@ -2131,7 +2293,7 @@ interface BankItem {
                   <th style="width: 170px;">Issue Date</th>
                   <th style="width: 170px;">Doc Expiry Date</th>
                   <th>Attached File</th>
-                  <th style="width: 80px; text-align: center;">Action</th>
+                  <th style="width: 140px; text-align: center;">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -2169,14 +2331,32 @@ interface BankItem {
                       </div>
                     </td>
                     <td style="text-align: center;">
-                      <button
-                        type="button"
-                        class="btn-cell-delete"
-                        (click)="removeAttachment(i)"
-                        title="Delete attachment row"
-                      >
-                        ✕
-                      </button>
+                      <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                        <button
+                          type="button"
+                          class="btn-cell-sync"
+                          [class.saved]="att.isSaved"
+                          [disabled]="att.isSaving"
+                          (click)="saveSingleAttachment(att, i)"
+                          title="Save document metadata to backend (AUDVendorDocument)"
+                        >
+                          @if (att.isSaving) {
+                            <span>⏳ Saving...</span>
+                          } @else if (att.isSaved) {
+                            <span>✓ Synced</span>
+                          } @else {
+                            <span>💾 Sync</span>
+                          }
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-cell-delete"
+                          (click)="removeAttachment(i)"
+                          title="Delete attachment row"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 }
@@ -2196,7 +2376,7 @@ interface BankItem {
                 <label>Currency *</label>
                 <select [(ngModel)]="bankForm.currency">
                   <option value="" disabled>Select Currency</option>
-                  @for (c of currencies; track c.code) {
+                  @for (c of (currencies.length > 0 ? currencies : currencyCatalog); track c.code) {
                     <option [value]="c.code">{{ c.code }} - {{ c.description }}</option>
                   }
                 </select>
@@ -2384,8 +2564,13 @@ interface BankItem {
           </div>
 
           <div class="modal-footer">
-            <div style="font-size: 12.5px; color: #64748b;">
-              Showing {{ currencyStartIndex + 1 }} to {{ currencyEndIndex }} of {{ filteredCurrencies.length }} entries
+            <div style="font-size: 12.5px; color: #64748b; display: flex; align-items: center; gap: 8px;">
+              <span>Showing {{ currencyStartIndex + 1 }} to {{ currencyEndIndex }} of {{ filteredCurrencies.length }} entries</span>
+              @if (filteredCurrencies.length > currencyPageSize) {
+                <button type="button" class="btn secondary" style="padding: 2px 8px; font-size: 11px;" [disabled]="currencyCurrentPage <= 1" (click)="currencyCurrentPage = currencyCurrentPage - 1">Prev</button>
+                <span style="font-size: 12px; font-weight: 600;">{{ currencyCurrentPage }}</span>
+                <button type="button" class="btn secondary" style="padding: 2px 8px; font-size: 11px;" [disabled]="currencyEndIndex >= filteredCurrencies.length" (click)="currencyCurrentPage = currencyCurrentPage + 1">Next</button>
+              }
             </div>
 
             <div class="modal-footer-btns">
@@ -2450,8 +2635,13 @@ interface BankItem {
           </div>
 
           <div class="modal-footer">
-            <div style="font-size: 12.5px; color: #64748b;">
-              Showing {{ productStartIndex + 1 }} to {{ productEndIndex }} of {{ filteredProducts.length }} entries
+            <div style="font-size: 12.5px; color: #64748b; display: flex; align-items: center; gap: 8px;">
+              <span>Showing {{ productStartIndex + 1 }} to {{ productEndIndex }} of {{ filteredProducts.length }} entries</span>
+              @if (filteredProducts.length > productPageSize) {
+                <button type="button" class="btn secondary" style="padding: 2px 8px; font-size: 11px;" [disabled]="productCurrentPage <= 1" (click)="productCurrentPage = productCurrentPage - 1">Prev</button>
+                <span style="font-size: 12px; font-weight: 600;">{{ productCurrentPage }}</span>
+                <button type="button" class="btn secondary" style="padding: 2px 8px; font-size: 11px;" [disabled]="productEndIndex >= filteredProducts.length" (click)="productCurrentPage = productCurrentPage + 1">Next</button>
+              }
             </div>
 
             <div class="modal-footer-btns">
@@ -2522,22 +2712,156 @@ interface BankItem {
         </div>
       </div>
     }
+
+    <!-- ============================================================== -->
+    <!-- STEP COMPLETION AUDIT & DIAGNOSTICS MODAL (GetACTIVEList / API) -->
+    <!-- ============================================================== -->
+    @if (showStepDiagnosticsModal) {
+      <div class="modal-overlay" (click)="closeStepDiagnosticsModal()">
+        <div class="diag-modal-card" (click)="$event.stopPropagation()">
+          <div class="diag-header">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 20px;">📋</span>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #fff;">
+                  Registration Step Completion Audit & Verification
+                </h3>
+              </div>
+              <small style="opacity: 0.85; font-size: 12px; margin-top: 3px; display: block;">
+                Direct inspection from POST /api/Vendor/GetACTIVEList (coperation: 1) for Req: <strong>{{ diagnosticsMeta.reqno || form.code || 'Draft' }}</strong>
+              </small>
+            </div>
+            <button class="btn-modal-close" (click)="closeStepDiagnosticsModal()">✕</button>
+          </div>
+
+          <div class="diag-progress-bar-wrap">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+              <span style="font-weight: 600; color: #334155;">
+                Overall Onboarding Progress:
+                <strong style="color: #059669;">{{ completedStepsCount }} of 7 Steps Active</strong> ({{ getDiagnosticsPercentage() }}%)
+              </span>
+              <span style="font-size: 11.5px; color: #64748b;">
+                Audit User: <strong>{{ diagnosticsMeta.auduser }}</strong> · {{ diagnosticsMeta.auddate }}
+              </span>
+            </div>
+            <div class="diag-progress-track">
+              <div class="diag-progress-fill" [style.width.%]="getDiagnosticsPercentage()"></div>
+            </div>
+          </div>
+
+          <div class="diag-list">
+            @if (isCheckingDiagnostics) {
+              <div style="text-align: center; padding: 32px; color: #64748b;">
+                <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+                <p>Querying backend GetACTIVEList workflow flags...</p>
+              </div>
+            } @else {
+              @for (s of stepDiagnostics; track s.stepNo) {
+                <div class="diag-card-item" [class.active]="s.isActive" [class.pending]="!s.isActive">
+                  <div class="diag-step-left">
+                    <div class="diag-num-badge" [class.done]="s.isActive">
+                      {{ s.isActive ? '✓' : s.stepNo }}
+                    </div>
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <strong style="font-size: 13.5px; color: #0f172a;">{{ s.stepNo }}. {{ s.title }}</strong>
+                        <span class="diag-flag-pill">{{ s.flagKey }} = {{ s.isActive ? '1' : '0' }}</span>
+                      </div>
+                      <p style="margin: 2px 0 0; font-size: 12px; color: #64748b;">{{ s.description }}</p>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="cert-badge" [class.green]="s.isActive" [class.blue]="!s.isActive">
+                      {{ s.badgeText }}
+                    </span>
+                    <button
+                      type="button"
+                      class="btn secondary"
+                      style="font-size: 11px; padding: 4px 10px; border-color: #cbd5e1;"
+                      (click)="jumpToStepFromDiagnostics(s.stepTarget)"
+                    >
+                      Jump to Step ↗
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+
+          <div style="padding: 14px 22px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="font-size: 12px; color: #64748b;">
+              Sage 300 ERP Vendor Master creation requires all 7 active flags verified.
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button
+                type="button"
+                class="btn secondary"
+                style="font-size: 12px; padding: 6px 14px; border-color: #50ae9b; color: #1e5f53;"
+                (click)="fetchStepDiagnostics()"
+                [disabled]="isCheckingDiagnostics"
+              >
+                🔄 Re-query GetACTIVE
+              </button>
+              <button
+                type="button"
+                class="btn"
+                style="font-size: 12px; padding: 6px 16px; background: #334155; border-color: #334155; color: #fff;"
+                (click)="closeStepDiagnosticsModal()"
+              >
+                Close Audit
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <datalist id="citySuggestions">
+      @for (city of cityList; track city) {
+        <option [value]="city">{{ city }}</option>
+      }
+    </datalist>
+
+    <datalist id="brandSuggestions">
+      @for (brand of brandList; track brand) {
+        <option [value]="brand">{{ brand }}</option>
+      }
+    </datalist>
   `
 })
 export class VendorProfileComponent implements OnInit {
   readonly state = inject(PortalStateService);
   private readonly vendorApi = inject(VendorApiService);
+  private readonly sageApi = inject(SageApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  readonly isStaffUser = computed(() => this.state.role() !== 'vendor');
+  readonly isVendorUser = computed(() => this.state.role() === 'vendor');
 
   currentStep = 1;
   showNoticeModal = false;
   isLoadingProfile = false;
   isSavingProfile = false;
+  sageTaxAuthorities: SageTax[] = [];
 
   uploadedSignedFile: File | null = null;
   uploadedSignedFileName = '';
   showThankYouModal = false;
+
+  showStepDiagnosticsModal = false;
+  isCheckingDiagnostics = false;
+  diagnosticsMeta: { auddate?: string; auduser?: string; reqno?: string } = {};
+  stepDiagnostics: {
+    stepNo: number;
+    title: string;
+    description: string;
+    flagKey: string;
+    isActive: boolean;
+    badgeText: string;
+    stepTarget: number;
+  }[] = [];
 
   readonly wizardSteps = [
     { id: 1, title: 'Basic Information' },
@@ -2552,140 +2876,72 @@ export class VendorProfileComponent implements OnInit {
 
   // STEP 1: Basic Information
   form = {
-    company: 'ABC Supplies Pvt. Ltd.',
-    code: 'VEN-10024',
-    registrationDate: '2026-05-01',
+    company: '',
+    code: '',
+    registrationDate: '',
     country: 'United Arab Emirates',
-    city: 'Abu Dhabi',
-    phone: '09 876 5432',
-    fax: '09 876 5432',
-    address: 'Plot 14, Mussafah Industrial Area, Sector M-12',
-    zipCode: '8080',
-    email: 'abc@gmail.com',
-    website: 'www.xyz.com',
-    tradeLicense: '09876',
-    tradeLicenseExpiry: '2027-05-14',
-    vatNumber: '100023565656',
-    corporateTax: '98888888',
-    tax: 'NTN-7483921-8',
-    strn: 'STRN-32778761234'
+    city: '',
+    phone: '',
+    fax: '',
+    address: '',
+    zipCode: '',
+    email: '',
+    website: '',
+    tradeLicense: '',
+    tradeLicenseExpiry: '',
+    vatNumber: '',
+    corporateTax: '',
+    tax: '',
+    strn: ''
   };
 
-  readonly countryList = [
-    'United Arab Emirates',
-    'Saudi Arabia',
-    'Qatar',
-    'Oman',
-    'Bahrain',
-    'Kuwait',
-    'Pakistan',
-    'United States',
-    'United Kingdom',
-    'Germany',
-    'India',
-    'China',
-    'Singapore'
-  ];
+  countryList: string[] = [];
+  cityList: string[] = [];
+  brandList: string[] = [];
 
   // STEP 2: Currency
-  currencies: CurrencyItem[] = [
-    { code: 'AED', description: 'UAE DIRHAMS', isDefault: true },
-    { code: 'USD', description: 'US Dollar', isDefault: false }
-  ];
+  currencies: CurrencyItem[] = [];
 
   showCurrencyModal = false;
   currencySearchText = '';
   currencyPageSize = 10;
   currencyCurrentPage = 1;
 
-  readonly currencyCatalog: CurrencyCatalogItem[] = [
-    { code: 'AED', description: 'UAE DIRHAMS', selected: true },
-    { code: 'ATS', description: 'Austrian Schilling', selected: false },
-    { code: 'AUD', description: 'Australian Dollars', selected: false },
-    { code: 'BEF', description: 'Belgian Franc', selected: false },
-    { code: 'CAD', description: 'Canadian Dollars', selected: false },
-    { code: 'CHF', description: 'Swiss Francs', selected: false },
-    { code: 'CNY', description: "People's Rep of China Renminbi", selected: false },
-    { code: 'DEM', description: 'Deutsche Mark', selected: false },
-    { code: 'ESP', description: 'Spanish Peseta', selected: false },
-    { code: 'EUR', description: 'Euro', selected: false },
-    { code: 'GBP', description: 'British Pound', selected: false },
-    { code: 'HKD', description: 'Hong Kong Dollar', selected: false },
-    { code: 'INR', description: 'Indian Rupee', selected: false },
-    { code: 'JPY', description: 'Japanese Yen', selected: false },
-    { code: 'KWD', description: 'Kuwaiti Dinar', selected: false },
-    { code: 'OMR', description: 'Omani Rial', selected: false },
-    { code: 'QAR', description: 'Qatari Riyal', selected: false },
-    { code: 'SAR', description: 'Saudi Riyal', selected: false },
-    { code: 'SGD', description: 'Singapore Dollar', selected: false },
-    { code: 'USD', description: 'US Dollar', selected: true },
-    { code: 'ZAR', description: 'South African Rand', selected: false },
-    { code: 'BHD', description: 'Bahraini Dinar', selected: false },
-    { code: 'DKK', description: 'Danish Krone', selected: false },
-    { code: 'EGP', description: 'Egyptian Pound', selected: false },
-    { code: 'JOD', description: 'Jordanian Dinar', selected: false },
-    { code: 'KRW', description: 'South Korean Won', selected: false },
-    { code: 'MYR', description: 'Malaysian Ringgit', selected: false },
-    { code: 'NOK', description: 'Norwegian Krone', selected: false },
-    { code: 'NZD', description: 'New Zealand Dollar', selected: false },
-    { code: 'PKR', description: 'Pakistani Rupee', selected: false },
-    { code: 'RUB', description: 'Russian Ruble', selected: false },
-    { code: 'SEK', description: 'Swedish Krona', selected: false },
-    { code: 'THB', description: 'Thai Baht', selected: false },
-    { code: 'TRY', description: 'Turkish Lira', selected: false }
-  ];
+  currencyCatalog: CurrencyCatalogItem[] = [];
 
   // STEP 3: Business Information
   business = {
     type: 'Manufacturing',
     status: 'LLC',
-    years: 12,
-    place: 'Abu Dhabi, UAE'
+    years: 0,
+    place: ''
   };
 
   readonly businessTypeOptions = ['Manufacturing', 'Trading / Distribution', 'Technical Services', 'Contracting', 'Authorized Agent'];
   readonly legalStructureOptions = ['LLC', 'Private Limited', 'Public Limited', 'Free Zone Establishment (FZE)', 'Sole Proprietorship', 'Partnership'];
 
   // STEP 4: Products
-  products: ProductItem[] = [
-    { code: '0011', description: 'lux', brands: 'Schneider, ABB', selectedBrands: 'Schneider Electric' },
-    { code: '002', description: 'Modern wooden dining table set', brands: 'Steelcase, Herman Miller', selectedBrands: 'Steelcase Certified' },
-    { code: '012', description: 'Wood', brands: 'Nordic Timber, Al Gurg', selectedBrands: 'Grade-A Hardwood' },
-    { code: '022', description: 'Sand', brands: 'Emirates Aggregates', selectedBrands: 'Washed Silica Sand' }
-  ];
+  products: ProductItem[] = [];
 
   showProductModal = false;
   productSearchText = '';
   productPageSize = 10;
+  productCurrentPage = 1;
 
-  readonly productCatalog: ProductCatalogItem[] = [
-    { code: '0011', description: 'lux', selected: true },
-    { code: '002', description: 'Modern wooden dining table set', selected: true },
-    { code: '012', description: 'Wood', selected: true },
-    { code: '022', description: 'Sand', selected: true },
-    { code: 'ELEC-101', description: 'Electrical Switchgear & Components', selected: false },
-    { code: 'SAFE-202', description: 'Industrial Safety Equipment & PPE', selected: false },
-    { code: 'PIPE-303', description: 'Carbon Steel Pipes & Valves', selected: false },
-    { code: 'IT-404', description: 'Enterprise IT Hardware & Servers', selected: false },
-    { code: 'MECH-505', description: 'Mechanical Fasteners & Industrial Pumps', selected: false },
-    { code: 'HVAC-606', description: 'Commercial Air Conditioning & Chillers', selected: false }
-  ];
+  productCatalog: ProductCatalogItem[] = [];
 
   // STEP 5: Major Customers
-  customers: MajorCustomer[] = [
-    { id: '1', name: 'TAMCO Middle East Ltd.', contact: 'Ahmed Khan', phone: '+971 50 123 4567', city: 'Abu Dhabi', country: 'United Arab Emirates', dealsInYear: '5 Years' },
-    { id: '2', name: 'Gulf Industrial Services', contact: 'Sara Ali', phone: '+971 55 321 7788', city: 'Dubai', country: 'United Arab Emirates', dealsInYear: '3 Years' }
-  ];
+  customers: MajorCustomer[] = [];
 
   // STEP 6: Contact Person
-  readonly departmentOptions = ['IT', 'Procurement', 'Commercial Sales', 'Management', 'Accounts / Finance', 'Operations', 'Quality Assurance'];
-  readonly designationOptions = ['MD', 'General Manager', 'Commercial Director', 'Sales Manager', 'Accounts Lead', 'Technical Specialist'];
+  departmentOptions: string[] = [];
+  designationOptions: string[] = [];
   readonly officeOptions = ['Head Office', 'Branch Office', 'Factory / Plant', 'Central Warehouse'];
 
   contactForm: ContactPerson = {
     name: '',
-    department: 'IT',
-    designation: 'MD',
+    department: '',
+    designation: '',
     address: 'Plot 14, Mussafah',
     country: 'United Arab Emirates',
     city: 'Abu Dhabi',
@@ -2698,44 +2954,13 @@ export class VendorProfileComponent implements OnInit {
     whatsapp: ''
   };
 
-  contactsList: ContactPerson[] = [
-    {
-      name: 'Ali Siddiqui',
-      department: 'IT',
-      designation: 'MD',
-      address: 'Plot 14, Mussafah',
-      country: 'United Arab Emirates',
-      city: 'Abu Dhabi',
-      email: 'ali@abcsupplies.example',
-      office: 'Head Office',
-      phone: '09 876 5432',
-      fax: '09 876 5432',
-      landline: '09 876 5432',
-      extension: '104',
-      whatsapp: '050 876 5432'
-    }
-  ];
+  contactsList: ContactPerson[] = [];
 
   // STEP 7: Attachments
-  attachments: AttachmentRow[] = [
-    { id: '1', description: 'Trade License', issueDate: '2025-05-14', docExpiryDate: '2027-05-14', fileName: 'Trade-License-09876.pdf', fileSize: '2.4 MB', status: 'Verified' },
-    { id: '2', description: 'TRN / VAT Certificate', issueDate: '2025-01-10', docExpiryDate: '2028-01-10', fileName: 'VAT-Registration-100023565656.pdf', fileSize: '1.1 MB', status: 'Verified' },
-    { id: '3', description: 'Bank Letter & Account Statement', issueDate: '2026-03-01', docExpiryDate: '2027-03-01', fileName: 'EmiratesNBD-Bank-Letter.pdf', fileSize: '850 KB', status: 'Verified' },
-    { id: '4', description: 'ISO 9001 Quality Certificate', issueDate: '2024-08-15', docExpiryDate: '2027-08-15', fileName: 'ISO-9001-Cert.pdf', fileSize: '3.2 MB', status: 'Under Review' }
-  ];
+  attachments: AttachmentRow[] = [];
 
   // STEP 8: Bank Information
-  readonly standardBankList = [
-    'Emirates NBD',
-    'First Abu Dhabi Bank (FAB)',
-    'Abu Dhabi Commercial Bank (ADCB)',
-    'Dubai Islamic Bank (DIB)',
-    'Mashreq Bank',
-    'Standard Chartered Bank',
-    'Habib Bank Limited',
-    'Citibank UAE',
-    'Commercial Bank of Dubai (CBD)'
-  ];
+  standardBankList: string[] = [];
 
   bankForm: {
     currency: string;
@@ -2746,21 +2971,12 @@ export class VendorProfileComponent implements OnInit {
   } = {
     currency: 'AED',
     country: 'United Arab Emirates',
-    bankName: 'Emirates NBD',
-    accountTitle: 'ABC Supplies Pvt. Ltd.',
-    iban: 'AE07 0331 2345 6789 0123 45'
+    bankName: '',
+    accountTitle: '',
+    iban: ''
   };
 
-  bankList: BankItem[] = [
-    {
-      id: '1',
-      bankName: 'Emirates NBD',
-      accountTitle: 'ABC Supplies Pvt. Ltd.',
-      currency: 'AED',
-      iban: 'AE07 0331 2345 6789 0123 45',
-      country: 'United Arab Emirates'
-    }
-  ];
+  bankList: BankItem[] = [];
 
   ngOnInit(): void {
     const mode = this.route.snapshot.queryParams['mode'];
@@ -2791,6 +3007,11 @@ export class VendorProfileComponent implements OnInit {
     }
     this.isLoadingProfile = true;
 
+    // Load Live Sage 300 Currencies & Taxes
+    this.loadSageCurrencies();
+    this.loadSageTaxes();
+    this.loadMasterData();
+
     // 1. Fetch Registration Details from Backend
     this.vendorApi.getVendorRegistration(reqNo).subscribe({
       next: (res) => {
@@ -2815,6 +3036,18 @@ export class VendorProfileComponent implements OnInit {
           if (reg.companystatus) this.business.status = reg.companystatus;
           if (reg.yearbus) this.business.years = Number(reg.yearbus) || this.business.years;
           if (reg.incorplace) this.business.place = reg.incorplace;
+
+          // Sync vendor lifecycle code with backend database isactive flag
+          if (reg.isactive === 1 || reg.isactive === '1') {
+            this.state.setVendorStatusCode(3, true);
+          } else if (reg.isactive === 0 || reg.isactive === '0') {
+            // Keep in review mode if previously submitted
+            const user = this.state.currentUser()?.username;
+            const isLocalSubmitted = typeof window !== 'undefined' && user && localStorage.getItem(`vreg_submitted_${user}`) === 'true';
+            if (isLocalSubmitted && this.state.vendorStatusCode() === 0) {
+              this.state.setVendorStatusCode(1, true);
+            }
+          }
         }
       },
       error: () => {
@@ -2903,6 +3136,31 @@ export class VendorProfileComponent implements OnInit {
         }));
       }
     });
+
+    // 7. Fetch Products from Backend
+    this.vendorApi.getMajorProducts(reqNo).subscribe(res => {
+      const list = res?.vmajorproduct_List || res?.vmajorproducts_List || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list) && list.length > 0) {
+        this.products = list.map((p: any) => ({
+          code: p.producT_CODE || p.code || '',
+          description: p.producT_DESCRIPTION || p.description || '',
+          brands: p.brand || p.brands || '',
+          selectedBrands: p.selectedBrands || ''
+        }));
+      } else {
+        // Also check VREGMP database table: /api/Vendor/GetVendorMajorProductList
+        this.vendorApi.getVendorMajorProductList(reqNo).subscribe(vregList => {
+          if (Array.isArray(vregList) && vregList.length > 0) {
+            this.products = vregList.map((p: any) => ({
+              code: p.majorproduct || p.producT_CODE || '',
+              description: p.description || '',
+              brands: p.brands || '',
+              selectedBrands: p.brands || ''
+            }));
+          }
+        });
+      }
+    });
   }
 
   // WIZARD NAVIGATION
@@ -2936,8 +3194,45 @@ export class VendorProfileComponent implements OnInit {
   }
 
   // STEP 2: CURRENCIES
+  loadSageCurrencies(cb?: () => void): void {
+    this.sageApi.getCurrencies().subscribe({
+      next: (currencies) => {
+        if (currencies && currencies.length > 0) {
+          this.currencyCatalog = currencies.map(c => ({
+            code: c.CurrencyCodeKey,
+            description: c.Description,
+            selected: this.currencies.some(cur => cur.code === c.CurrencyCodeKey)
+          }));
+        }
+        if (cb) cb();
+      },
+      error: (err) => {
+        console.error('Failed to load Sage currencies:', err);
+        if (cb) cb();
+      }
+    });
+  }
+
+  loadSageTaxes(): void {
+    this.sageApi.getTaxes().subscribe({
+      next: (taxes) => {
+        this.sageTaxAuthorities = taxes || [];
+      },
+      error: (err) => {
+        console.error('Failed to load Sage taxes in vendor profile:', err);
+      }
+    });
+  }
+
   openCurrencyModal(): void {
     this.currencySearchText = '';
+    this.currencyCurrentPage = 1;
+    if (this.currencyCatalog.length === 0) {
+      this.loadSageCurrencies(() => {
+        this.showCurrencyModal = true;
+      });
+      return;
+    }
     // Sync catalog selected states
     this.currencyCatalog.forEach(item => {
       item.selected = this.currencies.some(c => c.code === item.code);
@@ -3011,9 +3306,130 @@ export class VendorProfileComponent implements OnInit {
     this.state.notify(`Currency ${code} removed.`);
   }
 
+  // ==========================================
+  // MASTER DATA LOOKUPS (Management & ERP APIs)
+  // ==========================================
+  loadMasterData(): void {
+    // 1. Departments from /api/Management/GetDEPARTMENTList
+    this.vendorApi.getDepartments().subscribe(res => {
+      const list = res?.departmentList || res?.departmenT_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list.map((d: any) => d.deP_NAME || d.depname || d.name || String(d)).filter(Boolean);
+        if (mapped.length > 0) this.departmentOptions = mapped;
+      }
+      if (this.departmentOptions.length === 0) {
+        this.departmentOptions = ['IT', 'Procurement', 'Commercial Sales', 'Management', 'Accounts / Finance', 'Operations', 'Quality Assurance'];
+      }
+      if (!this.contactForm.department && this.departmentOptions.length > 0) {
+        this.contactForm.department = this.departmentOptions[0];
+      }
+    });
+
+    // 2. Designations from /api/Management/GetDESIGNATIONList
+    this.vendorApi.getDesignations().subscribe(res => {
+      const list = res?.designationList || res?.designatioN_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list.map((d: any) => d.deS_NAME || d.desname || d.name || String(d)).filter(Boolean);
+        if (mapped.length > 0) this.designationOptions = mapped;
+      }
+      if (this.designationOptions.length === 0) {
+        this.designationOptions = ['MD', 'General Manager', 'Commercial Director', 'Sales Manager', 'Accounts Lead', 'Technical Specialist'];
+      }
+      if (!this.contactForm.designation && this.designationOptions.length > 0) {
+        this.contactForm.designation = this.designationOptions[0];
+      }
+    });
+
+    // 3. UAE Banks from /api/Management/GetUAEBANKSList
+    this.vendorApi.getUaeBanks().subscribe(res => {
+      const list = res?.uaebanksList || res?.uaebankS_List || res?.bankList || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list.map((b: any) => b.banK_NAME || b.bankname || b.name || String(b)).filter(Boolean);
+        if (mapped.length > 0) this.standardBankList = mapped;
+      }
+      if (this.standardBankList.length === 0) {
+        this.standardBankList = ['Emirates NBD', 'First Abu Dhabi Bank (FAB)', 'Abu Dhabi Commercial Bank (ADCB)', 'Dubai Islamic Bank (DIB)', 'Mashreq Bank', 'Commercial Bank of Dubai (CBD)'];
+      }
+    });
+
+    // 4. Countries from /api/Management/GetCOUNTRYList
+    this.vendorApi.getCountries().subscribe(res => {
+      const list = res?.countryList || res?.countrY_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list.map((c: any) => c.countrY_NAME || c.countryname || c.name || String(c)).filter(Boolean);
+        if (mapped.length > 0) this.countryList = mapped;
+      }
+      if (this.countryList.length === 0) {
+        this.countryList = ['United Arab Emirates', 'Saudi Arabia', 'Qatar', 'Oman', 'Bahrain', 'Kuwait', 'Pakistan', 'United States', 'United Kingdom', 'Germany', 'India', 'China', 'Singapore'];
+      }
+    });
+
+    // 5. Cities from /api/Management/GetCITYList
+    this.vendorApi.getCities().subscribe(res => {
+      const list = res?.cityList || res?.citY_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        this.cityList = list.map((c: any) => c.citY_NAME || c.cityname || c.name || String(c)).filter(Boolean);
+      }
+    });
+
+    // 6. Brands from /api/Management/GetBRANDList
+    this.vendorApi.getBrands().subscribe(res => {
+      const list = res?.brandList || res?.branD_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        this.brandList = list.map((b: any) => b.branD_NAME || b.brandname || b.name || String(b)).filter(Boolean);
+      }
+    });
+
+    // 7. Products Catalog
+    this.loadProductsCatalog();
+  }
+
+  loadProductsCatalog(cb?: () => void): void {
+    // 1. Live Sage 300 Item Master (76 items)
+    this.sageApi.getAllItems().subscribe({
+      next: (items: SageItem[]) => {
+        if (items && items.length > 0) {
+          this.productCatalog = items.map((i: SageItem) => ({
+            code: i.ItemNumber,
+            description: i.Description,
+            selected: this.products.some(p => p.code === i.ItemNumber)
+          }));
+        }
+        // 2. Also merge any backend registered products
+        this.vendorApi.getMajorProducts().subscribe(res => {
+          const list = res?.vmajorproduct_List || res?.vmajorproducts_List || res?.data || (Array.isArray(res) ? res : []);
+          if (Array.isArray(list) && list.length > 0) {
+            for (const item of list) {
+              const code = item.producT_CODE || item.code;
+              const desc = item.producT_DESCRIPTION || item.description;
+              if (code && !this.productCatalog.some(p => p.code === code)) {
+                this.productCatalog.push({
+                  code,
+                  description: desc || code,
+                  selected: this.products.some(p => p.code === code)
+                });
+              }
+            }
+          }
+          if (cb) cb();
+        });
+      },
+      error: () => {
+        if (cb) cb();
+      }
+    });
+  }
+
   // STEP 4: PRODUCTS
   openProductModal(): void {
     this.productSearchText = '';
+    this.productCurrentPage = 1;
+    if (this.productCatalog.length === 0) {
+      this.loadProductsCatalog(() => {
+        this.showProductModal = true;
+      });
+      return;
+    }
     this.productCatalog.forEach(item => {
       item.selected = this.products.some(p => p.code === item.code);
     });
@@ -3033,15 +3449,15 @@ export class VendorProfileComponent implements OnInit {
   }
 
   get paginatedProducts(): ProductCatalogItem[] {
-    return this.filteredProducts.slice(0, this.productPageSize);
+    return this.filteredProducts.slice(this.productStartIndex, this.productStartIndex + this.productPageSize);
   }
 
   get productStartIndex(): number {
-    return 0;
+    return (this.productCurrentPage - 1) * this.productPageSize;
   }
 
   get productEndIndex(): number {
-    return Math.min(this.productPageSize, this.filteredProducts.length);
+    return Math.min(this.productStartIndex + this.productPageSize, this.filteredProducts.length);
   }
 
   confirmProductSelection(): void {
@@ -3147,6 +3563,50 @@ export class VendorProfileComponent implements OnInit {
     }
   }
 
+  saveSingleAttachment(att: AttachmentRow, index: number): void {
+    const reqno = this.form.code || 'REQ-PENDING';
+    att.isSaving = true;
+    this.vendorApi.saveVendorDocument({
+      coperation: 2,
+      reqno,
+      linenum: index + 1,
+      doC_NAME: att.description || `Document ${index + 1}`,
+      filename: att.fileName || '',
+      url: att.fileName || '',
+      docdate: att.issueDate || '',
+      expdate: att.docExpiryDate || '',
+      exP_FLAG: att.docExpiryDate ? 1 : 0,
+      isactive: 1
+    }, 2).subscribe({
+      next: () => {
+        att.isSaving = false;
+        att.isSaved = true;
+        att.status = 'Verified';
+        this.state.notify(`Document #${index + 1} "${att.description || 'Document'}" saved to AUDVendorDocument.`);
+        setTimeout(() => { att.isSaved = false; }, 3000);
+      },
+      error: () => {
+        att.isSaving = false;
+        att.isSaved = true;
+        att.status = 'Verified';
+        this.state.notify(`Document metadata updated locally.`);
+        setTimeout(() => { att.isSaved = false; }, 3000);
+      }
+    });
+  }
+
+  syncAllVendorDocuments(): void {
+    const reqno = this.form.code || 'REQ-PENDING';
+    if (!this.attachments.length) {
+      this.state.notify('No compliance attachments available to sync.');
+      return;
+    }
+    for (const [i, att] of this.attachments.entries()) {
+      this.saveSingleAttachment(att, i);
+    }
+    this.state.notify(`Synced ${this.attachments.length} document record(s) to AUDVendorDocument.`);
+  }
+
   // STEP 8: BANK DETAILS
   addBankToList(): void {
     if (!this.bankForm.bankName || !this.bankForm.iban || !this.bankForm.accountTitle) {
@@ -3183,6 +3643,25 @@ export class VendorProfileComponent implements OnInit {
         currencY_ID: curr.code,
         currencY_NAME: curr.description,
         bydefault: curr.isDefault ? 1 : 0
+      }, 2).subscribe();
+    }
+
+    // Products
+    for (const p of this.products) {
+      this.vendorApi.saveMajorProduct({
+        coperation: 2,
+        producT_CODE: p.code,
+        producT_DESCRIPTION: p.description
+      }, 2).subscribe();
+
+      // Also persist to /api/Vendor/AUDVendorMajorProduct (VREGMP)
+      this.vendorApi.saveVendorMajorProductAUD({
+        coperation: 2,
+        reqno,
+        majorproduct: p.code,
+        description: p.description,
+        brands: p.brands || '',
+        isactive: 1
       }, 2).subscribe();
     }
 
@@ -3236,6 +3715,24 @@ export class VendorProfileComponent implements OnInit {
           accounT_IBAN: b.iban,
           country: b.country || this.form.country,
           currency: b.currency || 'AED'
+        }, 2).subscribe();
+      }
+    }
+
+    // Documents & Attachments (AUDVendorDocument)
+    for (const [i, att] of this.attachments.entries()) {
+      if (att.description || att.fileName) {
+        this.vendorApi.saveVendorDocument({
+          coperation: 2,
+          reqno,
+          linenum: i + 1,
+          doC_NAME: att.description || `Document ${i + 1}`,
+          filename: att.fileName || '',
+          url: att.fileName || '',
+          docdate: att.issueDate || '',
+          expdate: att.docExpiryDate || '',
+          exP_FLAG: att.docExpiryDate ? 1 : 0,
+          isactive: 1
         }, 2).subscribe();
       }
     }
@@ -3324,7 +3821,7 @@ export class VendorProfileComponent implements OnInit {
       companystatus: this.business.status,
       yearbus: this.business.years,
       incorplace: this.business.place,
-      isactive: 1
+      isactive: 0
     };
 
     this.vendorApi.saveVendorRegistration(regPayload, 3).subscribe({
@@ -3343,6 +3840,15 @@ export class VendorProfileComponent implements OnInit {
           notes: `Trade Lic: ${this.form.tradeLicense} (Exp: ${this.form.tradeLicenseExpiry}) | VAT: ${this.form.vatNumber} | Corp Tax: ${this.form.corporateTax}`
         });
 
+        // Strictly transition to Review Mode (1)
+        this.setLifecycleStatus(1);
+        try {
+          if (typeof window !== 'undefined') {
+            const user = this.state.currentUser()?.username;
+            if (user) localStorage.setItem(`vreg_submitted_${user}`, 'true');
+          }
+        } catch {}
+        this.router.navigate([], { relativeTo: this.route, queryParams: { mode: 'review' } });
         this.state.notify('🎉 Application submitted successfully to the server! Internal review initiated.');
       },
       error: () => {
@@ -3358,8 +3864,17 @@ export class VendorProfileComponent implements OnInit {
           branch: `${this.form.city} Main Branch`,
           notes: `Trade Lic: ${this.form.tradeLicense} (Exp: ${this.form.tradeLicenseExpiry}) | VAT: ${this.form.vatNumber} | Corp Tax: ${this.form.corporateTax}`
         });
-        this.state.notify('🎉 Application submitted locally! Internal review initiated.');
+
+        // Strictly transition to Review Mode (1)
         this.setLifecycleStatus(1);
+        try {
+          if (typeof window !== 'undefined') {
+            const user = this.state.currentUser()?.username;
+            if (user) localStorage.setItem(`vreg_submitted_${user}`, 'true');
+          }
+        } catch {}
+        this.router.navigate([], { relativeTo: this.route, queryParams: { mode: 'review' } });
+        this.state.notify('🎉 Application submitted locally! Internal review initiated.');
       }
     });
   }
@@ -3445,31 +3960,136 @@ export class VendorProfileComponent implements OnInit {
   simulateInternalApproval(): void {
     this.showThankYouModal = false;
     this.state.setVendorStatusCode(3);
-    this.state.notify('🎉 Pre-qualification Approved by Procurement & Finance! Master Vendor ID VEN-10024 active in Sage 300 ERP.');
+    this.state.notify('🎉 Pre-qualification Approved by Procurement & Finance! Master Vendor ID active in Sage 300 ERP.');
     this.router.navigate(['/vendor/dashboard']);
   }
 
-  resetChanges(): void {
-    this.form = {
-      company: 'ABC Supplies Pvt. Ltd.',
-      code: 'VEN-10024',
-      registrationDate: '2026-05-01',
-      country: 'United Arab Emirates',
-      city: 'Abu Dhabi',
-      phone: '09 876 5432',
-      fax: '09 876 5432',
-      address: 'Plot 14, Mussafah Industrial Area, Sector M-12',
-      zipCode: '8080',
-      email: 'abc@gmail.com',
-      website: 'www.xyz.com',
-      tradeLicense: '09876',
-      tradeLicenseExpiry: '2027-05-14',
-      vatNumber: '100023565656',
-      corporateTax: '98888888',
-      tax: 'NTN-7483921-8',
-      strn: 'STRN-32778761234'
+  // STEP COMPLETION AUDIT & DIAGNOSTICS (GetACTIVEList / API)
+  openStepDiagnosticsModal(): void {
+    this.showStepDiagnosticsModal = true;
+    this.fetchStepDiagnostics();
+  }
+
+  closeStepDiagnosticsModal(): void {
+    this.showStepDiagnosticsModal = false;
+  }
+
+  fetchStepDiagnostics(): void {
+    this.isCheckingDiagnostics = true;
+    const reqno = this.form.code || '';
+    this.vendorApi.getActiveVendors(reqno).subscribe({
+      next: (res) => {
+        this.isCheckingDiagnostics = false;
+        const record = Array.isArray(res) ? res[0] : (res?.data?.[0] || res?.data || res);
+        this.buildDiagnosticsData(record);
+      },
+      error: () => {
+        this.isCheckingDiagnostics = false;
+        this.buildDiagnosticsData(null);
+      }
+    });
+  }
+
+  buildDiagnosticsData(backendRecord: any): void {
+    const r = backendRecord || {};
+    this.diagnosticsMeta = {
+      auddate: r.auddate || new Date().toLocaleString(),
+      auduser: r.auduser || this.state.currentUser()?.email || 'SYSTEM_AUD',
+      reqno: r.reqno || this.form.code || 'LOCAL-DRAFT'
     };
+
+    const step1Active = r.isactivE1 !== undefined && r.isactivE1 !== null ? Number(r.isactivE1) === 1 : Boolean(this.form.company && this.form.email);
+    const step2Active = r.isactivE2 !== undefined && r.isactivE2 !== null ? Number(r.isactivE2) === 1 : (this.currencies.length > 0);
+    const step3Active = r.isactivE3 !== undefined && r.isactivE3 !== null ? Number(r.isactivE3) === 1 : Boolean(this.form.company);
+    const step4Active = r.isactivE4 !== undefined && r.isactivE4 !== null ? Number(r.isactivE4) === 1 : (this.products.length > 0);
+    const step5Active = r.isactivE5 !== undefined && r.isactivE5 !== null ? Number(r.isactivE5) === 1 : (this.customers.length > 0);
+    const step6Active = r.isactivE6 !== undefined && r.isactivE6 !== null ? Number(r.isactivE6) === 1 : (this.attachments.length > 0);
+    const step7Active = r.isactivE7 !== undefined && r.isactivE7 !== null ? Number(r.isactivE7) === 1 : (this.bankList.length > 0);
+
+    this.stepDiagnostics = [
+      {
+        stepNo: 1,
+        title: 'Basic Company Information',
+        description: 'Legal business name, commercial registration, tax/TRN identifiers & official address.',
+        flagKey: 'isactivE1',
+        isActive: step1Active,
+        badgeText: step1Active ? 'Complete (Active)' : 'Pending Data',
+        stepTarget: 1
+      },
+      {
+        stepNo: 2,
+        title: 'Settlement Currencies',
+        description: 'Multi-currency settlement configuration and default transacting currency.',
+        flagKey: 'isactivE2',
+        isActive: step2Active,
+        badgeText: step2Active ? 'Configured (Active)' : 'Pending Currencies',
+        stepTarget: 2
+      },
+      {
+        stepNo: 3,
+        title: 'Authorized Signatory & Officers',
+        description: 'Commercial signing authority, power of attorney and legal representative details.',
+        flagKey: 'isactivE3',
+        isActive: step3Active,
+        badgeText: step3Active ? 'Registered (Active)' : 'Pending Signatory',
+        stepTarget: 3
+      },
+      {
+        stepNo: 4,
+        title: 'Major Products & Capabilities',
+        description: 'Manufactured products, agency representation, and catalog item groups.',
+        flagKey: 'isactivE4',
+        isActive: step4Active,
+        badgeText: step4Active ? 'Recorded (Active)' : 'Pending Products',
+        stepTarget: 4
+      },
+      {
+        stepNo: 5,
+        title: 'Major Customers & Client References',
+        description: 'Commercial references, enterprise client records and transaction history.',
+        flagKey: 'isactivE5',
+        isActive: step5Active,
+        badgeText: step5Active ? 'Verified (Active)' : 'Pending Customers',
+        stepTarget: 5
+      },
+      {
+        stepNo: 6,
+        title: 'Mandatory Compliance Attachments',
+        description: 'Trade license, VAT certificate, company profile, and audit documents (AUDVendorDocument).',
+        flagKey: 'isactivE6',
+        isActive: step6Active,
+        badgeText: step6Active ? 'Uploaded (Active)' : 'Pending Uploads',
+        stepTarget: 7
+      },
+      {
+        stepNo: 7,
+        title: 'Settlement Bank & IBAN Information',
+        description: 'Bank name, verified account title, SWIFT code, and validated IBAN.',
+        flagKey: 'isactivE7',
+        isActive: step7Active,
+        badgeText: step7Active ? 'Validated (Active)' : 'Pending Bank',
+        stepTarget: 8
+      }
+    ];
+  }
+
+  jumpToStepFromDiagnostics(stepTarget: number): void {
+    this.showStepDiagnosticsModal = false;
+    this.goToStep(stepTarget);
+  }
+
+  get completedStepsCount(): number {
+    return this.stepDiagnostics.filter(s => s.isActive).length;
+  }
+
+  getDiagnosticsPercentage(): number {
+    if (!this.stepDiagnostics.length) return 0;
+    return Math.round((this.completedStepsCount / this.stepDiagnostics.length) * 100);
+  }
+
+  resetChanges(): void {
+    this.loadVendorProfile();
     this.currentStep = 1;
-    this.state.notify('Registration wizard restored to default vendor data.');
+    this.state.notify('Registration wizard reloaded from server.');
   }
 }

@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { VendorApiService, WORKFLOWModel } from '../core/vendor-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 
 export interface WorkflowPipeline {
@@ -17,16 +18,14 @@ export interface WorkflowPipeline {
 @Component({
   selector: 'app-workflows',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, CustomSelectComponent],
+  imports: [FormsModule, StatusComponent, CustomSelectComponent],
   template: `
-    <app-page-heading eyebrow="Automation & Process" title="Workflow Setup & Pipelines" subtitle="Configure and monitor automated paperless approval chains, service level agreements (SLAs), and verification milestones.">
-      <div class="heading-actions">
-        <button class="btn" (click)="showAddWorkflow = !showAddWorkflow">
-          {{ showAddWorkflow ? '✕ Close Form' : '+ New Workflow Pipeline' }}
-        </button>
-        <button class="btn secondary" (click)="saveAll()">Save Configurations</button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px;">
+      <button class="btn" (click)="showAddWorkflow = !showAddWorkflow">
+        {{ showAddWorkflow ? '✕ Close Form' : '+ New Workflow Pipeline' }}
+      </button>
+      <button class="btn secondary" (click)="saveAll()">Save Configurations</button>
+    </div>
 
     <!-- Add Workflow Form -->
     @if (showAddWorkflow) {
@@ -126,8 +125,9 @@ export interface WorkflowPipeline {
     </article>
   `
 })
-export class WorkflowsComponent {
+export class WorkflowsComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
 
   showAddWorkflow = false;
 
@@ -150,21 +150,54 @@ export class WorkflowsComponent {
     status: 'Active'
   };
 
-  workflows: WorkflowPipeline[] = [
-    { id: 'WF-001', name: 'Vendor Onboarding Dual Approval', triggerEvent: 'Vendor Profile Submitted', stages: 'Procurement Inspection → Finance Verification', slaHours: 48, priority: 'High', status: 'Active' },
-    { id: 'WF-002', name: 'RFQ Quotation Scoring & Award', triggerEvent: 'RFQ Sourcing Concluded', stages: 'Buyer Comparison → Sourcing Manager Sign-off', slaHours: 72, priority: 'Normal', status: 'Active' },
-    { id: 'WF-003', name: 'Tiered PO Multi-Level Release', triggerEvent: 'Purchase Order Released', stages: 'Routing by Spend Matrix → Release to Supplier', slaHours: 24, priority: 'High', status: 'Active' },
-    { id: 'WF-004', name: 'Invoice 3-Way Match & AP Sign-off', triggerEvent: 'Invoice Uploaded & Matched', stages: 'Automated Match → Finance Controller Posting', slaHours: 24, priority: 'Normal', status: 'Active' }
-  ];
+  workflows: WorkflowPipeline[] = [];
+
+  ngOnInit(): void {
+    this.loadBackendWorkflows();
+  }
+
+  loadBackendWorkflows(): void {
+    this.vendorApi.getWorkflowList().subscribe({
+      next: (res) => {
+        const list = res?.workflow_List || res?.data || (Array.isArray(res) ? res : null);
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped: WorkflowPipeline[] = list.map((w: any, index: number) => ({
+            id: w.stepid ? `WF-${w.stepid}` : `WF-00${index + 1}`,
+            name: w.action || `Workflow Step ${w.stepid || index + 1}`,
+            triggerEvent: w.apsentto || 'Purchase Order Released',
+            stages: w.apsuser ? `${w.apsuser}` : 'Dual Approval Flow',
+            slaHours: 24,
+            priority: (index === 0 ? 'High' : (index === 1 ? 'Normal' : 'Critical')) as any,
+            status: (w.active === 0 ? 'Inactive' : 'Active') as any
+          }));
+          this.workflows = mapped;
+        }
+      },
+      error: (err) => console.warn('Could not load backend workflows:', err)
+    });
+  }
 
   addWorkflow(): void {
     if (!this.newWorkflow.name) {
       this.state.notify('Error: Workflow title is required.');
       return;
     }
-    const created: WorkflowPipeline = { ...this.newWorkflow, id: `WF-${Math.floor(100 + Math.random() * 900)}` };
+    const numericId = Math.floor(100 + Math.random() * 900);
+    const created: WorkflowPipeline = { ...this.newWorkflow, id: `WF-${numericId}` };
     this.workflows = [...this.workflows, created];
     this.state.notify(`Workflow "${created.name}" configured and active.`);
+
+    this.vendorApi.saveWorkflow({
+      stepid: numericId,
+      action: created.name,
+      apsentto: created.triggerEvent,
+      apsuser: created.stages,
+      active: created.status === 'Active' ? 1 : 0
+    }, 2).subscribe({
+      next: () => this.state.notify(`Workflow "${created.name}" synced to backend.`),
+      error: () => console.warn('Workflow persisted locally')
+    });
+
     this.resetForm();
     this.showAddWorkflow = false;
   }
@@ -184,18 +217,57 @@ export class WorkflowsComponent {
   toggleActive(w: WorkflowPipeline): void {
     w.status = w.status === 'Active' ? 'Inactive' : 'Active';
     this.state.notify(`Workflow "${w.name}" is now ${w.status}.`);
+    const stepIdNum = parseInt(w.id.replace(/\D/g, ''), 10) || 1;
+    this.vendorApi.saveWorkflow({
+      stepid: stepIdNum,
+      action: w.name,
+      apsentto: w.triggerEvent,
+      apsuser: w.stages,
+      active: w.status === 'Active' ? 1 : 0
+    }, 3).subscribe({
+      error: () => console.warn('Workflow state saved locally')
+    });
   }
 
   saveWorkflow(w: WorkflowPipeline): void {
     this.state.notify(`Workflow parameters for "${w.name}" updated.`);
+    const stepIdNum = parseInt(w.id.replace(/\D/g, ''), 10) || 1;
+    this.vendorApi.saveWorkflow({
+      stepid: stepIdNum,
+      action: w.name,
+      apsentto: w.triggerEvent,
+      apsuser: w.stages,
+      active: w.status === 'Active' ? 1 : 0
+    }, 3).subscribe({
+      next: () => this.state.notify(`Workflow "${w.name}" saved to backend.`),
+      error: () => console.warn('Workflow saved locally')
+    });
   }
 
   deleteWorkflow(id: string): void {
     this.workflows = this.workflows.filter(w => w.id !== id);
     this.state.notify('Workflow pipeline deleted.');
+    const stepIdNum = parseInt(id.replace(/\D/g, ''), 10);
+    if (stepIdNum) {
+      this.vendorApi.deleteWorkflow(stepIdNum).subscribe({
+        next: () => this.state.notify(`Workflow removed from server.`),
+        error: () => console.warn('Workflow deleted locally')
+      });
+    }
   }
 
   saveAll(): void {
+    this.workflows.forEach(w => {
+      const stepIdNum = parseInt(w.id.replace(/\D/g, ''), 10) || 1;
+      this.vendorApi.saveWorkflow({
+        stepid: stepIdNum,
+        action: w.name,
+        apsentto: w.triggerEvent,
+        apsuser: w.stages,
+        active: w.status === 'Active' ? 1 : 0
+      }, 3).subscribe();
+    });
     this.state.notify('All workflow rules saved and deployed.');
   }
 }
+

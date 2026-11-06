@@ -20,7 +20,10 @@
               {"glob": "**/*", "input": "public"},
               {"glob": "tamco-logo.png", "input": "src/app", "output": ""}
             ],
-            "styles": ["src/styles.scss"]
+            "styles": [
+              "src/styles.scss",
+              "src/modern.scss"
+            ]
           },
           "configurations": {
             "production": {
@@ -40,6 +43,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {"buildTarget": "vendor-portal-angular:build:production"},
             "development": {"buildTarget": "vendor-portal-angular:build:development"}

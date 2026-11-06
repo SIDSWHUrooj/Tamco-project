@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent } from '../shared/ui.component';
+import { VendorApiService, REVBIDModel } from '../core/vendor-api.service';
 import { IconComponent } from '../shared/icon.component';
 
 export interface BiddingLineItem {
@@ -38,14 +38,8 @@ export interface BiddingRequestHeader {
 @Component({
   selector: 'app-bidding',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeadingComponent, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
-    <app-page-heading
-      eyebrow="Commercial Sourcing"
-      title="Vendor Bidding"
-      subtitle="Submit formal quotation unit prices for active TAMCO RFQs and Procurement requisitions.">
-    </app-page-heading>
-
     <div class="bidding-container">
       <!-- TOP CARD: REQUISITION HEADER DETAILS (Matches Bidding/BiddinView.cshtml) -->
       <div class="card-body-box">
@@ -741,6 +735,7 @@ export interface BiddingRequestHeader {
 export class BiddingComponent implements OnInit {
   private readonly state = inject(PortalStateService);
   private readonly route = inject(ActivatedRoute);
+  private readonly vendorApi = inject(VendorApiService);
 
   showReqModal = false;
 
@@ -802,7 +797,7 @@ export class BiddingComponent implements OnInit {
     }
   ];
 
-  readonly availableRequests: BiddingRequestHeader[] = [
+  availableRequests: BiddingRequestHeader[] = [
     {
       reqNo: 'RFQ-0061',
       reqFor: 'Main Substation 11kV Switchgear Project',
@@ -852,12 +847,111 @@ export class BiddingComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.loadRequestsFromStateAndBackend();
+
     this.route.queryParams.subscribe(params => {
       const rfqId = params['rfq'] || params['reqNo'];
       if (rfqId) {
         const found = this.availableRequests.find(r => r.reqNo.toLowerCase() === rfqId.toLowerCase());
         if (found) {
           this.selectRequest(found);
+        }
+      }
+    });
+  }
+
+  loadRequestsFromStateAndBackend(): void {
+    // 1. Sync active requisitions from Portal State
+    const stateReqs = this.state.requisitions();
+    for (const r of stateReqs) {
+      if (!this.availableRequests.some(a => a.reqNo === r.header.documentNumber)) {
+        this.availableRequests.push({
+          reqNo: r.header.documentNumber,
+          reqFor: r.header.requiredFor,
+          enteredBy: r.header.enteredBy,
+          date: r.header.date,
+          dateRequired: r.header.dateRequired,
+          shipVia: r.header.shipVia,
+          location: r.header.location,
+          description: r.header.requestDescription,
+          comments: r.header.comments || '',
+          items: r.items.map(it => ({
+            sr: it.sr,
+            price: null,
+            itemNo: it.itemNo,
+            dateRequired: it.dateRequired,
+            itemDesc: it.itemDesc,
+            uom: it.uom,
+            qty: it.quantity,
+            loc: it.location,
+            project: it.projectId,
+            incoterm: it.incoTerm,
+            shipvia: it.shipVia,
+            comments: it.comments
+          }))
+        });
+      }
+    }
+
+    // 2. Query open request headers from backend Request controller
+    this.vendorApi.getRequestHeaders().subscribe(res => {
+      const list = res?.reqh_List || res?.reqH_List || res?.reQH_List || res?.reqhList || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const h of list) {
+          const docNo = h.reQ_NO || h.reqno || '';
+          if (!docNo) continue;
+          if (!this.availableRequests.some(a => a.reqNo === docNo)) {
+            this.vendorApi.getRequestDetails(docNo).subscribe(dRes => {
+              const dList = dRes?.reqd_List || dRes?.reqD_List || dRes?.reQD_List || dRes?.reqdList || dRes?.data || (Array.isArray(dRes) ? dRes : []);
+              const mappedItems: BiddingLineItem[] = Array.isArray(dList) && dList.length > 0
+                ? dList.map((d: any, idx: number) => ({
+                    sr: d.linenum || idx + 1,
+                    price: null,
+                    itemNo: d.itemno || '',
+                    dateRequired: d.requiR_DATE ? String(d.requiR_DATE).substring(0, 10) : (h.requirE_DATE ? String(h.requirE_DATE).substring(0, 10) : ''),
+                    itemDesc: d.itemdesc || '',
+                    uom: d.uom || 'EA',
+                    qty: Number(d.qty) || 1,
+                    loc: d.loc || h.loc || '',
+                    project: String(d.project || ''),
+                    incoterm: d.incoterm || 'DDP',
+                    shipvia: d.shipvia || h.shipvia || '',
+                    comments: d.comments || ''
+                  }))
+                : [];
+
+              this.availableRequests.push({
+                reqNo: docNo,
+                reqFor: h.reQ_FOR || 'Tender Sourcing',
+                enteredBy: h.reQ_ENTER_BY || 'Procurement Team',
+                date: h.reQ_DATE ? String(h.reQ_DATE).substring(0, 10) : new Date().toISOString().substring(0, 10),
+                dateRequired: h.requirE_DATE ? String(h.requirE_DATE).substring(0, 10) : '',
+                shipVia: h.shipvia || 'Road Logistics',
+                location: h.loc || 'Dubai Warehouse',
+                description: h.reQ_DESC || '',
+                comments: h.comments || '',
+                items: mappedItems
+              });
+            });
+          }
+        }
+      }
+    });
+
+    // 3. Pre-load any existing quotes for the default request from backend
+    this.fetchSubmittedQuotes(this.header.reqNo);
+  }
+
+  fetchSubmittedQuotes(reqNo: string): void {
+    const vId = this.state.currentVendorId() || 'VEN-001';
+    this.vendorApi.getVendorBiddingList(reqNo, vId).subscribe(res => {
+      const list = res?.revbid_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const bid of list) {
+          const match = this.items.find(i => i.itemNo === bid.iteM_NO);
+          if (match && (bid.price !== undefined && bid.price !== null)) {
+            match.price = Number(bid.price);
+          }
         }
       }
     });
@@ -875,12 +969,15 @@ export class BiddingComponent implements OnInit {
     this.header = { ...req };
     this.items = req.items.map(it => ({ ...it }));
     this.closeReqModal();
+    this.fetchSubmittedQuotes(req.reqNo);
     this.state.notify(`Bidding request ${req.reqNo} loaded successfully.`);
   }
 
   refreshCurrentReq(): void {
     const defaultReq = this.availableRequests[0];
-    this.selectRequest(defaultReq);
+    if (defaultReq) {
+      this.selectRequest(defaultReq);
+    }
   }
 
   totalQuotationValue(): number {
@@ -888,6 +985,11 @@ export class BiddingComponent implements OnInit {
   }
 
   clearQuotes(): void {
+    const vendorId = this.state.currentVendorId() || 'VEN-001';
+    this.vendorApi.deleteVendorBidding(this.header.reqNo, vendorId).subscribe({
+      next: (res) => console.log('Vendor bids cleared from backend:', res),
+      error: (err) => console.warn('deleteVendorBidding error:', err)
+    });
     this.items.forEach(it => it.price = null);
     this.state.notify('Quoted prices cleared.');
   }
@@ -900,6 +1002,38 @@ export class BiddingComponent implements OnInit {
     }
 
     const total = this.totalQuotationValue();
+    const vendorId = this.state.currentVendorId() || 'VEN-001';
+    const vendorName = this.state.currentVendorName() || 'Al Futtaim Industrial Solutions';
+
+    // Persist each quoted line item to backend AUDVENDORBidding
+    for (const it of this.items) {
+      const bidPayload: Partial<REVBIDModel> = {
+        reqno: this.header.reqNo,
+        vendorid: vendorId,
+        vendorname: vendorName,
+        iteM_NO: it.itemNo,
+        iteM_DESC: it.itemDesc,
+        uom: it.uom,
+        qty: Number(it.qty) || 1,
+        price: Math.round(Number(it.price) || 0),
+        cost: Math.round((Number(it.price) || 0) * (Number(it.qty) || 1)),
+        currency: 'AED',
+        location: it.loc || this.header.location,
+        incoterm: it.incoterm || 'DDP',
+        shipvia: it.shipvia || this.header.shipVia,
+        reqdate: this.header.date ? new Date(this.header.date).toISOString() : new Date().toISOString(),
+        validitY_DATE: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        reqdesc: this.header.description,
+        comments: it.comments || this.header.comments || '',
+        action: 1
+      };
+
+      this.vendorApi.saveVendorBidding(bidPayload, 2).subscribe({
+        next: (res) => console.log('Vendor bidding line persisted to backend:', res),
+        error: (err) => console.warn('AUDVENDORBidding error:', err)
+      });
+    }
+
     this.state.submitVendorBid(this.header.reqNo, total, 7);
     this.state.notify(`Quotation for ${this.header.reqNo} (${total.toLocaleString()} AED) submitted successfully to TAMCO Procurement!`);
   }

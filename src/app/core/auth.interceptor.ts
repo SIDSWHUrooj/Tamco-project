@@ -1,68 +1,40 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const router = inject(Router);
-
-  // Retrieve token from sessionStorage
+  // 1. Retrieve token from sessionStorage or localStorage
   let token: string | null = null;
   try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      token = sessionStorage.getItem('tamco_jwt_token');
+    if (typeof window !== 'undefined') {
+      const sToken = window.sessionStorage?.getItem('tamco_jwt_token');
+      const lToken = window.localStorage?.getItem('tamco_jwt_token');
+      token = (sToken && !sToken.startsWith('DEMO_TOKEN_')) ? sToken : ((lToken && !lToken.startsWith('DEMO_TOKEN_')) ? lToken : null);
     }
   } catch {
     token = null;
   }
 
-  // Check if request is directed to our backend API
-  const isApiUrl = req.url.startsWith(environment.apiUrl) || req.url.startsWith('/api/');
+  // 2. Check if request targets our backend API
+  const isApiUrl = req.url.startsWith(environment.apiUrl) ||
+                   req.url.startsWith('/api/') ||
+                   req.url.includes('vportalapi.siddev.online');
 
-  // Check if current session is an offline/demo session
-  const isDemo = !token || token.includes('DEMO_TOKEN') || false;
-
-  // Proactively check token expiration before sending (real backend JWT tokens only)
-  if (token && !isDemo) {
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.exp && Date.now() >= payload.exp * 1000) {
-          sessionStorage.removeItem('tamco_jwt_token');
-          sessionStorage.removeItem('tamco_refresh_token');
-          sessionStorage.removeItem('tamco_portal_auth');
-          router.navigate(['/login']);
-          return throwError(() => new Error('Session expired. Please sign in again.'));
-        }
-      }
-    } catch {}
-  }
-
+  // 3. Attach Bearer token to all backend API requests
   let authReq = req;
-  if (token && isApiUrl && !isDemo) {
+  const cleanToken = token?.trim();
+  if (cleanToken && cleanToken !== 'undefined' && cleanToken !== 'null' && isApiUrl) {
     authReq = req.clone({
       setHeaders: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${cleanToken}`
       }
     });
   }
 
   return next(authReq).pipe(
     catchError((error: HttpErrorResponse) => {
-      // If server returns 401 Unauthorized for real backend sessions
       if (error.status === 401 && !req.url.includes('/api/Account/')) {
-        const activeToken = sessionStorage.getItem('tamco_jwt_token');
-        const activeDemo = !activeToken || activeToken.includes('DEMO_TOKEN');
-        if (!activeDemo) {
-          try {
-            sessionStorage.removeItem('tamco_jwt_token');
-            sessionStorage.removeItem('tamco_refresh_token');
-            sessionStorage.removeItem('tamco_portal_auth');
-          } catch {}
-          router.navigate(['/login']);
-        }
+        console.warn(`[HTTP 401 Unauthorized] API rejected request to ${req.url}. Token attached: ${!!cleanToken}`);
       }
       return throwError(() => error);
     })

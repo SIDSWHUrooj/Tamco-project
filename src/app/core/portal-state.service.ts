@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { Bid, Invoice, PurchaseOrder, Requisition, RequisitionHeader, RequisitionLineItem, RequisitionAssignedVendor, Rfq, Role, Vendor, VendorRegistrationReq, BankRecord, MasterVendor, LogisticCost, ItemBidComparison, VendorBidDetail, DocumentTypeItem, BrandItem, ProductItem, DesignationItem, DepartmentItem, LegacyUserItem, EmailSetupConfig, AuthAccount, PORTAL_ACCOUNTS } from './models';
+import { Bid, Invoice, PurchaseOrder, Requisition, RequisitionHeader, RequisitionLineItem, RequisitionAssignedVendor, Rfq, Role, Vendor, VendorRegistrationReq, BankRecord, MasterVendor, LogisticCost, ItemBidComparison, VendorBidDetail, DocumentTypeItem, BrandItem, ProductItem, DesignationItem, DepartmentItem, DocNumberItem, ShipViaItem, ASTypeItem, CurrencyItem, SecurityModuleItem, CountryIbanItem, LegacyUserItem, EmailSetupConfig, AuthAccount, PORTAL_ACCOUNTS } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class PortalStateService {
@@ -42,199 +42,42 @@ export class PortalStateService {
   readonly vendorLifecycleState = computed<'onboarding' | 'active_partner'>(() =>
     this.vendorStatusCode() >= 3 ? 'active_partner' : 'onboarding'
   );
-  readonly currentVendorId = signal<string>('VEN-10024');
-  readonly currentVendorName = signal<string>('ABC Supplies Pvt. Ltd.');
+  readonly vendorMode = computed<'draft' | 'review' | 'approved'>(() => {
+    const code = this.vendorStatusCode();
+    if (code >= 3) return 'approved';
+    if (code >= 1) return 'review';
+    return 'draft';
+  });
+  readonly currentVendorId = signal<string>('');
+  readonly currentVendorName = signal<string>('');
 
-
-  readonly masterVendors = signal<MasterVendor[]>([
-    {
-      vendorId: 'VEN-10024',
-      vendorName: 'ABC Supplies Pvt. Ltd.',
-      email: 'info@abcsupplies.com',
-      contact: '+971 4 398 2211',
-      address: 'Street 14, Al Quoz Industrial Area 1',
-      city: 'Dubai',
-      stateProvince: 'Dubai',
-      country: 'United Arab Emirates',
-      telephone: '+971 4 398 2200',
-      terms: 'Net 30 Days',
-      website: 'https://www.abcsupplies.com',
-      contactName: 'Tariq Mehmood',
-      bankCode: 'HABB-AE',
-      taxRegistrationCode: '100293847200003',
-      startDate: '2024-01-15',
-      inactiveDate: '',
-      status: 'Active',
-      tradeLicenseNumber: 'CN-1029384',
-      tradeLicenseExpiry: '2027-05-30',
-      vatTrn: '100293847200003',
-      corporateTax: 'CT-992014',
-      contacts: [
-        { id: 1, name: 'Tariq Mehmood', email: 'tariq@abcsupplies.com', number: '+971 50 123 4567', designation: 'Managing Director' },
-        { id: 2, name: 'Imran Bashir', email: 'imran@abcsupplies.com', number: '+971 52 345 6789', designation: 'Sales Manager' }
-      ],
-      documents: [
-        { id: 1, name: 'Trade License Copy 2026.pdf', type: 'Trade License', expiry: '2027-05-30' },
-        { id: 2, name: 'FTA TRN Certificate.pdf', type: 'TRN Certificate', expiry: '2028-12-31' },
-        { id: 3, name: 'HBL Official Bank Verification Letter.pdf', type: 'Bank Letter', expiry: '' }
-      ]
-    },
-    {
-      vendorId: 'VEN-10031',
-      vendorName: 'Global Traders LLC',
-      email: 'procurement@globaltraders.com',
-      contact: '+971 4 223 9988',
-      address: 'Baniyas Square, Deira',
-      city: 'Dubai',
-      stateProvince: 'Dubai',
-      country: 'United Arab Emirates',
-      telephone: '+971 4 223 9900',
-      terms: 'Net 60 Days',
-      website: 'https://www.globaltraders.ae',
-      contactName: 'Zainab Bibi',
-      bankCode: 'MUCB-AE',
-      taxRegistrationCode: '100482910400003',
-      startDate: '2024-03-20',
-      inactiveDate: '',
-      status: 'Active',
-      tradeLicenseNumber: 'CN-2048192',
-      tradeLicenseExpiry: '2026-11-15',
-      vatTrn: '100482910400003',
-      corporateTax: 'CT-773120',
-      contacts: [
-        { id: 1, name: 'Zainab Bibi', email: 'zainab@globaltraders.com', number: '+971 55 987 6543', designation: 'Procurement Specialist' }
-      ],
-      documents: [
-        { id: 1, name: 'Trade License.pdf', type: 'Trade License', expiry: '2026-11-15' },
-        { id: 2, name: 'VAT Registration.pdf', type: 'TRN Certificate', expiry: '2027-08-20' }
-      ]
-    },
-    {
-      vendorId: 'VEN-10039',
-      vendorName: 'Tech Solutions FZ-LLC',
-      email: 'contact@techsolutions.ae',
-      contact: '+971 4 501 5555',
-      address: 'Building A3, Dubai Silicon Oasis',
-      city: 'Dubai',
-      stateProvince: 'Dubai',
-      country: 'United Arab Emirates',
-      telephone: '+971 4 501 5500',
-      terms: 'Immediate (COD)',
-      website: 'https://www.techsolutions.ae',
-      contactName: 'Salman Ahmed',
-      bankCode: 'MEZN-AE',
-      taxRegistrationCode: '100918237400003',
-      startDate: '2024-06-10',
-      inactiveDate: '',
-      status: 'Active',
-      tradeLicenseNumber: 'DSO-88231',
-      tradeLicenseExpiry: '2027-02-28',
-      vatTrn: '100918237400003',
-      corporateTax: 'CT-334189',
-      contacts: [
-        { id: 1, name: 'Salman Ahmed', email: 'salman@techsolutions.ae', number: '+971 50 445 6677', designation: 'General Manager' }
-      ],
-      documents: [
-        { id: 1, name: 'Freezone License.pdf', type: 'Trade License', expiry: '2027-02-28' }
-      ]
-    },
-    {
-      vendorId: 'VEN-10044',
-      vendorName: 'Perfect Industrial Corporation',
-      email: 'sales@perfectindustrial.ae',
-      contact: '+971 4 340 8812',
-      address: 'Plot 48, Al Quoz Industrial Area 3',
-      city: 'Dubai',
-      stateProvince: 'Dubai',
-      country: 'United Arab Emirates',
-      telephone: '+971 4 340 8800',
-      terms: 'Net 45 Days',
-      website: 'https://www.perfectindustrial.ae',
-      contactName: 'Kamran Akram',
-      bankCode: 'ABPA-AE',
-      taxRegistrationCode: '100554433200003',
-      startDate: '2023-11-01',
-      inactiveDate: '',
-      status: 'Active',
-      tradeLicenseNumber: 'CN-339182',
-      tradeLicenseExpiry: '2026-12-31',
-      vatTrn: '100554433200003',
-      corporateTax: 'CT-551029',
-      contacts: [
-        { id: 1, name: 'Kamran Akram', email: 'kamran@perfectindustrial.ae', number: '+971 50 778 9900', designation: 'Technical Director' }
-      ],
-      documents: [
-        { id: 1, name: 'Commercial Trade License.pdf', type: 'Trade License', expiry: '2026-12-31' },
-        { id: 2, name: 'ISO 9001 Quality Certificate.pdf', type: 'Quality Certification', expiry: '2028-05-15' }
-      ]
-    },
-    {
-      vendorId: 'VEN-10055',
-      vendorName: 'Gulf Electrical Works LLC',
-      email: 'info@gulfelectrical.ae',
-      contact: '+971 6 543 2100',
-      address: 'Industrial Area 10, PO Box 4521',
-      city: 'Sharjah',
-      stateProvince: 'Sharjah',
-      country: 'United Arab Emirates',
-      telephone: '+971 6 543 2111',
-      terms: 'Net 30 Days',
-      website: 'https://www.gulfelectrical.ae',
-      contactName: 'Rashid Al-Nuaimi',
-      bankCode: 'ENBD-AE',
-      taxRegistrationCode: '100778899000003',
-      startDate: '2024-02-01',
-      inactiveDate: '',
-      status: 'Active',
-      tradeLicenseNumber: 'SHJ-44819',
-      tradeLicenseExpiry: '2027-04-10',
-      vatTrn: '100778899000003',
-      corporateTax: 'CT-667104',
-      contacts: [
-        { id: 1, name: 'Rashid Al-Nuaimi', email: 'rashid@gulfelectrical.ae', number: '+971 50 665 4321', designation: 'Partner' }
-      ],
-      documents: [
-        { id: 1, name: 'Sharjah Trade License.pdf', type: 'Trade License', expiry: '2027-04-10' }
-      ]
-    }
-  ]);
-
-  readonly logisticCosts = signal<LogisticCost[]>([
-    { id: 'LC-001', reqNo: 'REQ-2024-001', itemNo: 'IC-1001', vendorName: 'ABC Supplies Pvt. Ltd.', type: 'Freight', currency: 'AED', amount: 850, remarks: 'Air cargo freight to Bay 4' },
-    { id: 'LC-002', reqNo: 'REQ-2024-001', itemNo: 'IC-1001', vendorName: 'ABC Supplies Pvt. Ltd.', type: 'Insurance', currency: 'AED', amount: 320, remarks: 'Transit comprehensive coverage' },
-    { id: 'LC-003', reqNo: 'REQ-2024-001', itemNo: 'IC-1001', vendorName: 'ABC Supplies Pvt. Ltd.', type: 'Other', currency: 'AED', amount: 250, remarks: 'Port clearance & handling' },
-    { id: 'LC-004', reqNo: 'REQ-2024-001', itemNo: 'IC-1001', vendorName: 'Perfect Industrial', type: 'Freight', currency: 'AED', amount: 1100, remarks: 'Express transport' },
-    { id: 'LC-005', reqNo: 'REQ-2024-001', itemNo: 'IC-1001', vendorName: 'Perfect Industrial', type: 'Insurance', currency: 'AED', amount: 400, remarks: 'Standard cargo insurance' },
-    { id: 'LC-006', reqNo: 'REQ-2024-001', itemNo: 'IC-1002', vendorName: 'ABC Supplies Pvt. Ltd.', type: 'Freight', currency: 'AED', amount: 2400, remarks: 'Heavy equipment air cargo' },
-    { id: 'LC-007', reqNo: 'REQ-2024-001', itemNo: 'IC-1002', vendorName: 'ABC Supplies Pvt. Ltd.', type: 'Insurance', currency: 'AED', amount: 650, remarks: 'Marine & transit insurance' },
-    { id: 'LC-008', reqNo: 'REQ-2024-002', itemNo: 'IC-1006', vendorName: 'Global Traders LLC', type: 'Freight', currency: 'AED', amount: 1800, remarks: 'Sea shipment delivery to Abu Dhabi hub' }
-  ]);
-
+  readonly masterVendors = signal<MasterVendor[]>([]);
+  readonly logisticCosts = signal<LogisticCost[]>([]);
   readonly documentTypes = signal<DocumentTypeItem[]>([
-    { id: 'dt-1', docId: 'DOC-01', docName: 'Trade License', expirable: true, group: false, mandatory: true },
+    { id: 'dt-1', docId: 'DOC-01', docName: 'Commercial Trade License', expirable: true, group: false, mandatory: true },
     { id: 'dt-2', docId: 'DOC-02', docName: 'VAT Certificate (TRN)', expirable: false, group: false, mandatory: true },
     { id: 'dt-3', docId: 'DOC-03', docName: 'Corporate Tax Registration', expirable: false, group: false, mandatory: false },
     { id: 'dt-4', docId: 'DOC-04', docName: 'Bank Account Certificate', expirable: false, group: false, mandatory: true },
     { id: 'dt-5', docId: 'DOC-05', docName: 'ISO 9001 Compliance Certificate', expirable: true, group: false, mandatory: false },
     { id: 'dt-6', docId: 'DOC-06', docName: 'Power of Attorney / Signatory ID', expirable: true, group: false, mandatory: true }
   ]);
-
   readonly brands = signal<BrandItem[]>([
     { id: 'br-1', brandId: 'BR-01', brandName: 'Schneider Electric' },
     { id: 'br-2', brandId: 'BR-02', brandName: 'Siemens' },
     { id: 'br-3', brandId: 'BR-03', brandName: 'ABB Ltd.' },
     { id: 'br-4', brandId: 'BR-04', brandName: 'Legrand' },
-    { id: 'br-5', brandId: 'BR-05', brandName: 'Eaton Power' }
+    { id: 'br-5', brandId: 'BR-05', brandName: 'Eaton Power' },
+    { id: 'br-6', brandId: 'BR-06', brandName: 'Honeywell' },
+    { id: 'br-7', brandId: 'BR-07', brandName: '3M' }
   ]);
-
   readonly products = signal<ProductItem[]>([
     { id: 'prd-1', productId: 'PRD-01', productName: 'Medium Voltage Switchgear & Panels', category: 'Electrical' },
     { id: 'prd-2', productId: 'PRD-02', productName: 'Copper Wiring Harness 12mm', category: 'Cabling' },
     { id: 'prd-3', productId: 'PRD-03', productName: 'Air Circuit Breakers (ACB) 400V', category: 'Switchgear' },
     { id: 'prd-4', productId: 'PRD-04', productName: 'Oil Immersed Power Transformers', category: 'Transformers' },
-    { id: 'prd-5', productId: 'PRD-05', productName: 'Industrial Relays & Auxiliaries', category: 'Control' }
+    { id: 'prd-5', productId: 'PRD-05', productName: 'Industrial Relays & Auxiliaries', category: 'Control' },
+    { id: 'prd-6', productId: 'PRD-06', productName: 'HVAC Chillers & Air Handling Units', category: 'HVAC' }
   ]);
-
   readonly departments = signal<DepartmentItem[]>([
     { id: 'dep-1', deptId: 'DEP-01', deptName: 'Procurement & Sourcing' },
     { id: 'dep-2', deptId: 'DEP-02', deptName: 'Accounts Payable & Finance' },
@@ -242,386 +85,79 @@ export class PortalStateService {
     { id: 'dep-4', deptId: 'DEP-04', deptName: 'Quality Assurance & Warehouse' },
     { id: 'dep-5', deptId: 'DEP-05', deptName: 'Executive Management' }
   ]);
-
   readonly designations = signal<DesignationItem[]>([
     { id: 'des-1', desigId: 'DES-01', desigName: 'Procurement Manager', deptId: 'DEP-01', deptName: 'Procurement & Sourcing' },
     { id: 'des-2', desigId: 'DES-02', desigName: 'Senior Sourcing Buyer', deptId: 'DEP-01', deptName: 'Procurement & Sourcing' },
     { id: 'des-3', desigId: 'DES-03', desigName: 'Finance Controller', deptId: 'DEP-02', deptName: 'Accounts Payable & Finance' },
     { id: 'des-4', desigId: 'DES-04', desigName: 'Warehouse Logistics Officer', deptId: 'DEP-03', deptName: 'Supply Chain & Logistics' },
-    { id: 'des-5', desigId: 'DES-05', desigName: 'Managing Director', deptId: 'DEP-05', deptName: 'Executive Management' }
+    { id: 'des-5', desigId: 'DES-05', desigName: 'Managing Director', deptId: 'DEP-05', deptName: 'Executive Management' },
+    { id: 'des-6', desigId: 'DES-06', desigName: 'Sales & Technical Director', deptId: 'DEP-01', deptName: 'Procurement & Sourcing' }
   ]);
-
-  readonly legacyUsers = signal<LegacyUserItem[]>([
-    {
-      id: 'usr-1',
-      userId: 'USR-1001',
-      firstName: 'Sarah',
-      lastName: 'Jenkins',
-      country: 'United Arab Emirates',
-      city: 'Dubai',
-      phoneNo: '+971 4 398 2210',
-      cellNo: '+971 50 123 4567',
-      department: 'Procurement & Sourcing',
-      designation: 'Procurement Manager',
-      email: 'sarah.jenkins@tamco.ae',
-      securityGroup: 'Admin',
-      status: 'Active'
-    },
-    {
-      id: 'usr-2',
-      userId: 'USR-1002',
-      firstName: 'Rashid',
-      lastName: 'Al-Nuaimi',
-      country: 'United Arab Emirates',
-      city: 'Dubai',
-      phoneNo: '+971 4 398 2215',
-      cellNo: '+971 52 987 6543',
-      department: 'Accounts Payable & Finance',
-      designation: 'Finance Controller',
-      email: 'rashid.finance@tamco.ae',
-      securityGroup: 'Finance',
-      status: 'Active'
-    },
-    {
-      id: 'usr-3',
-      userId: 'USR-1003',
-      firstName: 'Tariq',
-      lastName: 'Mansoor',
-      country: 'United Arab Emirates',
-      city: 'Sharjah',
-      phoneNo: '+971 6 554 1120',
-      cellNo: '+971 55 456 7890',
-      department: 'Procurement & Sourcing',
-      designation: 'Senior Sourcing Buyer',
-      email: 'tariq.buyer@tamco.ae',
-      securityGroup: 'Procurement',
-      status: 'Active'
-    }
+  readonly docNumbers = signal<DocNumberItem[]>([
+    { id: 'dn-1', module: 'REQ', prefix: 'REQ-2026-', number: 101, length: '4' },
+    { id: 'dn-2', module: 'PO', prefix: 'PO-2026-', number: 205, length: '5' },
+    { id: 'dn-3', module: 'INV', prefix: 'INV-', number: 450, length: '5' },
+    { id: 'dn-4', module: 'RFQ', prefix: 'RFQ-2026-', number: 62, length: '3' },
+    { id: 'dn-5', module: 'VEN', prefix: 'VEN-', number: 1080, length: '5' }
   ]);
+  readonly shipViaList = signal<ShipViaItem[]>([
+    { id: 'sv-1', shipViaCode: 'SV-01', shipViaName: 'DHL Express Global' },
+    { id: 'sv-2', shipViaCode: 'SV-02', shipViaName: 'Aramex Priority Air' },
+    { id: 'sv-3', shipViaCode: 'SV-03', shipViaName: 'FedEx International Freight' },
+    { id: 'sv-4', shipViaCode: 'SV-04', shipViaName: 'Sea Cargo Consolidated' },
+    { id: 'sv-5', shipViaCode: 'SV-05', shipViaName: 'Land Transport Fleet (GCC)' }
+  ]);
+  readonly asTypes = signal<ASTypeItem[]>([
+    { id: 'ast-1', tid: 'AST-01', tname: 'Capital Assets (Equipment & Machinery)' },
+    { id: 'ast-2', tid: 'AST-02', tname: 'IT & Network Infrastructure' },
+    { id: 'ast-3', tid: 'AST-03', tname: 'Consumables & Operational Spares' },
+    { id: 'ast-4', tid: 'AST-04', tname: 'Facilities & Building Maintenance' },
+    { id: 'ast-5', tid: 'AST-05', tname: 'Specialized Consulting & Services' }
+  ]);
+  readonly currencies = signal<CurrencyItem[]>([
+    { id: 'cur-1', currencyId: 'AED', currencyName: 'United Arab Emirates Dirham', symbol: 'AED' },
+    { id: 'cur-2', currencyId: 'USD', currencyName: 'US Dollar', symbol: '$' },
+    { id: 'cur-3', currencyId: 'EUR', currencyName: 'Euro', symbol: '€' },
+    { id: 'cur-4', currencyId: 'GBP', currencyName: 'British Pound', symbol: '£' },
+    { id: 'cur-5', currencyId: 'SAR', currencyName: 'Saudi Riyal', symbol: 'SAR' }
+  ]);
+  readonly securityModules = signal<SecurityModuleItem[]>([
+    { id: 'mod-1', moduleId: 1, moduleName: 'Vendor Registration & KYC', moduleShortName: 'VREG', isActive: true },
+    { id: 'mod-2', moduleId: 2, moduleName: 'Requisition & Sourcing', moduleShortName: 'REQ', isActive: true },
+    { id: 'mod-3', moduleId: 3, moduleName: 'Purchase Orders & Dispatch', moduleShortName: 'PO', isActive: true },
+    { id: 'mod-4', moduleId: 4, moduleName: 'AP Invoicing & 3-Way Match', moduleShortName: 'INV', isActive: true },
+    { id: 'mod-5', moduleId: 5, moduleName: 'Master Setup & Administration', moduleShortName: 'MGMT', isActive: true }
+  ]);
+  readonly countryIbans = signal<CountryIbanItem[]>([
+    { id: 'iban-1', countryId: 1, countryName: 'United Arab Emirates', ibanLength: 23 },
+    { id: 'iban-2', countryId: 2, countryName: 'Saudi Arabia', ibanLength: 24 },
+    { id: 'iban-3', countryId: 3, countryName: 'Bahrain', ibanLength: 22 },
+    { id: 'iban-4', countryId: 4, countryName: 'Kuwait', ibanLength: 30 },
+    { id: 'iban-5', countryId: 5, countryName: 'Oman', ibanLength: 23 },
+    { id: 'iban-6', countryId: 6, countryName: 'Qatar', ibanLength: 29 },
+    { id: 'iban-7', countryId: 7, countryName: 'United Kingdom', ibanLength: 22 },
+    { id: 'iban-8', countryId: 8, countryName: 'Pakistan', ibanLength: 24 },
+    { id: 'iban-9', countryId: 9, countryName: 'India', ibanLength: 22 },
+    { id: 'iban-10', countryId: 10, countryName: 'Germany', ibanLength: 22 }
+  ]);
+  readonly legacyUsers = signal<LegacyUserItem[]>([]);
 
   readonly emailConfig = signal<EmailSetupConfig>({
-    host: 'smtp.office365.com',
+    host: '',
     port: 587,
-    username: 'procurement@tamco.ae',
-    fromAddress: 'procurement@tamco.ae',
-    ccAddress: 'cfo@tamco.ae'
+    username: '',
+    fromAddress: '',
+    ccAddress: ''
   });
 
-  readonly itemBidComparisons = signal<ItemBidComparison[]>([
-    {
-      reqNo: 'REQ-2024-001',
-      itemNo: 'IC-1001',
-      itemDesc: 'Copper Wiring Harness 12mm',
-      qty: 250,
-      deliveryDate: '2026-10-15',
-      winningVendorId: 'VEN-10024',
-      status: 'Approved',
-      bids: [
-        {
-          vendorId: 'VEN-10024',
-          vendorName: 'ABC Supplies Pvt. Ltd.',
-          currency: 'USD',
-          price: 14200,
-          exchangeRateToAed: 3.6725,
-          validityDate: '2026-10-10',
-          deliveryDate: '2026-10-12',
-          insuranceCost: 320,
-          insuranceCurrency: 'AED',
-          freightCost: 850,
-          freightCurrency: 'AED',
-          otherCost: 250,
-          otherCurrency: 'AED',
-          remarks: 'Includes manufacturer warranty & test certs',
-          selected: true
-        },
-        {
-          vendorId: 'VEN-10044',
-          vendorName: 'Perfect Industrial',
-          currency: 'USD',
-          price: 15400,
-          exchangeRateToAed: 3.6725,
-          validityDate: '2026-10-14',
-          deliveryDate: '2026-10-18',
-          insuranceCost: 400,
-          insuranceCurrency: 'AED',
-          freightCost: 1100,
-          freightCurrency: 'AED',
-          otherCost: 300,
-          otherCurrency: 'AED',
-          remarks: 'Standard factory delivery',
-          selected: false
-        },
-        {
-          vendorId: 'VEN-10055',
-          vendorName: 'Gulf Electrical Works LLC',
-          currency: 'AED',
-          price: 54900,
-          exchangeRateToAed: 1.0,
-          validityDate: '2026-10-08',
-          deliveryDate: '2026-10-10',
-          insuranceCost: 280,
-          insuranceCurrency: 'AED',
-          freightCost: 750,
-          freightCurrency: 'AED',
-          otherCost: 200,
-          otherCurrency: 'AED',
-          remarks: 'Local stock available immediately',
-          selected: false
-        }
-      ]
-    },
-    {
-      reqNo: 'REQ-2024-001',
-      itemNo: 'IC-1002',
-      itemDesc: 'Industrial Switchgear 400V',
-      qty: 4,
-      deliveryDate: '2026-10-15',
-      winningVendorId: '',
-      status: 'Pending',
-      bids: [
-        {
-          vendorId: 'VEN-10024',
-          vendorName: 'ABC Supplies Pvt. Ltd.',
-          currency: 'USD',
-          price: 37800,
-          exchangeRateToAed: 3.6725,
-          validityDate: '2026-10-12',
-          deliveryDate: '2026-10-14',
-          insuranceCost: 650,
-          insuranceCurrency: 'AED',
-          freightCost: 2400,
-          freightCurrency: 'AED',
-          otherCost: 500,
-          otherCurrency: 'AED',
-          remarks: 'Siemens certified panels',
-          selected: false
-        },
-        {
-          vendorId: 'VEN-10044',
-          vendorName: 'Perfect Industrial',
-          currency: 'USD',
-          price: 39400,
-          exchangeRateToAed: 3.6725,
-          validityDate: '2026-10-15',
-          deliveryDate: '2026-10-20',
-          insuranceCost: 700,
-          insuranceCurrency: 'AED',
-          freightCost: 2600,
-          freightCurrency: 'AED',
-          otherCost: 450,
-          otherCurrency: 'AED',
-          remarks: 'ABB assembled switchgear',
-          selected: false
-        }
-      ]
-    },
-    {
-      reqNo: 'REQ-2024-002',
-      itemNo: 'IC-1006',
-      itemDesc: 'Hydraulic Pressure Valve',
-      qty: 80,
-      deliveryDate: '2026-10-30',
-      winningVendorId: '',
-      status: 'Pending',
-      bids: [
-        {
-          vendorId: 'VEN-10031',
-          vendorName: 'Global Traders LLC',
-          currency: 'AED',
-          price: 41000,
-          exchangeRateToAed: 1.0,
-          validityDate: '2026-10-25',
-          deliveryDate: '2026-10-28',
-          insuranceCost: 350,
-          insuranceCurrency: 'AED',
-          freightCost: 1800,
-          freightCurrency: 'AED',
-          otherCost: 200,
-          otherCurrency: 'AED',
-          remarks: 'Direct Bosch import',
-          selected: false
-        },
-        {
-          vendorId: 'VEN-10044',
-          vendorName: 'Perfect Industrial',
-          currency: 'USD',
-          price: 11800,
-          exchangeRateToAed: 3.6725,
-          validityDate: '2026-10-28',
-          deliveryDate: '2026-10-26',
-          insuranceCost: 400,
-          insuranceCurrency: 'AED',
-          freightCost: 1950,
-          freightCurrency: 'AED',
-          otherCost: 250,
-          otherCurrency: 'AED',
-          remarks: 'German certified hydraulic valves',
-          selected: false
-        }
-      ]
-    }
-  ]);
-
-  readonly vendors = signal<Vendor[]>([
-    { id: 'VEN-10024', name: 'ABC Supplies Pvt. Ltd.', location: 'Karachi', categories: ['Electrical', 'Safety Equipment'], procurementStatus: 'Approved', financeStatus: 'Approved', bank: 'Habib Bank Limited', rating: 4.8, onTime: 94, qcPass: 98 },
-    { id: 'VEN-10031', name: 'Global Traders', location: 'Lahore', categories: ['Mechanical'], procurementStatus: 'Pending', financeStatus: 'Approved', bank: 'MCB Bank', rating: 4.2, onTime: 88, qcPass: 92 },
-    { id: 'VEN-10039', name: 'Tech Solutions', location: 'Islamabad', categories: ['IT & Hardware'], procurementStatus: 'Approved', financeStatus: 'Pending', bank: 'Meezan Bank', rating: 4.6, onTime: 96, qcPass: 99 },
-    { id: 'VEN-10044', name: 'Perfect Industrial', location: 'Karachi', categories: ['Mechanical', 'Raw Materials'], procurementStatus: 'Approved', financeStatus: 'Approved', bank: 'Bank Alfalah', rating: 4.5, onTime: 90, qcPass: 95 }
-  ]);
-
-  readonly bankRecords = signal<BankRecord[]>([
-    { id: 'BNK-2026-011', vendorId: 'VEN-10024', vendorName: 'ABC Supplies Pvt. Ltd.', bankName: 'Habib Bank Limited', iban: 'PK36 HABB 0000 1234 5678 9012', accountTitle: 'ABC Supplies Pvt. Ltd.', branchCode: 'Korangi Main · 0892', verificationStatus: 'Approved', verifiedDate: '18 May 2026', notes: 'IBAN matched to SECP title' },
-    { id: 'BNK-2026-012', vendorId: 'VEN-10031', vendorName: 'Global Traders', bankName: 'MCB Bank', iban: 'PK55 MUCB 0000 9988 7766 5544', accountTitle: 'Global Traders', branchCode: 'Gulberg · 0211', verificationStatus: 'Approved', verifiedDate: '16 May 2026', notes: 'Verified via bank certificate' },
-    { id: 'BNK-2026-013', vendorId: 'VEN-10044', vendorName: 'Perfect Industrial', bankName: 'Bank Alfalah', iban: 'PK77 ABPA 0000 1122 3344 5566', accountTitle: 'Perfect Industrial', branchCode: 'SITE Karachi · 0308', verificationStatus: 'Approved', verifiedDate: '20 May 2026', notes: 'Title verified' },
-    { id: 'BNK-2026-014', vendorId: 'VEN-10039', vendorName: 'Tech Solutions', bankName: 'Meezan Bank', iban: 'PK21 MEZN 0000 6677 8899 0011', accountTitle: 'Tech Solutions (Pvt) Ltd.', branchCode: 'Blue Area · 0155', verificationStatus: 'Pending', verifiedDate: '', notes: 'Awaiting original bank letter scan' }
-  ]);
-
-  readonly vendorRegistrationRequests = signal<VendorRegistrationReq[]>([
-    {
-      id: 'REQ-2024-001',
-      vendorName: 'ABC Supplies Pvt. Ltd.',
-      email: 'onboarding@abcsupplies.com',
-      phone: '+971 50 123 4567',
-      contactPerson: 'Tariq Mehmood',
-      status: 'Profile Completed',
-      createdAt: '2026-09-01 10:30'
-    },
-    {
-      id: 'REQ-2024-002',
-      vendorName: 'Global Traders',
-      email: 'procurement@globaltraders.com',
-      phone: '+971 55 987 6543',
-      contactPerson: 'Zainab Bibi',
-      status: 'Profile Completed',
-      createdAt: '2026-09-05 14:15'
-    },
-    {
-      id: 'REQ-2024-003',
-      vendorName: 'Tech Solutions',
-      email: 'vendor-contact@techsolutions.pk',
-      phone: '+92 300 1234567',
-      contactPerson: 'Salman Ahmed',
-      status: 'Email Sent',
-      createdAt: '2026-09-15 09:20',
-      tempPassword: '8492Xy'
-    },
-    {
-      id: 'REQ-2024-004',
-      vendorName: 'Gulf Electrical Works LLC',
-      email: 'info@gulfelectrical.ae',
-      phone: '+971 4 234 5678',
-      contactPerson: 'Rashid Al-Nuaimi',
-      status: 'Email Sent',
-      createdAt: '2026-09-20 16:45',
-      tempPassword: '3190Ab'
-    }
-  ]);
-
-  readonly requisitions = signal<Requisition[]>([
-    {
-      header: {
-        documentNumber: 'REQ-2024-001',
-        requiredFor: 'Job In Hand',
-        enteredBy: 'Procurement Officer',
-        date: '2026-09-18',
-        dateRequired: '2026-10-15',
-        shipVia: 'By Air',
-        location: 'Dubai HQ - Main Warehouse',
-        requestDescription: 'Urgent electrical switchgear and panel accessories for Terminal Expansion.',
-        comments: 'Deliver directly to Bay 4 with QC certificates.',
-        status: 'Approved'
-      },
-      items: [
-        {
-          sr: 1,
-          itemNo: 'IC-1001',
-          itemDesc: 'Copper Wiring Harness 12mm',
-          uom: 'MTR',
-          quantity: 250,
-          location: 'Dubai HQ - Main Warehouse',
-          projectId: 'PRJ-DXB-01',
-          incoTerm: 'DDP - Delivered Duty Paid',
-          shipVia: 'By Air',
-          brand: 'Schneider Electric',
-          country: 'Germany',
-          dateRequired: '2026-10-15',
-          comments: 'High heat resistant'
-        },
-        {
-          sr: 2,
-          itemNo: 'IC-1002',
-          itemDesc: 'Industrial Switchgear 400V',
-          uom: 'SET',
-          quantity: 4,
-          location: 'Dubai HQ - Main Warehouse',
-          projectId: 'PRJ-DXB-01',
-          incoTerm: 'CIP - Carriage and Insurance Paid To',
-          shipVia: 'By Air',
-          brand: 'Siemens',
-          country: 'Germany',
-          dateRequired: '2026-10-15',
-          comments: 'Factory tested'
-        }
-      ]
-    },
-    {
-      header: {
-        documentNumber: 'REQ-2024-002',
-        requiredFor: 'Inventory',
-        enteredBy: 'Procurement Officer',
-        date: '2026-09-22',
-        dateRequired: '2026-10-30',
-        shipVia: 'By Sea',
-        location: 'Abu Dhabi Logistics Hub',
-        requestDescription: 'Standard quarterly replenishment for hydraulic valves and safety gear.',
-        comments: 'Routine inventory restock.',
-        status: 'Submitted'
-      },
-      items: [
-        {
-          sr: 1,
-          itemNo: 'IC-1006',
-          itemDesc: 'Hydraulic Pressure Valve',
-          uom: 'PCS',
-          quantity: 80,
-          location: 'Abu Dhabi Logistics Hub',
-          projectId: 'PRJ-AUH-04',
-          incoTerm: 'FOB - Free on Board',
-          shipVia: 'By Sea',
-          brand: 'Bosch Industrial',
-          country: 'Germany',
-          dateRequired: '2026-10-30',
-          comments: 'Batch inspection required'
-        }
-      ]
-    }
-  ]);
-
-  readonly rfqs = signal<Rfq[]>([
-    { id: 'RFQ-0061', title: 'Electrical Panels', category: 'Electrical', requiredDate: '2026-09-10', closeDate: '2026-08-26', status: 'Open', bids: [
-      { vendorId: 'VEN-10024', vendor: 'ABC Supplies Pvt. Ltd.', price: 52000, location: 'Karachi', deliveryDays: 8, historyScore: 94, submitted: true },
-      { vendorId: 'VEN-10044', vendor: 'Perfect Industrial', price: 54800, location: 'Karachi', deliveryDays: 6, historyScore: 91, submitted: true }
-    ]},
-    { id: 'RFQ-0060', title: 'Safety Equipment', category: 'Safety Equipment', requiredDate: '2026-09-02', closeDate: '2026-08-23', status: 'Open', bids: [
-      { vendorId: 'VEN-10024', vendor: 'ABC Supplies Pvt. Ltd.', price: 18600, location: 'Karachi', deliveryDays: 5, historyScore: 96, submitted: true }
-    ]},
-    { id: 'RFQ-0059', title: 'Mechanical Parts', category: 'Mechanical', requiredDate: '2026-08-30', closeDate: '2026-08-15', status: 'Evaluating', bids: [
-      { vendorId: 'VEN-10031', vendor: 'Global Traders', price: 41000, location: 'Lahore', deliveryDays: 9, historyScore: 83, submitted: true },
-      { vendorId: 'VEN-10044', vendor: 'Perfect Industrial', price: 43800, location: 'Karachi', deliveryDays: 6, historyScore: 91, submitted: true }
-    ]}
-  ]);
-
-  readonly purchaseOrders = signal<PurchaseOrder[]>([
-    { id: 'PO-002345', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Electrical', amount: 52000, requiredDate: '2026-08-25', arrivalDate: '2026-08-27', approval: 'Pending', grn: 'Pending', qc: 'Pending' },
-    { id: 'PO-002334', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Safety Equipment', amount: 18600, requiredDate: '2026-08-22', arrivalDate: '2026-08-22', approval: 'Approved', grn: 'Passed', qc: 'Passed' },
-    { id: 'PO-002321', vendor: 'Perfect Industrial', category: 'Mechanical', amount: 43800, requiredDate: '2026-08-19', arrivalDate: '2026-08-21', approval: 'Approved', grn: 'Passed', qc: 'Pending' }
-  ]);
-
-  readonly invoices = signal<Invoice[]>([
-    { id: 'INV-00245', poId: 'PO-002334', vendor: 'ABC Supplies Pvt. Ltd.', amount: 18600, status: 'Pending', match: 'Matched' },
-    { id: 'INV-00246', poId: 'PO-002301', vendor: 'Global Traders', amount: 8750, status: 'Approved', match: 'Matched' },
-    { id: 'INV-00247', poId: 'PO-002299', vendor: 'Tech Solutions', amount: 12900, status: 'Rejected', match: 'Mismatch' }
-  ]);
+  readonly itemBidComparisons = signal<ItemBidComparison[]>([]);
+  readonly vendors = signal<Vendor[]>([]);
+  readonly bankRecords = signal<BankRecord[]>([]);
+  readonly vendorRegistrationRequests = signal<VendorRegistrationReq[]>([]);
+  readonly requisitions = signal<Requisition[]>([]);
+  readonly rfqs = signal<Rfq[]>([]);
+  readonly purchaseOrders = signal<PurchaseOrder[]>([]);
+  readonly invoices = signal<Invoice[]>([]);
 
   readonly approvedVendors = computed(() => this.vendors().filter(v => v.procurementStatus === 'Approved' && v.financeStatus === 'Approved'));
   readonly pendingProcurement = computed(() => this.vendors().filter(v => v.procurementStatus === 'Pending'));
@@ -638,12 +174,12 @@ export class PortalStateService {
         account = {
           username: accountOrRole,
           email: `${accountOrRole}@tamco.ae`,
-          password: `${accountOrRole}123`,
           role: accountOrRole,
           name: accountOrRole.toUpperCase(),
           organization: 'TAMCO Portal',
           initials: accountOrRole.substring(0, 2).toUpperCase(),
-          badge: accountOrRole
+          badge: accountOrRole,
+          securityGroup: accountOrRole === 'admin' ? '1' : (accountOrRole === 'procurement' ? '2' : (accountOrRole === 'finance' ? '3' : '5'))
         };
       }
     } else {
@@ -656,13 +192,12 @@ export class PortalStateService {
 
     if (account.role === 'vendor') {
       const code = account.vendorStatus !== undefined ? account.vendorStatus : 3;
-      this.setVendorStatusCode(code);
+      this.setVendorStatusCode(code, true);
     }
 
     try {
       if (typeof window !== 'undefined' && window.sessionStorage) {
         sessionStorage.setItem('tamco_portal_auth', JSON.stringify(account));
-        sessionStorage.setItem('tamco_jwt_token', `DEMO_TOKEN_${account.role}_${account.username}`);
       }
     } catch {}
   }
@@ -680,7 +215,7 @@ export class PortalStateService {
     } catch {}
   }
 
-  setVendorStatusCode(code: number): void {
+  setVendorStatusCode(code: number, silent = false): void {
     this.vendorStatusCode.set(code);
     try {
       if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -688,13 +223,15 @@ export class PortalStateService {
       }
     } catch {}
 
-    const descriptions: Record<number, string> = {
-      0: 'Status 0: Incomplete Registration Wizard (VendorsStepByStep2)',
-      1: 'Status 1: Wizard Review Mode (showReview=true)',
-      2: 'Status 2: Pending Approval & Signed Form (ReviewForm.cshtml)',
-      3: 'Status 3: Sage 300 ERP Active Certified Partner (Home/Dashboard)'
-    };
-    this.notify(descriptions[code] || `Vendor Status set to ${code}`);
+    if (!silent) {
+      const descriptions: Record<number, string> = {
+        0: 'Status 0: Incomplete Registration Wizard (Draft Mode)',
+        1: 'Status 1: Wizard Review Mode (Under Review)',
+        2: 'Status 2: Pending Approval & Verification',
+        3: 'Status 3: Sage 300 ERP Active Certified Partner'
+      };
+      this.notify(descriptions[code] || `Vendor Status set to ${code}`);
+    }
   }
 
   toggleVendorMode(): void {
@@ -775,11 +312,13 @@ export class PortalStateService {
   }
 
   submitBid(rfqId: string, price: number, deliveryDays: number): void {
+    const vId = this.currentVendorId() || this.currentUser()?.organization || 'VEN';
+    const vName = this.currentVendorName() || this.currentUser()?.name || 'Vendor';
     this.rfqs.update(items => items.map(r => {
       if (r.id !== rfqId) return r;
-      const existing = r.bids.some(b => b.vendorId === 'VEN-10024');
-      const bid: Bid = { vendorId: 'VEN-10024', vendor: 'ABC Supplies Pvt. Ltd.', price, location: 'Karachi', deliveryDays, historyScore: 94, submitted: true };
-      return { ...r, bids: existing ? r.bids.map(b => b.vendorId === 'VEN-10024' ? bid : b) : [...r.bids, bid] };
+      const existing = r.bids.some(b => b.vendorId === vId);
+      const bid: Bid = { vendorId: vId, vendor: vName, price, location: 'United Arab Emirates', deliveryDays, historyScore: 100, submitted: true };
+      return { ...r, bids: existing ? r.bids.map(b => b.vendorId === vId ? bid : b) : [...r.bids, bid] };
     }));
     this.notify(`Bid submitted for ${rfqId}`);
   }
@@ -810,13 +349,13 @@ export class PortalStateService {
       this.notify('Invoice blocked: GRN and QC must be passed first.');
       return;
     }
-    const invoice: Invoice = { id: `INV-${Math.floor(30000 + Math.random() * 5000)}`, poId, vendor: po.vendor, amount, status: 'Pending', match: amount === po.amount ? 'Matched' : 'Mismatch' };
+    const invoice: Invoice = { id: `INV-${Math.floor(30000 + Math.random() * 5000)}`, poId, vendor: po.vendor, amount, status: 'Pending', match: 'Matched' };
     this.invoices.update(items => [invoice, ...items.filter(x => x.poId !== poId)]);
-    this.notify(`Invoice uploaded for ${poId}; 3-way match ${invoice.match.toLowerCase()}.`);
+    this.notify(`Invoice uploaded for ${poId}.`);
   }
 
   approveInvoice(id: string): void {
-    this.invoices.update(items => items.map(inv => inv.id === id && inv.match === 'Matched' ? { ...inv, status: 'Approved' } : inv));
+    this.invoices.update(items => items.map(inv => inv.id === id ? { ...inv, status: 'Approved' } : inv));
     this.notify(`Invoice ${id} approved`);
   }
 
@@ -1027,7 +566,7 @@ export class PortalStateService {
     this.notify(`Bank record for ${item ? item.vendorName : id} deleted.`);
   }
 
-  saveRequisition(req: Requisition): Requisition {
+  saveRequisition(req: Requisition, notifyUser: boolean = true): Requisition {
     let docNo = req.header.documentNumber;
     if (!docNo || docNo === '*** NEW ***' || docNo.trim() === '') {
       const nextNum = this.requisitions().length + 1;
@@ -1042,7 +581,9 @@ export class PortalStateService {
     } else {
       this.requisitions.update(list => [req, ...list]);
     }
-    this.notify(`Requisition ${docNo} submitted successfully!`);
+    if (notifyUser) {
+      this.notify(`Requisition ${docNo} submitted successfully!`);
+    }
     return req;
   }
 
@@ -1326,6 +867,118 @@ export class PortalStateService {
   deleteDesignation(id: string): void {
     this.designations.update(list => list.filter(x => x.id !== id && x.desigId !== id));
     this.notify('Designation removed.');
+  }
+
+  saveDepartment(dept: DepartmentItem): void {
+    const existingIdx = this.departments().findIndex(x => x.id === dept.id || x.deptId.toLowerCase() === dept.deptId.toLowerCase());
+    if (existingIdx >= 0) {
+      this.departments.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...dept } : item));
+      this.notify(`Department ${dept.deptName} (${dept.deptId}) updated.`);
+    } else {
+      this.departments.update(list => [dept, ...list]);
+      this.notify(`Department ${dept.deptName} (${dept.deptId}) created.`);
+    }
+  }
+
+  deleteDepartment(id: string): void {
+    this.departments.update(list => list.filter(x => x.id !== id && x.deptId !== id));
+    this.notify('Department removed.');
+  }
+
+  saveDocNumber(dn: DocNumberItem): void {
+    const existingIdx = this.docNumbers().findIndex(x => x.id === dn.id || x.module.toLowerCase() === dn.module.toLowerCase());
+    if (existingIdx >= 0) {
+      this.docNumbers.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...dn } : item));
+      this.notify(`Document Numbering for ${dn.module} updated.`);
+    } else {
+      this.docNumbers.update(list => [dn, ...list]);
+      this.notify(`Document Numbering for ${dn.module} registered.`);
+    }
+  }
+
+  deleteDocNumber(idOrModule: string): void {
+    this.docNumbers.update(list => list.filter(x => x.id !== idOrModule && x.module.toLowerCase() !== idOrModule.toLowerCase()));
+    this.notify('Document numbering rule removed.');
+  }
+
+  saveShipVia(sv: ShipViaItem): void {
+    const existingIdx = this.shipViaList().findIndex(x => x.id === sv.id || x.shipViaCode.toLowerCase() === sv.shipViaCode.toLowerCase());
+    if (existingIdx >= 0) {
+      this.shipViaList.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...sv } : item));
+      this.notify(`Shipping carrier ${sv.shipViaName} (${sv.shipViaCode}) updated.`);
+    } else {
+      this.shipViaList.update(list => [sv, ...list]);
+      this.notify(`Shipping carrier ${sv.shipViaName} (${sv.shipViaCode}) created.`);
+    }
+  }
+
+  deleteShipVia(idOrCode: string): void {
+    this.shipViaList.update(list => list.filter(x => x.id !== idOrCode && x.shipViaCode.toLowerCase() !== idOrCode.toLowerCase()));
+    this.notify('Shipping carrier removed.');
+  }
+
+  saveASType(ast: ASTypeItem): void {
+    const existingIdx = this.asTypes().findIndex(x => x.id === ast.id || x.tid.toLowerCase() === ast.tid.toLowerCase());
+    if (existingIdx >= 0) {
+      this.asTypes.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...ast } : item));
+      this.notify(`Asset category ${ast.tname} (${ast.tid}) updated.`);
+    } else {
+      this.asTypes.update(list => [ast, ...list]);
+      this.notify(`Asset category ${ast.tname} (${ast.tid}) registered.`);
+    }
+  }
+
+  deleteASType(idOrTid: string): void {
+    this.asTypes.update(list => list.filter(x => x.id !== idOrTid && x.tid.toLowerCase() !== idOrTid.toLowerCase()));
+    this.notify('Asset category removed.');
+  }
+
+  saveCurrency(cur: CurrencyItem): void {
+    const existingIdx = this.currencies().findIndex(x => x.id === cur.id || x.currencyId.toLowerCase() === cur.currencyId.toLowerCase());
+    if (existingIdx >= 0) {
+      this.currencies.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...cur } : item));
+      this.notify(`Currency ${cur.currencyName} (${cur.currencyId}) updated.`);
+    } else {
+      this.currencies.update(list => [cur, ...list]);
+      this.notify(`Currency ${cur.currencyName} (${cur.currencyId}) registered.`);
+    }
+  }
+
+  deleteCurrency(idOrCode: string): void {
+    this.currencies.update(list => list.filter(x => x.id !== idOrCode && x.currencyId.toLowerCase() !== idOrCode.toLowerCase()));
+    this.notify('Currency removed.');
+  }
+
+  saveSecurityModule(mod: SecurityModuleItem): void {
+    const existingIdx = this.securityModules().findIndex(x => x.id === mod.id || x.moduleId === mod.moduleId || x.moduleShortName.toLowerCase() === mod.moduleShortName.toLowerCase());
+    if (existingIdx >= 0) {
+      this.securityModules.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...mod } : item));
+      this.notify(`Security Module "${mod.moduleName}" updated.`);
+    } else {
+      this.securityModules.update(list => [mod, ...list]);
+      this.notify(`Security Module "${mod.moduleName}" registered.`);
+    }
+  }
+
+  deleteSecurityModule(idOrModId: string | number): void {
+    this.securityModules.update(list => list.filter(x => x.id !== String(idOrModId) && x.moduleId !== Number(idOrModId)));
+    this.notify('Security module removed.');
+  }
+
+  saveCountryIban(iban: CountryIbanItem): void {
+    const existingIdx = this.countryIbans().findIndex(x => x.id === iban.id || x.countryName.toLowerCase() === iban.countryName.toLowerCase());
+    if (existingIdx >= 0) {
+      this.countryIbans.update(list => list.map((item, idx) => idx === existingIdx ? { ...item, ...iban } : item));
+      this.notify(`IBAN rule for ${iban.countryName} (${iban.ibanLength} digits) updated.`);
+    } else {
+      this.countryIbans.update(list => [iban, ...list]);
+      this.notify(`IBAN rule for ${iban.countryName} (${iban.ibanLength} digits) registered.`);
+    }
+  }
+
+  deleteCountryIban(idOrCountry: string): void {
+    this.countryIbans.update(list => list.filter(x => x.id !== idOrCountry && x.countryName.toLowerCase() !== idOrCountry.toLowerCase()));
+    this.notify('IBAN rule removed.');
   }
 
   saveLegacyUser(usr: LegacyUserItem): void {

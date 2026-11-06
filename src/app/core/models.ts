@@ -135,6 +135,9 @@ export interface BankRecord {
 export interface MasterVendor {
   vendorId: string;
   vendorName: string;
+  shortName?: string;
+  vendorGroup?: string;
+  currency?: string;
   email: string;
   contact: string;
   address: string;
@@ -164,7 +167,7 @@ export interface LogisticCost {
   itemNo: string;
   vendorName: string;
   type: 'Freight' | 'Insurance' | 'Other';
-  currency: 'AED' | 'USD' | 'EUR';
+  currency: string;
   amount: number;
   remarks: string;
 }
@@ -234,6 +237,48 @@ export interface DepartmentItem {
   deptName: string;
 }
 
+export interface DocNumberItem {
+  id: string;
+  module: string;
+  prefix: string;
+  number: number;
+  length: string;
+}
+
+export interface ShipViaItem {
+  id: string;
+  shipViaCode: string;
+  shipViaName: string;
+}
+
+export interface ASTypeItem {
+  id: string;
+  tid: string;
+  tname: string;
+}
+
+export interface CurrencyItem {
+  id: string;
+  currencyId: string;
+  currencyName: string;
+  symbol: string;
+}
+
+export interface SecurityModuleItem {
+  id: string;
+  moduleId: number;
+  moduleName: string;
+  moduleShortName: string;
+  isActive: boolean;
+}
+
+export interface CountryIbanItem {
+  id: string;
+  countryId: number;
+  countryName: string;
+  ibanLength: number;
+}
+
 export interface LegacyUserItem {
   id: string;
   userId: string;
@@ -263,90 +308,15 @@ export interface EmailSetupConfig {
 export interface AuthAccount {
   username: string;
   email: string;
-  password: string;
   role: Role;
   name: string;
   organization: string;
   initials: string;
   badge: string;
   vendorStatus?: number; // 0 = Incomplete Wizard, 1 = Review Mode, 2 = Pending Approval, 3+ = Approved Partner
+  securityGroup?: string;
 }
 
-export const PORTAL_ACCOUNTS: AuthAccount[] = [
-  {
-    username: 'admin',
-    email: 'admin@tamco.ae',
-    password: 'admin123',
-    role: 'admin',
-    name: 'Admin Lead',
-    organization: 'TAMCO Administration',
-    initials: 'AL',
-    badge: 'Administration'
-  },
-  {
-    username: 'procurement',
-    email: 'procurement@tamco.ae',
-    password: 'procurement123',
-    role: 'procurement',
-    name: 'Sarah Jenkins',
-    organization: 'Procurement Department',
-    initials: 'SJ',
-    badge: 'Procurement'
-  },
-  {
-    username: 'finance',
-    email: 'finance@tamco.ae',
-    password: 'finance123',
-    role: 'finance',
-    name: 'David Chen',
-    organization: 'Finance Operations',
-    initials: 'DC',
-    badge: 'Finance & AP'
-  },
-  {
-    username: 'vendor',
-    email: 'vendor@abcsupplies.com',
-    password: 'vendor123',
-    role: 'vendor',
-    name: 'ABC Supplies Pvt. Ltd.',
-    organization: 'VEN-10024 · Dubai',
-    initials: 'AS',
-    badge: 'Partner (Approved ERP)',
-    vendorStatus: 3
-  },
-  {
-    username: 'vendor-pending',
-    email: 'pending@gulftech.ae',
-    password: 'vendor123',
-    role: 'vendor',
-    name: 'Gulf Tech Enterprises LLC',
-    organization: 'REQ-2024-889 · In Audit',
-    initials: 'GT',
-    badge: 'Vendor (Pending Audit)',
-    vendorStatus: 2
-  },
-  {
-    username: 'vendor-review',
-    email: 'review@arabianpipes.ae',
-    password: 'vendor123',
-    role: 'vendor',
-    name: 'Arabian Pipes & Fittings',
-    organization: 'REQ-2024-912 · Review',
-    initials: 'AP',
-    badge: 'Vendor (Review Mode)',
-    vendorStatus: 1
-  },
-  {
-    username: 'vendor-new',
-    email: 'newvendor@oriental.ae',
-    password: 'vendor123',
-    role: 'vendor',
-    name: 'Oriental Supplies Co.',
-    organization: 'REQ-2024-940 · New Invite',
-    initials: 'OS',
-    badge: 'Vendor (New Wizard)',
-    vendorStatus: 0
-  }
-];
+export const PORTAL_ACCOUNTS: AuthAccount[] = [];
 
 

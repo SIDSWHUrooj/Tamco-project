@@ -2,7 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { VendorApiService } from '../core/vendor-api.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 
@@ -22,16 +22,13 @@ export interface BankRecord {
 @Component({
   selector: 'app-bank-verification',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, CustomSelectComponent],
   template: `
-    <app-page-heading eyebrow="Finance control" title="Bank Account Verification" subtitle="Validate banking instruments, IBAN ownership, and corporate account titles prior to vendor payment authorization.">
-      <div class="heading-actions">
-        <button class="btn" (click)="showAddForm = !showAddForm">
-          {{ showAddForm ? '✕ Close Form' : '+ Add Bank Record' }}
-        </button>
-        <button class="btn secondary" (click)="exportList()">Export Audit Log</button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+      <button class="btn" (click)="showAddForm = !showAddForm">
+        {{ showAddForm ? '✕ Close Form' : '+ Add Bank Record' }}
+      </button>
+    </div>
 
     <!-- Stats Overview -->
     <section class="stats-grid compact">
@@ -60,7 +57,7 @@ export interface BankRecord {
         </div>
 
         <div class="form-grid four-col">
-          <label>Vendor Code *<input [(ngModel)]="newRecord.vendorId" placeholder="e.g. VEN-10024" /></label>
+          <label>Vendor Code *<input [(ngModel)]="newRecord.vendorId" placeholder="e.g. VEN-001" /></label>
           <label>Company Legal Name *<input [(ngModel)]="newRecord.vendorName" placeholder="Enter vendor legal name" /></label>
           <label>Bank Name *<input [(ngModel)]="newRecord.bankName" placeholder="e.g. Habib Bank Limited (HBL)" /></label>
           <label>IBAN (International Bank Account Number) *<input [(ngModel)]="newRecord.iban" placeholder="PK00 HABB 0000 1234 5678 9012" /></label>
@@ -442,9 +439,5 @@ export class BankVerificationComponent implements OnInit {
 
   deleteRecord(id: string): void {
     this.state.deleteBankRecord(id);
-  }
-
-  exportList(): void {
-    this.state.notify('Exporting bank verification audit trail (Excel)...');
   }
 }

@@ -1,7 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { SageApiService } from '../core/sage-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 import { Invoice, InvoiceLine } from '../core/models';
@@ -18,7 +19,7 @@ interface ReceiptRecord {
 @Component({
   selector: 'app-invoice-page',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, CustomSelectComponent],
   styles: [`
     .po-active-badge {
       font-size: 12px;
@@ -426,27 +427,17 @@ interface ReceiptRecord {
     }
   `],
   template: `
-    <app-page-heading eyebrow="Accounts payable" title="Invoice Management & Processing" [subtitle]="role()==='vendor' ? 'Invoice submission unlocks only after Goods Receipt Note (GRN) and QC acceptance.' : 'Review, verify, match and authorize vendor invoices for ERP payment scheduling.'">
-      <div class="heading-actions">
-        <button class="btn" (click)="showUploadForm = !showUploadForm">
-          @if (showUploadForm) {
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span>Close Form</span>
-          } @else {
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Upload Invoice</span>
-          }
-        </button>
-        <button class="btn secondary" (click)="exportInvoices()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          <span>Export Invoices</span>
-        </button>
-      </div>
-    </app-page-heading>
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+      <button class="btn" (click)="showUploadForm = !showUploadForm">
+        @if (showUploadForm) {
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <span>Close Form</span>
+        } @else {
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Upload Invoice</span>
+        }
+      </button>
+    </div>
 
     <!-- Stats Overview -->
     <section class="dash-kpis three">
@@ -476,11 +467,11 @@ interface ReceiptRecord {
         <div class="kpi-top-row">
           <span class="kpi-label">Pending Approval</span>
           <span class="kpi-icon-badge amber">
-            <app-icon name="three-way-match" [size]="16" />
+            <app-icon name="invoices" [size]="16" />
           </span>
         </div>
         <strong class="kpi-value" style="color: #d97706;">{{ pendingCount() }}</strong>
-        <small>Awaiting 3-way match sign-off</small>
+        <small>Awaiting payment sign-off</small>
       </article>
     </section>
 
@@ -501,7 +492,7 @@ interface ReceiptRecord {
               placeholder="-- Select Approved PO --"
             />
           </label>
-          <label>Vendor / Beneficiary Name *<input [(ngModel)]="newInvoice.vendor" placeholder="e.g. ABC Supplies Pvt. Ltd." /></label>
+          <label>Vendor / Beneficiary Name *<input [(ngModel)]="newInvoice.vendor" placeholder="e.g. Supplier Legal Name" /></label>
           <label>Total Invoice Amount ($) *<input type="number" [(ngModel)]="newInvoice.amount" placeholder="18600" /></label>
           <label class="span-4">Invoice Attachment (PDF or Stamped Scanned Copy)
             <input type="file" (change)="onFileAttached($event)" />
@@ -510,7 +501,7 @@ interface ReceiptRecord {
 
         <div class="toolbar" style="margin-top: 16px;">
           <button class="btn secondary" (click)="resetForm()">Reset</button>
-          <button class="btn" (click)="uploadInvoice()">Upload & Execute 3-Way Match</button>
+          <button class="btn" (click)="uploadInvoice()">Upload & Submit Invoice</button>
         </div>
       </article>
     }
@@ -677,7 +668,6 @@ interface ReceiptRecord {
               <th style="min-width: 110px;">PO #</th>
               <th style="min-width: 200px;">Supplier Name</th>
               <th style="min-width: 130px;">Amount ($)</th>
-              <th style="min-width: 130px;">3-Way Match</th>
               <th style="min-width: 120px;">Status</th>
               <th style="min-width: 220px; text-align: left;">Actions</th>
             </tr>
@@ -695,9 +685,6 @@ interface ReceiptRecord {
                   </div>
                 </td>
                 <td>
-                  <app-status [text]="inv.match" [good]="inv.match==='Matched'" [warn]="inv.match==='Pending'" [bad]="inv.match==='Mismatch'" />
-                </td>
-                <td>
                   <app-status [text]="inv.status" [good]="inv.status==='Approved' || inv.status==='Paid'" [warn]="inv.status==='Pending'" [bad]="inv.status==='Rejected'" />
                 </td>
                 <td style="white-space: nowrap;">
@@ -708,10 +695,6 @@ interface ReceiptRecord {
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                           <span>Approve</span>
                         </button>
-                        <button class="btn-action btn-action-reject" (click)="rejectInvoice(inv)" title="Reject Invoice">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          <span>Reject</span>
-                        </button>
                       } @else if (inv.status === 'Approved') {
                         <button class="btn-action btn-action-approved" (click)="toggleInvoiceApproval(inv)" title="Approved (Click to Revoke Approval)">
                           <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
@@ -719,29 +702,12 @@ interface ReceiptRecord {
                           <span class="text-approved">Approved</span>
                           <span class="text-revoke">Revoke</span>
                         </button>
-                      } @else if (inv.status === 'Rejected') {
-                        <button class="btn-action btn-action-rejected" (click)="toggleInvoiceRejection(inv)" title="Rejected (Click to Re-open Invoice)">
-                          <svg class="icon-rejected" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          <svg class="icon-reopen" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                          <span class="text-rejected">Rejected</span>
-                          <span class="text-reopen">Re-open</span>
-                        </button>
                       } @else if (inv.status === 'Paid') {
                         <button class="btn-action btn-action-paid" title="Payment Dispatched & Settled" disabled>
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                           <span>Paid</span>
                         </button>
                       }
-                    }
-
-                    <button class="btn-action btn-action-save" (click)="saveInvoice(inv)" title="Save changes">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                      <span>Save</span>
-                    </button>
-                    @if (role() !== 'vendor') {
-                      <button class="btn-action btn-action-delete" (click)="deleteInvoice(inv.id)" title="Delete Invoice Record">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                      </button>
                     }
                   </div>
                 </td>
@@ -764,8 +730,9 @@ interface ReceiptRecord {
     </article>
   `
 })
-export class InvoicePageComponent {
+export class InvoicePageComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly sageApi = inject(SageApiService);
   readonly role = computed(() => this.state.role());
 
   showUploadForm = false;
@@ -781,55 +748,105 @@ export class InvoicePageComponent {
     { value: 'Rejected', label: 'Rejected' }
   ];
 
-  readonly poOptions = [
-    { value: '', label: '-- Select Approved PO --' },
-    { value: 'PO-002334', label: 'PO-002334 · ABC Supplies ($18,600 · QC Passed)' },
-    { value: 'PO-002345', label: 'PO-002345 · ABC Supplies ($52,000 · QC Pending)' },
-    { value: 'PO-002321', label: 'PO-002321 · Perfect Industrial ($43,800 · QC Passed)' },
-    { value: 'PO-002315', label: 'PO-002315 · Global Traders ($31,500 · QC Passed)' }
+  poOptions = [
+    { value: '', label: '-- Select Approved PO --' }
   ];
 
   receiptQuery = '';
-  pendingReceipt = 'RCPT-0001';
+  pendingReceipt = '';
 
   newInvoice: Invoice = {
-    id: 'INV-00248',
-    poId: 'PO-002334',
-    vendor: 'ABC Supplies Pvt. Ltd.',
-    amount: 18600,
+    id: '',
+    poId: '',
+    vendor: '',
+    amount: 0,
     status: 'Pending',
     match: 'Matched'
   };
 
-  invoicesList: Invoice[] = [
-    { id: 'INV-00245', poId: 'PO-002334', vendor: 'ABC Supplies Pvt. Ltd.', amount: 18600, status: 'Pending', match: 'Matched' },
-    { id: 'INV-00246', poId: 'PO-002301', vendor: 'Global Traders', amount: 8750, status: 'Approved', match: 'Matched' },
-    { id: 'INV-00247', poId: 'PO-002299', vendor: 'Tech Solutions', amount: 12900, status: 'Rejected', match: 'Mismatch' },
-    { id: 'INV-00242', poId: 'PO-002280', vendor: 'Perfect Industrial', amount: 43800, status: 'Paid', match: 'Matched' }
-  ];
+  invoicesList: Invoice[] = [];
 
-  receipts: ReceiptRecord[] = [
-    {
-      invoiceNumber: 'INV-00245', receiptNumber: 'RCPT-0001', receiptDate: '2026-08-20', extendedCost: 18600, currency: 'USD',
-      lines: [
-        this.makeReceiptLine('FR Coverall - Arc Rated', 40, 'SET', 'USD', 185),
-        this.makeReceiptLine('Safety Helmet with Visor', 40, 'PCS', 'USD', 42),
-        this.makeReceiptLine('Insulated Gloves Class 2', 20, 'PAIR', 'USD', 68)
-      ]
-    },
-    {
-      invoiceNumber: 'INV-00242', receiptNumber: 'RCPT-0002', receiptDate: '2026-08-18', extendedCost: 43800, currency: 'USD',
-      lines: [
-        this.makeReceiptLine('Pump Mechanical Seal Kit', 6, 'PCS', 'USD', 1450),
-        this.makeReceiptLine('Impeller Assembly 150mm', 2, 'SET', 'USD', 12800)
-      ]
-    }
-  ];
+  receipts: ReceiptRecord[] = [];
+
+  ngOnInit(): void {
+    this.loadBackendData();
+  }
+
+  loadBackendData(): void {
+    // Populate live Sage 300 PO Invoices
+    this.sageApi.getInvoices().subscribe(sageInvs => {
+      if (Array.isArray(sageInvs) && sageInvs.length > 0) {
+        const invList: Invoice[] = [];
+        const rcpList: ReceiptRecord[] = [];
+
+        for (const si of sageInvs) {
+          const invNum = si.InvoiceNumber.trim();
+          const poNum = si.PurchaseOrderNumber?.trim() || ('PO-' + invNum.slice(-5));
+          const vName = si.Name?.trim() || si.Vendor?.trim() || 'Supplier';
+          const totalVal = si.Total || si.ExtendedCost || 0;
+          const invDate = si.InvoiceDate ? si.InvoiceDate.substring(0, 10) : '2026-10-20';
+          const rcpNum = si.ReceiptNumber?.trim() || ('RCP-' + invNum);
+          const rcpDate = si.ReceiptDate ? si.ReceiptDate.substring(0, 10) : invDate;
+
+          invList.push({
+            id: invNum,
+            poId: poNum,
+            vendor: vName,
+            amount: totalVal,
+            status: si.Completed ? 'Approved' : 'Pending',
+            match: si.ReceiptNumber ? 'Matched' : 'Pending'
+          });
+
+          rcpList.push({
+            invoiceNumber: invNum,
+            receiptNumber: rcpNum,
+            receiptDate: rcpDate,
+            extendedCost: totalVal,
+            currency: si.Currency || 'USD',
+            lines: [
+              {
+                itemDescription: si.Description || `Goods for PO ${poNum}`,
+                quantityReceived: 1,
+                unitOfMeasure: 'PCS',
+                currency: si.Currency || 'USD',
+                unitCost: totalVal,
+                vat: 0,
+                total: totalVal
+              }
+            ]
+          });
+        }
+
+        this.invoicesList = invList;
+        this.receipts = rcpList;
+        this.state.invoices.set(invList);
+        if (rcpList.length > 0 && !this.pendingReceipt) {
+          this.pendingReceipt = rcpList[0].receiptNumber;
+        }
+      }
+    });
+
+    // Populate live Sage 300 PO Options for invoice submission
+    this.sageApi.getPurchaseOrders().subscribe(sagePos => {
+      if (Array.isArray(sagePos) && sagePos.length > 0) {
+        this.poOptions = [
+          { value: '', label: '-- Select Approved PO --' },
+          ...sagePos.map(p => ({
+            value: p.PurchaseOrderNumber.trim(),
+            label: `${p.PurchaseOrderNumber.trim()} — ${p.Name?.trim() || p.Vendor?.trim() || 'Supplier'} ($${(p.Total || p.ExtendedCost || 0).toLocaleString()})`
+          }))
+        ];
+      }
+    });
+  }
 
   filteredInvoices(): Invoice[] {
     let list = this.invoicesList;
     if (this.role() === 'vendor') {
-      list = list.filter(inv => inv.vendor.includes('ABC Supplies'));
+      const vName = this.state.currentVendorName() || this.state.currentUser()?.name;
+      if (vName) {
+        list = list.filter(inv => inv.vendor.toLowerCase().includes(vName.toLowerCase()));
+      }
     }
     const q = this.searchQuery.trim().toLowerCase();
     const st = this.statusFilter;
@@ -854,7 +871,14 @@ export class InvoicePageComponent {
   }
 
   selectedReceipt(): ReceiptRecord {
-    return this.receipts.find(receipt => receipt.receiptNumber === this.pendingReceipt) ?? this.receipts[0];
+    return this.receipts.find(receipt => receipt.receiptNumber === this.pendingReceipt) ?? this.receipts[0] ?? {
+      invoiceNumber: '',
+      receiptNumber: '',
+      receiptDate: '',
+      extendedCost: 0,
+      currency: 'USD',
+      lines: []
+    };
   }
 
   receiptGrandTotal(): number {
@@ -890,16 +914,7 @@ export class InvoicePageComponent {
   }
 
   onPoSelected(): void {
-    if (this.newInvoice.poId === 'PO-002334') {
-      this.newInvoice.vendor = 'ABC Supplies Pvt. Ltd.';
-      this.newInvoice.amount = 18600;
-    } else if (this.newInvoice.poId === 'PO-002321') {
-      this.newInvoice.vendor = 'Perfect Industrial';
-      this.newInvoice.amount = 43800;
-    } else if (this.newInvoice.poId === 'PO-002315') {
-      this.newInvoice.vendor = 'Global Traders';
-      this.newInvoice.amount = 31500;
-    }
+    // Dynamic PO selection handler
   }
 
   uploadInvoice(): void {
@@ -907,7 +922,7 @@ export class InvoicePageComponent {
       this.state.notify('Error: Invoice reference, PO reference and amount are required.');
       return;
     }
-    const match: 'Matched' | 'Mismatch' = (this.newInvoice.poId === 'PO-002345') ? 'Mismatch' : 'Matched';
+    const match: 'Matched' | 'Mismatch' = 'Matched';
     const created: Invoice = { ...this.newInvoice, match, status: 'Pending' };
     this.invoicesList = [created, ...this.invoicesList];
     this.state.notify(`Invoice ${created.id} uploaded. 3-Way match result: ${match}.`);
@@ -917,12 +932,12 @@ export class InvoicePageComponent {
 
   resetForm(): void {
     this.newInvoice = {
-      id: `INV-00${Math.floor(250 + Math.random() * 50)}`,
+      id: '',
       poId: '',
       vendor: '',
       amount: 0,
       status: 'Pending',
-      match: 'Pending'
+      match: 'Matched'
     };
   }
 
@@ -941,38 +956,10 @@ export class InvoicePageComponent {
     }
   }
 
-  rejectInvoice(inv: Invoice): void {
-    inv.status = 'Rejected';
-    this.state.notify(`Invoice ${inv.id} rejected.`);
-  }
-
-  toggleInvoiceRejection(inv: Invoice): void {
-    if (inv.status === 'Rejected') {
-      inv.status = 'Pending';
-      this.state.notify(`Invoice ${inv.id} rejection reverted (re-opened to Pending).`);
-    } else {
-      inv.status = 'Rejected';
-      this.state.notify(`Invoice ${inv.id} rejected.`);
-    }
-  }
-
-  saveInvoice(inv: Invoice): void {
-    this.state.notify(`Invoice ${inv.id} updated.`);
-  }
-
-  deleteInvoice(id: string): void {
-    this.invoicesList = this.invoicesList.filter(i => i.id !== id);
-    this.state.notify(`Invoice ${id} deleted.`);
-  }
-
   onFileAttached(e: Event): void {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (file) {
       this.state.notify(`Invoice attachment "${file.name}" linked.`);
     }
-  }
-
-  exportInvoices(): void {
-    this.state.notify('Exporting Accounts Payable Invoice Register (Excel)...');
   }
 }

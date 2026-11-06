@@ -2,6 +2,7 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostBinding,
   HostListener,
   Input,
   Output,
@@ -34,13 +35,13 @@ export interface SelectOption {
       [class.has-label]="!!label"
       [class.is-open]="isOpen()"
       [class.is-disabled]="disabled"
-      [style.min-width]="minWidth || '170px'"
+      [style.min-width]="minWidth"
     >
       @if (label) {
-        <span class="floating-label">{{ label }}</span>
+        <label class="floating-label">{{ label }}</label>
       }
 
-      <!-- Trigger Box -->
+      <!-- Trigger Box (Option 1) -->
       <button
         type="button"
         class="custom-select-trigger"
@@ -60,9 +61,9 @@ export interface SelectOption {
         </span>
       </button>
 
-      <!-- Dropdown Menu Popover -->
+      <!-- Dropdown Menu Popover (Option 1 - Floats Outside Card) -->
       @if (isOpen()) {
-        <div class="custom-select-menu" role="listbox">
+        <div class="custom-select-menu" [class.open-upward]="openUpward()" role="listbox">
           @for (opt of normalizedOptions(); track opt.value) {
             <div
               class="custom-select-option"
@@ -92,10 +93,16 @@ export interface SelectOption {
   `,
   styles: [`
     :host {
-      display: inline-block;
+      display: block;
       position: relative;
       user-select: none;
       font-family: inherit;
+      width: 100%;
+      z-index: 1;
+
+      &.is-open {
+        z-index: 1050;
+      }
     }
 
     .custom-select-container {
@@ -103,52 +110,58 @@ export interface SelectOption {
       display: flex;
       flex-direction: column;
       width: 100%;
+
+      &.is-open {
+        z-index: 1050;
+      }
     }
 
-    /* Floating/Top Label (Matching reference image) */
+    /* Option 1 Clean Top Label */
     .floating-label {
-      font-size: 11.5px;
+      display: block;
+      font-size: 13px;
       font-weight: 600;
-      color: #64748b;
-      margin-bottom: 4px;
+      color: #0f172a;
+      margin-bottom: 6px;
       letter-spacing: 0.01em;
       transition: color 0.15s ease;
     }
 
     .is-open .floating-label {
-      color: var(--role-accent, #2563eb);
+      color: var(--role-accent, #50ae9b);
     }
 
-    /* Trigger Button */
+    /* Option 1 Trigger Box */
     .custom-select-trigger {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
       height: 38px;
-      padding: 7px 14px;
+      padding: 8px 14px;
       background: #ffffff;
       border: 1px solid var(--line-strong, #cbd5e1);
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      font-size: 12.5px;
+      font-size: 13.5px;
       font-weight: 500;
       color: var(--text, #1e293b);
       text-align: left;
       outline: none;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      box-sizing: border-box;
       transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 
       &:hover:not(:disabled) {
-        border-color: #94a3b8;
+        border-color: var(--role-accent, #50ae9b);
         background-color: #f8fafc;
       }
 
       &:focus,
       &:focus-visible {
-        border-color: var(--role-accent, #2563eb);
-        box-shadow: 0 0 0 3px var(--role-soft, rgba(37, 99, 235, 0.12));
+        border-color: var(--role-accent, #50ae9b);
+        box-shadow: 0 0 0 3px var(--role-soft, rgba(80, 174, 155, 0.2));
       }
 
       &:disabled {
@@ -160,8 +173,8 @@ export interface SelectOption {
     }
 
     .is-open .custom-select-trigger {
-      border-color: var(--role-accent, #2563eb);
-      box-shadow: 0 0 0 3px var(--role-soft, rgba(37, 99, 235, 0.12));
+      border-color: var(--role-accent, #50ae9b);
+      box-shadow: 0 0 0 3px var(--role-soft, rgba(80, 174, 155, 0.2));
     }
 
     .selected-text {
@@ -181,42 +194,52 @@ export interface SelectOption {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #64748b;
+      color: #334155;
       transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
       flex-shrink: 0;
 
       &.rotated {
         transform: rotate(180deg);
-        color: var(--role-accent, #2563eb);
+        color: var(--role-accent, #50ae9b);
       }
     }
 
-    /* Dropdown Popover Menu */
+    /* Option 1 Dropdown Popover Menu (Floats cleanly outside over cards) */
     .custom-select-menu {
       position: absolute;
-      top: calc(100% + 5px);
+      top: calc(100% + 6px);
       left: 0;
       right: 0;
       min-width: 100%;
-      max-height: 230px;
+      max-height: 240px;
       overflow-y: auto;
       background: #ffffff;
       border: 1px solid var(--line-strong, #cbd5e1);
-      border-radius: 9px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.16), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
       z-index: 1050;
-      padding: 4px;
+      padding: 6px;
+      box-sizing: border-box;
       animation: selectDropdownIn 0.15s ease forwards;
+      scrollbar-width: thin;
+      scrollbar-color: var(--role-accent, #50ae9b) transparent;
 
-      /* Custom scrollbar with active theme pill (matching reference image) */
+      &.open-upward {
+        top: auto;
+        bottom: calc(100% + 6px);
+        animation: selectDropdownInUp 0.15s ease forwards;
+      }
+
+      /* Option 1 Pill Scrollbar matching role theme */
       &::-webkit-scrollbar {
-        width: 6px;
+        width: 5px;
       }
       &::-webkit-scrollbar-track {
         background: transparent;
+        margin: 6px 0;
       }
       &::-webkit-scrollbar-thumb {
-        background: var(--role-accent, #2563eb);
+        background: var(--role-accent, #50ae9b);
         border-radius: 9999px;
       }
     }
@@ -232,31 +255,55 @@ export interface SelectOption {
       }
     }
 
-    /* Option Items */
+    @keyframes selectDropdownInUp {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Option 1 Items matching role theme */
     .custom-select-option {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 12.5px;
+      margin-bottom: 2px;
+      border-radius: 8px;
+      font-size: 13.5px;
       font-weight: 500;
-      color: var(--text, #334155);
+      color: #334155;
       cursor: pointer;
       transition: all 0.12s ease;
 
-      /* Hover state according to theme */
-      &:hover {
-        background: var(--role-soft, #eff6ff);
-        color: var(--role-accent, #2563eb);
+      &:last-child {
+        margin-bottom: 0;
       }
 
-      /* Selected state according to theme */
+      /* Hover state */
+      &:hover {
+        background: var(--surface-2, #f8fafc);
+        color: #1e293b;
+      }
+
+      /* Selected state (matching role theme: soft accent pill highlight with bold text) */
       &.is-selected {
-        background: var(--role-soft, #eff6ff);
-        color: var(--role-accent, #2563eb);
+        background: var(--role-soft, rgba(80, 174, 155, 0.14));
+        color: var(--role-accent, #50ae9b);
         font-weight: 600;
+
+        &:hover {
+          background: var(--role-soft, rgba(80, 174, 155, 0.22));
+        }
+
+        .check-icon {
+          color: var(--role-accent, #50ae9b);
+        }
       }
     }
 
@@ -272,7 +319,7 @@ export interface SelectOption {
       font-weight: 600;
       padding: 2px 7px;
       border-radius: 999px;
-      background: var(--role-accent, #2563eb);
+      background: var(--role-accent, #50ae9b);
       color: #ffffff;
       line-height: 1.2;
     }
@@ -281,13 +328,13 @@ export interface SelectOption {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: var(--role-accent, #2563eb);
+      color: var(--role-accent, #50ae9b);
       flex-shrink: 0;
     }
   `]
 })
 export class CustomSelectComponent implements ControlValueAccessor {
-  @Input() options: (string | SelectOption)[] = [];
+  @Input() options: (string | number | SelectOption | any)[] = [];
   @Input() placeholder = 'Select an option';
   @Input() label?: string;
   @Input() minWidth?: string;
@@ -295,7 +342,12 @@ export class CustomSelectComponent implements ControlValueAccessor {
   @Output() selectionChange = new EventEmitter<any>();
 
   isOpen = signal(false);
+  openUpward = signal(false);
   currentValue: any = null;
+
+  @HostBinding('class.is-open') get hostIsOpen() {
+    return this.isOpen();
+  }
 
   private onChange: (val: any) => void = () => {};
   private onTouched: () => void = () => {};
@@ -303,11 +355,19 @@ export class CustomSelectComponent implements ControlValueAccessor {
   constructor(private elementRef: ElementRef) {}
 
   normalizedOptions(): SelectOption[] {
-    return this.options.map((opt) => {
-      if (typeof opt === 'string') {
-        return { value: opt, label: opt };
+    if (!Array.isArray(this.options)) return [];
+    return this.options.map((opt: any) => {
+      if (typeof opt === 'string' || typeof opt === 'number') {
+        return { value: opt, label: String(opt) };
       }
-      return opt;
+      if (opt && typeof opt === 'object') {
+        return {
+          value: opt.value !== undefined ? opt.value : (opt.id !== undefined ? opt.id : (opt.key !== undefined ? opt.key : opt)),
+          label: opt.label !== undefined ? opt.label : (opt.name !== undefined ? opt.name : (opt.title !== undefined ? opt.title : String(opt.value))),
+          badge: opt.badge
+        };
+      }
+      return { value: opt, label: String(opt) };
     });
   }
 
@@ -330,6 +390,11 @@ export class CustomSelectComponent implements ControlValueAccessor {
   toggleOpen(event: Event): void {
     event.stopPropagation();
     if (!this.disabled) {
+      if (!this.isOpen()) {
+        const rect = this.elementRef.nativeElement.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        this.openUpward.set(spaceBelow < 230 && rect.top > 230);
+      }
       this.isOpen.update((v) => !v);
     }
   }

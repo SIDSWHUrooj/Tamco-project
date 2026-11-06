@@ -1,7 +1,9 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { VendorApiService } from '../core/vendor-api.service';
+import { SageApiService } from '../core/sage-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
 import { CustomDatePickerComponent } from '../shared/custom-date-picker.component';
@@ -71,7 +73,7 @@ export interface VendorCatalogEntry {
 @Component({
   selector: 'app-orders-page',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
+  imports: [FormsModule, StatusComponent, IconComponent, CustomSelectComponent, CustomDatePickerComponent],
   styles: [`
     /* Option 6 Pill Capsule Tabs */
     .profile-tabs {
@@ -392,22 +394,6 @@ export interface VendorCatalogEntry {
     }
   `],
   template: `
-    <app-page-heading
-      eyebrow="Procurement Management"
-      [title]="role() === 'vendor' ? 'My Purchase Orders' : 'Purchase Orders Hub'"
-      [subtitle]="role() === 'vendor' ? 'Review released purchase orders, milestones, GRN acceptances and QC inspection results.' : 'Issue, inspect and release purchase orders matching TAMCO .NET Procurement & ERP workflows.'">
-      <div class="heading-actions">
-        <button class="btn secondary" (click)="exportPos()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          <span>Export PO Log</span>
-        </button>
-      </div>
-    </app-page-heading>
-
     <!-- Option 6 Pill Capsule Tabs Navigation -->
     <div class="profile-tabs">
       @if (role() !== 'vendor') {
@@ -768,18 +754,7 @@ export interface VendorCatalogEntry {
               <app-icon name="table" [size]="12" />
               <span>View in Register</span>
             </button>
-            @if (role() !== 'vendor') {
-              @if (currentPoStatus() === 'Pending') {
-                <button type="button" class="btn small" (click)="toggleCurrentPoApproval()" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span>Approve & Release to Supplier</span>
-                </button>
-              } @else {
-                <button type="button" class="btn secondary small" (click)="toggleCurrentPoApproval()" style="color: #dc3545; border-color: #fca5a5;">
-                  <span>Revoke Approval</span>
-                </button>
-              }
-            } @else {
+            @if (role() === 'vendor') {
               @if (!isVendorAcknowledged()) {
                 <button type="button" class="btn small" (click)="acknowledgeCurrentPo()" style="background: #004225; border-color: #004225; color: #ffffff; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -895,30 +870,6 @@ export interface VendorCatalogEntry {
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         <span>View</span>
                       </button>
-                      @if (role() !== 'vendor') {
-                        @if (po.approval === 'Pending') {
-                          <button class="btn-action btn-action-approve" (click)="toggleApproval(po.id)" title="Click to Approve Purchase Order">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                            <span>Approve</span>
-                          </button>
-                        } @else {
-                          <button class="btn-action btn-action-approved" (click)="toggleApproval(po.id)" title="Approved (Click to Revoke Approval)">
-                            <svg class="icon-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                            <svg class="icon-revoke" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                            <span class="text-approved">Approved</span>
-                            <span class="text-revoke">Revoke</span>
-                          </button>
-                        }
-                      }
-                      <button class="btn-action btn-action-save" (click)="savePo(po)" title="Save changes">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        <span>Save</span>
-                      </button>
-                      @if (role() !== 'vendor') {
-                        <button class="btn-action btn-action-delete" (click)="deletePo(po.id)" title="Delete Purchase Order">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                        </button>
-                      }
                     </div>
                   </td>
                 </tr>
@@ -1026,8 +977,10 @@ export interface VendorCatalogEntry {
     }
   `
 })
-export class OrdersPageComponent {
+export class OrdersPageComponent implements OnInit {
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
+  readonly sageApi = inject(SageApiService);
   readonly role = computed(() => this.state.role());
 
   // Active Tab:
@@ -1054,160 +1007,142 @@ export class OrdersPageComponent {
   ];
 
   // ---------------------------------------------------------------------------
-  // SCREEN 1 (Create PO) State - Matches Photo 2
+  // SCREEN 1 (Create PO) State
   // ---------------------------------------------------------------------------
-  createVendorId = 'VEN-10024';
-  createVendorName = 'ABC Supplies Pvt. Ltd.';
-  createPoDate = '2026-10-02';
-  createPoCategory = 'Electrical';
+  createVendorId = '';
+  createVendorName = '';
+  createPoDate = '';
+  createPoCategory = '';
 
-  createPoItems: CreatePoItem[] = [
-    { srNo: 1, itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
-    { srNo: 2, itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
-    { srNo: 3, itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
-  ];
+  createPoItems: CreatePoItem[] = [];
 
-  readonly vendorCatalog: VendorCatalogEntry[] = [
-    {
-      vendorId: 'VEN-10024',
-      vendorName: 'ABC Supplies Pvt. Ltd.',
-      category: 'Electrical',
-      contactPerson: 'Adnan Tariq',
-      items: [
-        { itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
-        { itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
-        { itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
-      ]
-    },
-    {
-      vendorId: 'VEN-10031',
-      vendorName: 'Perfect Industrial',
-      category: 'Mechanical',
-      contactPerson: 'Zubair Khan',
-      items: [
-        { itemNumber: 'PUMP-SEAL-150', description: 'Pump Mechanical Seal Kit', price: 1450, qty: 6 },
-        { itemNumber: 'IMP-ASSY-150', description: 'Impeller Assembly 150mm', price: 12800, qty: 2 }
-      ]
-    },
-    {
-      vendorId: 'VEN-10045',
-      vendorName: 'Global Traders',
-      category: 'Raw Materials',
-      contactPerson: 'Mohammad Al-Rashid',
-      items: [
-        { itemNumber: 'XLPE-120MM', description: 'XLPE Copper Cable 120mm²', price: 28, qty: 800 },
-        { itemNumber: 'DRUM-STEEL', description: 'Heavy Steel Cable Drum', price: 2150, qty: 4 }
-      ]
-    },
-    {
-      vendorId: 'VEN-10052',
-      vendorName: 'Gulf Electro Mechanical',
-      category: 'Electrical',
-      contactPerson: 'Farhan Zaidi',
-      items: [
-        { itemNumber: 'RELAY-AUX-24', description: 'Switchgear Auxiliary Relay 24V', price: 340, qty: 15 },
-        { itemNumber: 'EARTH-TAPE-CU', description: 'Earthing Copper Tape 25x3mm', price: 45, qty: 120 }
-      ]
-    },
-    {
-      vendorId: 'VEN-10060',
-      vendorName: 'Siemens Energy Middle East',
-      category: 'Electrical',
-      contactPerson: 'Klaus Schmidt',
-      items: [
-        { itemNumber: 'SIPROTEC-5', description: 'Digital Protection Relay SIPROTEC', price: 8200, qty: 4 },
-        { itemNumber: 'TEST-BLK-VT', description: 'CT/VT Secondary Test Block', price: 290, qty: 10 }
-      ]
-    }
-  ];
+  vendorCatalog: VendorCatalogEntry[] = [];
+
+  ngOnInit(): void {
+    this.loadBackendData();
+  }
+
+  loadBackendData(): void {
+    this.vendorApi.getVendorBasicInfo().subscribe(res => {
+      const list = res?.vendorBI_List || res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        for (const v of list) {
+          const vId = v.reQ_NO || v.vendorid || '';
+          const vName = v.vendoR_NAME || 'Unknown Supplier';
+          if (!vId) continue;
+          if (!this.vendorCatalog.some(e => e.vendorId === vId)) {
+            this.vendorCatalog.push({
+              vendorId: vId,
+              vendorName: vName,
+              category: v.category || 'Procurement Partner',
+              contactPerson: v.cT_PERSON || v.contact || 'Account Representative',
+              items: [
+                { itemNumber: 'GEN-001', description: `${vName} Contract Supply`, price: 1500, qty: 1 }
+              ]
+            });
+          }
+        }
+      }
+    });
+
+    // Also populate live Sage 300 ERP vendors
+    this.sageApi.getVendors().subscribe(sList => {
+      if (Array.isArray(sList) && sList.length > 0) {
+        for (const sv of sList) {
+          if (!this.vendorCatalog.some(e => e.vendorId === sv.VendorNumber)) {
+            this.vendorCatalog.push({
+              vendorId: sv.VendorNumber,
+              vendorName: sv.VendorName || sv.ShortName || sv.VendorNumber,
+              category: sv.GroupCode || 'ERP Partner',
+              contactPerson: sv.ShortName || 'Sales Representative',
+              items: [
+                { itemNumber: 'ERP-001', description: `${sv.VendorName} General Supply`, price: 2000, qty: 1 }
+              ]
+            });
+          }
+        }
+      }
+    });
+
+    // Populate live Sage 300 Purchase Orders
+    this.sageApi.getPurchaseOrders().subscribe(sagePos => {
+      if (Array.isArray(sagePos) && sagePos.length > 0) {
+        const detailed: DetailedPurchaseOrder[] = [];
+        const master: PurchaseOrder[] = [];
+
+        for (const sp of sagePos) {
+          const poNum = sp.PurchaseOrderNumber.trim();
+          const vName = sp.Name?.trim() || sp.Vendor?.trim() || 'Supplier';
+          const poDate = sp.PurchaseOrderDate ? sp.PurchaseOrderDate.substring(0, 10) : (sp.OrderDate ? sp.OrderDate.substring(0, 10) : '2026-10-20');
+          const arrDate = sp.ExpectedArrivalDate ? sp.ExpectedArrivalDate.substring(0, 10) : poDate;
+          const totalVal = sp.Total || sp.ExtendedCost || 0;
+          const statusApproval: 'Approved' | 'Pending' = sp.Completed ? 'Approved' : 'Pending';
+
+          detailed.push({
+            purchaseOrderNumber: poNum,
+            vendorId: sp.Vendor?.trim() || '',
+            vendorName: vName,
+            purchaseOrderDate: poDate,
+            arrivalDate: arrDate,
+            paymentTerm: sp.TermsCode || 'Net 30 Days',
+            description: sp.Description || `PO for ${vName}`,
+            comments: sp.Comment || '',
+            items: [
+              {
+                srNo: 1,
+                itemNumber: poNum,
+                description: sp.Description || `${vName} Contract Supply`,
+                qty: sp.QuantityOrdered || 1,
+                uom: 'PCS',
+                cost: totalVal
+              }
+            ]
+          });
+
+          master.push({
+            id: poNum,
+            vendor: vName,
+            category: sp.Description || 'Procurement',
+            amount: totalVal,
+            requiredDate: arrDate,
+            arrivalDate: poDate,
+            approval: statusApproval,
+            grn: sp.Completed ? 'Passed' : 'Pending',
+            qc: sp.Completed ? 'Passed' : 'Pending'
+          });
+        }
+
+        this.detailedPos = detailed;
+        this.poList = master;
+        this.state.purchaseOrders.set(master);
+
+        // Pre-select first PO in viewer if none selected yet
+        if (!this.currentPoNumber && detailed.length > 0) {
+          this.selectDetailedPo(detailed[0]);
+        }
+      }
+    });
+  }
 
   // ---------------------------------------------------------------------------
-  // SCREEN 2 (Purchase Order Inspector) State - Matches Photo 1
+  // SCREEN 2 (Purchase Order Inspector) State
   // ---------------------------------------------------------------------------
-  currentPoNumber = 'PO-002345';
-  currentPoVendorId = 'VEN-10024';
-  currentPoDate = '2026-08-12';
-  currentPoArrivalDate = '2026-08-27';
-  currentPoPaymentTerm = 'Net 30 Days';
-  currentPoDescription = 'Electrical — LV Switchgear & Control Cable Lot';
-  currentPoComments = 'Deliver to Warehouse 2, standard manufacturer test certificate required.';
+  currentPoNumber = '';
+  currentPoVendorId = '';
+  currentPoDate = '';
+  currentPoArrivalDate = '';
+  currentPoPaymentTerm = '';
+  currentPoDescription = '';
+  currentPoComments = '';
 
-  currentPoItems: DetailedPoItem[] = [
-    { srNo: 1, itemNumber: 'SWG-GIS-11KV', description: '11kV GIS Incoming Panel', qty: 2, uom: 'SET', cost: 18500 },
-    { srNo: 2, itemNumber: 'CBL-CTL-4C', description: 'Control Cable 4C 2.5mm', qty: 500, uom: 'MTR', cost: 12 },
-    { srNo: 3, itemNumber: 'MCCB-250A-4P', description: 'Spare MCCB 250A 4-Pole', qty: 8, uom: 'PCS', cost: 420 }
-  ];
+  currentPoItems: DetailedPoItem[] = [];
 
-  detailedPos: DetailedPurchaseOrder[] = [
-    {
-      purchaseOrderNumber: 'PO-002345',
-      vendorId: 'VEN-10024',
-      vendorName: 'ABC Supplies Pvt. Ltd.',
-      purchaseOrderDate: '2026-08-12',
-      arrivalDate: '2026-08-27',
-      paymentTerm: 'Net 30 Days',
-      description: 'Electrical — LV Switchgear & Control Cable Lot',
-      comments: 'Deliver to Warehouse 2, standard manufacturer test certificate required.',
-      items: [
-        { srNo: 1, itemNumber: 'SWG-GIS-11KV', description: '11kV GIS Incoming Panel', qty: 2, uom: 'SET', cost: 18500 },
-        { srNo: 2, itemNumber: 'CBL-CTL-4C', description: 'Control Cable 4C 2.5mm', qty: 500, uom: 'MTR', cost: 12 },
-        { srNo: 3, itemNumber: 'MCCB-250A-4P', description: 'Spare MCCB 250A 4-Pole', qty: 8, uom: 'PCS', cost: 420 }
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002334',
-      vendorId: 'VEN-10024',
-      vendorName: 'ABC Supplies Pvt. Ltd.',
-      purchaseOrderDate: '2026-08-04',
-      arrivalDate: '2026-08-22',
-      paymentTerm: 'Net 45 Days',
-      description: 'Safety Equipment — PPE Lot for Substations',
-      comments: 'Arc-rated EN standards compliance certificate attached.',
-      items: [
-        { srNo: 1, itemNumber: 'PPE-FR-COV', description: 'FR Coverall — Arc Rated 40 cal', qty: 40, uom: 'SET', cost: 185 },
-        { srNo: 2, itemNumber: 'PPE-HLM-VSR', description: 'Safety Helmet with Face Visor', qty: 40, uom: 'PCS', cost: 42 },
-        { srNo: 3, itemNumber: 'GLV-INS-CL2', description: 'Insulated Gloves Class 2 17kV', qty: 20, uom: 'PAIR', cost: 68 }
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002321',
-      vendorId: 'VEN-10031',
-      vendorName: 'Perfect Industrial',
-      purchaseOrderDate: '2026-07-28',
-      arrivalDate: '2026-08-21',
-      paymentTerm: 'Net 30 Days',
-      description: 'Mechanical Parts — Heavy Duty Pump Spares',
-      comments: 'OEM warranty certificates with shipment.',
-      items: [
-        { srNo: 1, itemNumber: 'SEAL-PUMP-150', description: 'Pump Mechanical Seal Kit 150mm', qty: 6, uom: 'PCS', cost: 1450 },
-        { srNo: 2, itemNumber: 'IMP-ASSY-BRNZ', description: 'Impeller Assembly Bronze 150mm', qty: 2, uom: 'SET', cost: 12800 }
-      ]
-    },
-    {
-      purchaseOrderNumber: 'PO-002315',
-      vendorId: 'VEN-10045',
-      vendorName: 'Global Traders',
-      purchaseOrderDate: '2026-07-18',
-      arrivalDate: '2026-08-14',
-      paymentTerm: 'Letter of Credit (LC)',
-      description: 'Raw Materials — High Voltage Copper Cables',
-      comments: 'Inspected by third party BV inspector prior to dispatch.',
-      items: [
-        { srNo: 1, itemNumber: 'CBL-CU-120MM', description: 'XLPE Copper Cable 120mm² High Voltage', qty: 800, uom: 'MTR', cost: 28 },
-        { srNo: 2, itemNumber: 'DRM-STL-HD', description: 'Heavy Steel Cable Drum 1200mm', qty: 4, uom: 'PCS', cost: 2150 }
-      ]
-    }
-  ];
+  detailedPos: DetailedPurchaseOrder[] = [];
 
   // ---------------------------------------------------------------------------
   // SCREEN 3 (Master PO Register) State
   // ---------------------------------------------------------------------------
-  poList: PurchaseOrder[] = [
-    { id: 'PO-002345', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Electrical', amount: 52000, requiredDate: '2026-08-25', arrivalDate: '2026-08-27', approval: 'Pending', grn: 'Pending', qc: 'Pending' },
-    { id: 'PO-002334', vendor: 'ABC Supplies Pvt. Ltd.', category: 'Safety Equipment', amount: 18600, requiredDate: '2026-08-22', arrivalDate: '2026-08-22', approval: 'Approved', grn: 'Passed', qc: 'Passed' },
-    { id: 'PO-002321', vendor: 'Perfect Industrial', category: 'Mechanical', amount: 43800, requiredDate: '2026-08-19', arrivalDate: '2026-08-21', approval: 'Approved', grn: 'Passed', qc: 'Pending' },
-    { id: 'PO-002315', vendor: 'Global Traders', category: 'Raw Materials', amount: 31500, requiredDate: '2026-08-15', arrivalDate: '2026-08-14', approval: 'Approved', grn: 'Passed', qc: 'Passed' }
-  ];
+  poList: PurchaseOrder[] = [];
 
   constructor() {
     if (this.role() === 'vendor') {
@@ -1258,15 +1193,11 @@ export class OrdersPageComponent {
   }
 
   refreshPoCreate(): void {
-    this.createVendorId = 'VEN-10024';
-    this.createVendorName = 'ABC Supplies Pvt. Ltd.';
+    this.createVendorId = '';
+    this.createVendorName = '';
     this.createPoDate = new Date().toISOString().substring(0, 10);
-    this.createPoCategory = 'Electrical';
-    this.createPoItems = [
-      { srNo: 1, itemNumber: 'GIS-11KV-01', description: '11kV GIS Incoming Panel', price: 18500, qty: 2 },
-      { srNo: 2, itemNumber: 'CBL-4C-2.5', description: 'Control Cable 4C 2.5mm', price: 12, qty: 500 },
-      { srNo: 3, itemNumber: 'MCCB-250A', description: 'Spare MCCB 250A breaker', price: 420, qty: 8 }
-    ];
+    this.createPoCategory = '';
+    this.createPoItems = [];
     this.state.notify('Create PO form refreshed.');
   }
 
@@ -1406,10 +1337,6 @@ export class OrdersPageComponent {
     return match ? match.approval : 'Pending';
   }
 
-  toggleCurrentPoApproval(): void {
-    this.toggleApproval(this.currentPoNumber);
-  }
-
   isVendorAcknowledged(): boolean {
     const match = this.poList.find(p => p.id === this.currentPoNumber);
     return match ? match.approval === 'Approved' : false;
@@ -1430,7 +1357,10 @@ export class OrdersPageComponent {
   filteredPos(): PurchaseOrder[] {
     let list = this.poList;
     if (this.role() === 'vendor') {
-      list = list.filter(po => (po.vendor || '').includes('ABC Supplies'));
+      const vName = this.state.currentVendorName() || this.state.currentUser()?.name;
+      if (vName) {
+        list = list.filter(po => (po.vendor || '').toLowerCase().includes(vName.toLowerCase()));
+      }
     }
     const q = this.searchQuery.trim().toLowerCase();
     const af = this.approvalFilter;
@@ -1453,31 +1383,5 @@ export class OrdersPageComponent {
 
   pendingApprovalCount(): number {
     return this.poList.filter(po => po.approval === 'Pending').length;
-  }
-
-  toggleApproval(id: string): void {
-    const po = this.poList.find(p => p.id === id);
-    if (!po) return;
-
-    if (po.approval === 'Pending') {
-      po.approval = 'Approved';
-      this.state.notify(`Purchase Order ${id} approved and released.`);
-    } else {
-      po.approval = 'Pending';
-      this.state.notify(`Purchase Order ${id} reverted to Pending.`);
-    }
-  }
-
-  savePo(po: PurchaseOrder): void {
-    this.state.notify(`PO ${po.id} saved.`);
-  }
-
-  deletePo(id: string): void {
-    this.poList = this.poList.filter(po => po.id !== id);
-    this.state.notify(`PO ${id} cancelled and deleted.`);
-  }
-
-  exportPos(): void {
-    this.state.notify('Exporting Purchase Order register to Excel...');
   }
 }

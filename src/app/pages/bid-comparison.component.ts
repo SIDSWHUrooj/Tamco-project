@@ -3,37 +3,19 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PortalStateService } from '../core/portal-state.service';
-import { PageHeadingComponent, StatusComponent } from '../shared/ui.component';
+import { VendorApiService, PCOMPAREModel } from '../core/vendor-api.service';
+import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
-import { ItemBidComparison, Requisition, VendorBidDetail } from '../core/models';
+import { ItemBidComparison, Requisition, VendorBidDetail, LogisticCost } from '../core/models';
 
 @Component({
   selector: 'app-bid-comparison',
   standalone: true,
-  imports: [FormsModule, PageHeadingComponent, StatusComponent, IconComponent],
+  imports: [FormsModule, StatusComponent, IconComponent],
   template: `
-    <app-page-heading
-      eyebrow="Procedural Procurement"
-      title="Bid Comparison & Approval (/Comparison)"
-      subtitle="Side-by-side quotation comparison with Sage exchange rates, UAE 5% VAT, assigned logistics breakdown, landed cost calculations, and 1-click PO release."
-    >
-      <div class="heading-actions">
-        <button
-          type="button"
-          class="btn"
-          style="background-color: var(--role-accent, #2563eb); border-color: var(--role-accent, #2563eb); display: inline-flex; align-items: center; gap: 6px;"
-          (click)="navigateToLogisticCosts()"
-        >
-          <app-icon name="logistic-cost" [size]="15" />
-          <span>Assign Logistic Costs</span>
-        </button>
-        <button type="button" class="btn secondary" (click)="exportAnalysis()">Export Comparison</button>
-      </div>
-    </app-page-heading>
-
-
-    <!-- Option 6 Pill Capsule Tabs Navigation -->
-    <div class="profile-tabs">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap;">
+      <!-- Option 6 Pill Capsule Tabs Navigation -->
+      <div class="profile-tabs" style="margin-bottom: 0;">
       <button
         type="button"
         [class.active]="activeTab === 'evaluation'"
@@ -52,6 +34,17 @@ import { ItemBidComparison, Requisition, VendorBidDetail } from '../core/models'
         <span>Comparison Approval</span>
       </button>
     </div>
+
+    <button
+      type="button"
+      class="btn"
+      style="background-color: var(--role-accent, #2563eb); border-color: var(--role-accent, #2563eb); display: inline-flex; align-items: center; gap: 6px;"
+      (click)="navigateToLogisticCosts()"
+    >
+      <app-icon name="logistic-cost" [size]="15" />
+      <span>Assign Logistic Costs</span>
+    </button>
+  </div>
 
     <!-- REQUISITION DETAILS HEADER CARD (Matching Screenshots 1 & 2) -->
     <article class="panel req-header-panel">
@@ -1008,6 +1001,7 @@ export class BidComparisonComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly state = inject(PortalStateService);
+  readonly vendorApi = inject(VendorApiService);
 
   // --- TAB NAVIGATION (Screenshots 1 & 2) ---
   // 'evaluation' -> Tab 1: Bid Comparison (Buyer - Comparison.cshtml - Photo 2)
@@ -1023,13 +1017,13 @@ export class BidComparisonComponent implements OnInit {
   });
 
   // --- REQUISITION HEADER DATA ---
-  selectedReqNo = 'REQ-2024-001';
+  selectedReqNo = '';
   showReqSearchModal = false;
   reqModalSearch = '';
 
   // --- BID COMPARISON DECK STATE ---
   activeDeckItem: ItemBidComparison | null = null;
-  selectedWinnerVendorId = 'VEN-10024';
+  selectedWinnerVendorId = '';
   cardCurrencyMode: Record<string, 'vendor' | 'aed'> = {};
 
   ngOnInit(): void {
@@ -1039,11 +1033,105 @@ export class BidComparisonComponent implements OnInit {
       }
     });
 
-    // Default open comparison deck for item IC-1001 if available
-    const item = this.comparisonItems()[0];
-    if (item) {
-      this.openComparisonDeck(item);
-    }
+    this.loadRequisitions();
+  }
+
+  loadRequisitions(): void {
+    this.vendorApi.getRequestHeaders().subscribe({
+      next: (res) => {
+        const headers = res?.reqH_List || res?.reqh_List || res?.reQH_List || res?.reqhList || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(headers) && headers.length > 0) {
+          if (!this.selectedReqNo) {
+            this.selectedReqNo = headers[0].reQ_NO || headers[0].reqno || '';
+          }
+          this.loadComparisonData();
+        }
+      },
+      error: (err) => console.warn('getRequestHeaders error:', err)
+    });
+  }
+
+  loadComparisonData(): void {
+    if (!this.selectedReqNo) return;
+
+    // 1. Fetch live logistics from DB
+    this.vendorApi.getLogisticsList(this.selectedReqNo).subscribe({
+      next: (res) => {
+        const list = res?.readdcostList || res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const mappedCosts: LogisticCost[] = list.map((row: any) => ({
+            id: `${row.reQ_NO || row.reqno}_${row.itemnum}_${row.linenum || Math.random()}`,
+            reqNo: row.reQ_NO || row.reqno || '',
+            itemNo: row.itemnum || '',
+            vendorName: row.vendoR_ID || row.vendorname || '',
+            type: (row.type?.toLowerCase().includes('freight') || row.type?.toLowerCase().includes('frieght'))
+              ? 'Freight'
+              : (row.type?.toLowerCase().includes('insur') ? 'Insurance' : 'Other'),
+            currency: (row.currency || 'AED') as any,
+            amount: Number(row.samount || row.famount || 0),
+            remarks: row.remarks || ''
+          }));
+          this.state.logisticCosts.set(mappedCosts);
+        }
+      },
+      error: (err) => console.warn('getLogisticsList error:', err)
+    });
+
+    // 2. Fetch live price comparisons from DB
+    this.vendorApi.getPriceCompareList(this.selectedReqNo).subscribe({
+      next: (res) => {
+        const list = res?.pcomparE_List || res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const itemMap = new Map<string, ItemBidComparison>();
+
+          for (const row of list) {
+            const itemNo = row.itemnum || 'General Item';
+            let comp = itemMap.get(itemNo);
+            if (!comp) {
+              comp = {
+                reqNo: row.reqno || this.selectedReqNo,
+                itemNo: itemNo,
+                itemDesc: `Item ${itemNo}`,
+                qty: Number(row.qty || 1),
+                deliveryDate: row.audtdate ? String(row.audtdate).substring(0, 10) : new Date().toISOString().substring(0, 10),
+                winningVendorId: row.action === 1 ? (row.vendorid || row.vendoR_NAME) : undefined,
+                status: row.action === 1 ? 'Approved' : 'Pending',
+                bids: []
+              };
+              itemMap.set(itemNo, comp);
+            }
+
+            const vendorName = row.vendoR_NAME || row.vendorid || 'Vendor';
+            const existingBid = comp.bids.find(b => b.vendorName === vendorName);
+            if (!existingBid) {
+              comp.bids.push({
+                vendorId: row.vendorid || vendorName,
+                vendorName: vendorName,
+                currency: row.currency || 'AED',
+                price: Number(row.price || 0),
+                exchangeRateToAed: 1,
+                validityDate: '',
+                deliveryDate: '',
+                insuranceCost: 0,
+                insuranceCurrency: 'AED',
+                freightCost: 0,
+                freightCurrency: 'AED',
+                otherCost: 0,
+                otherCurrency: 'AED',
+                selected: row.action === 1
+              });
+            }
+          }
+
+          const liveComps = Array.from(itemMap.values());
+          if (liveComps.length > 0) {
+            this.state.itemBidComparisons.set(liveComps);
+            this.openComparisonDeck(liveComps[0]);
+          }
+        }
+      },
+      error: (err) => console.warn('getPriceCompareList error:', err)
+    });
   }
 
   currentReq = computed<Requisition | undefined>(() => {
@@ -1077,11 +1165,14 @@ export class BidComparisonComponent implements OnInit {
   selectRequisitionFromModal(docNo: string): void {
     this.selectedReqNo = docNo;
     this.showReqSearchModal = false;
+    this.loadComparisonData();
     this.activeDeckItem = this.comparisonItems()[0] || null;
     this.state.notify(`Requisition ${docNo} loaded.`);
   }
 
   refreshRequisition(): void {
+    this.loadRequisitions();
+    this.loadComparisonData();
     this.state.notify(`Requisition ${this.selectedReqNo} refreshed from ERP database.`);
   }
 
@@ -1179,7 +1270,21 @@ export class BidComparisonComponent implements OnInit {
   recommendWinner(): void {
     if (!this.activeDeckItem || !this.selectedWinnerVendorId) return;
     this.activeDeckItem.winningVendorId = this.selectedWinnerVendorId;
-    this.state.notify(`Winning recommendation (${this.getWinningVendorName()}) saved for ${this.activeDeckItem.itemNo}. Routed for Manager Sign-off.`);
+
+    const payload: PCOMPAREModel = {
+      coperation: 2,
+      reqno: this.selectedReqNo,
+      itemnum: this.activeDeckItem.itemNo,
+      vendorid: this.selectedWinnerVendorId,
+      vendoR_NAME: this.getWinningVendorName(),
+      qty: this.activeDeckItem.qty,
+      action: 0,
+      isactive: 0
+    };
+    this.vendorApi.savePriceCompare(payload).subscribe({
+      next: () => this.state.notify(`Winning recommendation (${this.getWinningVendorName()}) saved to database for ${this.activeDeckItem?.itemNo}.`),
+      error: (err) => console.warn('savePriceCompare recommendation error:', err)
+    });
   }
 
   submitEvaluationBatch(): void {
@@ -1196,6 +1301,24 @@ export class BidComparisonComponent implements OnInit {
     this.state.approveItemComparison(this.selectedReqNo, this.activeDeckItem.itemNo, this.selectedWinnerVendorId);
     this.activeDeckItem.status = 'Approved';
     this.activeDeckItem.winningVendorId = this.selectedWinnerVendorId;
+
+    const payload: PCOMPAREModel = {
+      coperation: 2,
+      reqno: this.selectedReqNo,
+      itemnum: this.activeDeckItem.itemNo,
+      vendorid: this.selectedWinnerVendorId,
+      vendoR_NAME: this.getWinningVendorName(),
+      qty: this.activeDeckItem.qty,
+      action: 1,
+      isactive: 1
+    };
+    this.vendorApi.savePriceCompare(payload).subscribe({
+      next: () => {
+        this.loadComparisonData();
+        this.state.notify(`Comparison approval signed off and saved to database for ${this.activeDeckItem?.itemNo}.`);
+      },
+      error: (err) => console.warn('savePriceCompare approval error:', err)
+    });
   }
 
   rejectComparison(): void {
@@ -1212,9 +1335,5 @@ export class BidComparisonComponent implements OnInit {
     this.router.navigate([`/${role}/logistic-cost`], {
       queryParams: { reqNo: this.selectedReqNo }
     });
-  }
-
-  exportAnalysis(): void {
-    this.state.notify('Exporting Procedural Bid Comparison Report (Excel)...');
   }
 }
