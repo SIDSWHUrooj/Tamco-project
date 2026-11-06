@@ -23,8 +23,10 @@ export interface VREGModel {
   faxnumber?: string;
   website?: string;
   isactive?: number;
-  tL_EXPIRY?: string;
+  date?: string | null;
+  tL_EXPIRY?: string | null;
   corP_TAX?: string;
+  auddate?: string | null;
   auduser?: string;
   [key: string]: any;
 }
@@ -92,11 +94,13 @@ export interface VDOCSModel {
   doC_NAME?: string;
   filename?: string;
   url?: string;
-  expdate?: string;
-  docdate?: string;
+  expdate?: string | null;
+  docdate?: string | null;
   exP_FLAG?: boolean | number | string;
   linenum?: number;
   isactive?: number;
+  auddate?: string | null;
+  auduser?: string;
   [key: string]: any;
 }
 
@@ -613,9 +617,22 @@ export class VendorApiService {
   }
 
   saveVendorRegistration(data: Partial<VREGModel>, op: number = 2): Observable<any> {
+    const sanitizeDate = (val: any) => {
+      if (!val || typeof val !== 'string' || val.trim() === '') return null;
+      try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d.toISOString();
+      } catch {
+        return null;
+      }
+    };
+
     const body: VREGModel = {
       coperation: op,
-      ...data
+      ...data,
+      tL_EXPIRY: sanitizeDate(data.tL_EXPIRY),
+      date: sanitizeDate(data.date),
+      auddate: sanitizeDate(data.auddate)
     };
     return this.http.post(`${this.baseUrl}/AUDVendorRegistration`, body);
   }
@@ -741,9 +758,22 @@ export class VendorApiService {
   }
 
   saveVendorDocument(data: Partial<VDOCSModel>, op: number = 2): Observable<any> {
+    const sanitizeDate = (val: any) => {
+      if (!val || typeof val !== 'string' || val.trim() === '') return null;
+      try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d.toISOString();
+      } catch {
+        return null;
+      }
+    };
+
     const body: VDOCSModel = {
       coperation: op,
-      ...data
+      ...data,
+      expdate: sanitizeDate(data.expdate),
+      docdate: sanitizeDate(data.docdate),
+      auddate: sanitizeDate(data.auddate)
     };
     return this.http.post(`${this.baseUrl}/AUDVendorDocument`, body);
   }

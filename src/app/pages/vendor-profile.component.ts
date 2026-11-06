@@ -3770,9 +3770,13 @@ export class VendorProfileComponent implements OnInit {
         this.isSavingProfile = false;
         this.state.notify('Registration draft saved successfully to backend.');
       },
-      error: () => {
+      error: (err) => {
         this.isSavingProfile = false;
-        this.state.notify('Registration draft saved locally.');
+        console.error('saveDraft failed:', err);
+        const errMsg = err?.error?.errors
+          ? Object.entries(err.error.errors).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join(' | ')
+          : (err?.error?.title || err?.message || 'Server error');
+        this.state.notify(`❌ Draft save failed: ${errMsg}`);
       }
     });
   }
@@ -3851,30 +3855,13 @@ export class VendorProfileComponent implements OnInit {
         this.router.navigate([], { relativeTo: this.route, queryParams: { mode: 'review' } });
         this.state.notify('🎉 Application submitted successfully to the server! Internal review initiated.');
       },
-      error: () => {
+      error: (err) => {
         this.isSavingProfile = false;
-        this.state.submitVendorProfile({
-          id: this.form.code,
-          company: this.form.company,
-          location: this.form.city,
-          categories: categories.length ? categories : ['Electrical', 'Industrial Safety', 'Mechanical'],
-          bank: primaryBank.bankName,
-          iban: primaryBank.iban,
-          accountTitle: primaryBank.accountTitle,
-          branch: `${this.form.city} Main Branch`,
-          notes: `Trade Lic: ${this.form.tradeLicense} (Exp: ${this.form.tradeLicenseExpiry}) | VAT: ${this.form.vatNumber} | Corp Tax: ${this.form.corporateTax}`
-        });
-
-        // Strictly transition to Review Mode (1)
-        this.setLifecycleStatus(1);
-        try {
-          if (typeof window !== 'undefined') {
-            const user = this.state.currentUser()?.username;
-            if (user) localStorage.setItem(`vreg_submitted_${user}`, 'true');
-          }
-        } catch {}
-        this.router.navigate([], { relativeTo: this.route, queryParams: { mode: 'review' } });
-        this.state.notify('🎉 Application submitted locally! Internal review initiated.');
+        console.error('saveVendorRegistration failed:', err);
+        const errMsg = err?.error?.errors
+          ? Object.entries(err.error.errors).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join(' | ')
+          : (err?.error?.title || err?.message || 'Server error');
+        this.state.notify(`❌ Submission rejected by server: ${errMsg}`);
       }
     });
   }
