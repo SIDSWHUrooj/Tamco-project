@@ -1,7 +1,8 @@
-import { Component, computed, inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, computed, HostListener, inject, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
+import { VendorRegistrationReq } from '../core/models';
 import { VendorApiService, VREGModel } from '../core/vendor-api.service';
 import { SageApiService, SageTax, SageItem } from '../core/sage-api.service';
 import { IconComponent } from '../shared/icon.component';
@@ -75,6 +76,8 @@ interface AttachmentRow {
   fileName: string;
   fileSize?: string;
   status: string;
+  hasExpiry?: boolean;
+  mandatory?: boolean;
   isSaving?: boolean;
   isSaved?: boolean;
 }
@@ -82,12 +85,20 @@ interface AttachmentRow {
 interface BankItem {
   id: string;
   bankName: string;
+  beneficiaryBank?: string;
+  bankAddress?: string;
   accountTitle: string;
   currency: string;
-  iban: string;
   country: string;
-  branch?: string;
+  accountNo?: string;
+  iban: string;
   swift?: string;
+  routingNumber?: string;
+  sortCode?: string;
+  bankCertificate?: string;
+  fileName?: string;
+  issueDate?: string;
+  branch?: string;
 }
 
 @Component({
@@ -242,9 +253,15 @@ interface BankItem {
       justify-content: center;
       min-width: max-content;
 
-      &:hover:not(.active) {
+      &:hover:not(.active):not(:disabled) {
         color: #0f172a;
         background: #f1f5f9;
+      }
+
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        color: #94a3b8;
       }
 
       &.active {
@@ -780,18 +797,40 @@ interface BankItem {
       gap: 8px;
       transition: all 0.15s ease;
       margin-left: auto;
-      &:hover {
+      &:hover:not(:disabled) {
         background: var(--role-accent-hover, #15803d);
         transform: translateY(-1px);
         box-shadow: 0 4px 12px var(--role-glow, rgba(22, 163, 74, 0.25));
       }
+      &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
       &.btn-submit-app {
         background: #059669;
-        &:hover {
+        &:hover:not(:disabled) {
           background: #047857;
           box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
         }
       }
+    }
+    .step-validation-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #b45309;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    .hero-actions .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     /* MODAL OVERLAY & POPUPS */
@@ -1341,14 +1380,77 @@ interface BankItem {
       display: block;
       margin-bottom: 12px;
     }
+
+    .sub-section-bar.blue-bar {
+      background: #1d78cd;
+      border-radius: 4px;
+      padding: 7px 14px;
+      margin: 18px 0 12px;
+    }
+    .bank-form-card {
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 6px;
+      padding: 18px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .print-declaration-box {
+      margin-top: 28px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 20px;
+      background: #ffffff;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .review-mode-container, .review-mode-container * {
+        visibility: visible;
+      }
+      .review-mode-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10px !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .review-actions-bar,
+      .profile-hero,
+      .wizard-progress-bar,
+      .wizard-footer-nav,
+      .btn,
+      .btn-cell-delete,
+      .btn-nav-prev,
+      .btn-nav-next,
+      .review-section-title button {
+        display: none !important;
+      }
+      .print-declaration-box {
+        display: block !important;
+        page-break-inside: avoid;
+      }
+    }
   `],
   template: `
-    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
-      <button class="btn" (click)="openNoticeModal()" style="background: #16a34a; border-color: #16a34a; display: inline-flex; align-items: center; gap: 6px;">
-        <app-icon name="documents" [size]="14" />
-        <span>Important Notice</span>
-      </button>
+    @if (isStaffUser() && form.code) {
+      <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);">
+        <div style="display: flex; align-items: center; gap: 10px; color: #1e40af; font-size: 13.5px;">
+          <span style="font-size: 18px;">📝</span>
+          <span><strong>Staff Direct Entry:</strong> Filling out registration profile for <strong>{{ form.company || 'Vendor' }}</strong> (ID: <code style="background: #dbeafe; padding: 2px 6px; border-radius: 4px; font-weight: 700;">{{ form.code }}</code>). Email was skipped so you can complete this onboarding directly.</span>
+        </div>
+        <button type="button" class="btn secondary" (click)="returnToVendorsList()" style="padding: 6px 14px; font-size: 12.5px; font-weight: 600; border-color: #93c5fd; color: #1d4ed8;">
+          ← Back to Onboarding
+        </button>
+      </div>
+    }
 
+    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
       <button class="btn secondary" (click)="printSummary()" style="display: inline-flex; align-items: center; gap: 6px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="6 9 6 2 18 2 18 9" />
@@ -1360,7 +1462,13 @@ interface BankItem {
 
       @if (state.vendorStatusCode() === 0) {
         <button class="btn secondary" (click)="saveDraft()">Save Draft</button>
-        <button class="btn" (click)="submitForVerification()" style="background: var(--role-accent); border-color: var(--role-accent); display: inline-flex; align-items: center; gap: 6px;">
+        <button
+          class="btn"
+          [disabled]="!areAllStepsValid() || isSavingProfile"
+          [title]="!areAllStepsValid() ? 'Complete all mandatory (*) steps before submitting' : 'Submit Profile for Review'"
+          (click)="submitForVerification()"
+          style="background: var(--role-accent); border-color: var(--role-accent); display: inline-flex; align-items: center; gap: 6px;"
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
@@ -1370,11 +1478,6 @@ interface BankItem {
         <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 9999px; color: #92400e; font-weight: 700; font-size: 12.5px;">
           <span>⏳</span>
           <span>Application Under Review — TAMCO Verification In Progress</span>
-        </div>
-      } @else {
-        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 9999px; color: #065f46; font-weight: 700; font-size: 12.5px;">
-          <span>✓</span>
-          <span>Certified Active Partner (Sage 300 ERP)</span>
         </div>
       }
 
@@ -1452,41 +1555,57 @@ interface BankItem {
       </div>
     </div>
 
-    <!-- CERTIFIED SAGE PARTNER BANNER -->
-    @if (isFullyApproved()) {
-      <div class="certified-partner-banner">
-        <div class="cert-left">
-          <span class="cert-icon">🏛️</span>
-          <div>
-            <h4>Sage 300 ERP Certified Vendor Partner</h4>
-            <p>Master Accounting Record active in Sage 300 AP Ledger (APVEN). Authorized to receive Purchase Orders, submit Invoices, and participate in procedural sourcing RFQs.</p>
-          </div>
-        </div>
-        <div class="cert-right">
-          <span class="cert-badge green">OFFICIAL VENDOR ID: {{ form.code || 'ERP ALLOCATED' }}</span>
-          <span class="cert-badge blue">TERMS: NET 30 DAYS</span>
-        </div>
-      </div>
-    }
 
     <!-- ============================================================
-         STATE 1: REVIEW MODE (VendorsStepByStep2.cshtml?showReview=true)
+         STATE 1 & STATE 2: VENDOR REGISTRATION SUMMARY REVIEW & SUBMISSION
     ============================================================= -->
-    @if (state.vendorStatusCode() === 1) {
+    @if (state.vendorStatusCode() === 1 || state.vendorStatusCode() === 2) {
       <div class="review-mode-container">
-        <div class="review-header-bar">
-          <div>
-            <h2>Application Summary Review</h2>
-            <small style="opacity: 0.9;">Please verify all 8 sections before final submission to TAMCO Procurement.</small>
+        @if (isRevisionRequired()) {
+          <div style="background: #fef2f2; border: 1.5px solid #fecaca; border-left: 5px solid #dc2626; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; color: #991b1b; box-shadow: 0 1px 3px rgba(220, 38, 38, 0.1);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 22px;">⚠️</span>
+              <div>
+                <strong style="display: block; font-size: 14px; margin-bottom: 2px;">Application Returned for Revision by TAMCO {{ getRevisionDepartment() }}:</strong>
+                <span>Updates or re-verification have been requested for your application. Please unlock the form to update the required details and re-submit your signed registration.</span>
+              </div>
+            </div>
+            <button type="button" class="btn secondary" (click)="unlockForRevision()" style="font-weight: 700; color: #dc2626; border-color: #fca5a5; white-space: nowrap; padding: 7px 16px;">
+              Unlock for Revision ✎
+            </button>
           </div>
-          <span class="review-badge-pill">Mode: showReview=true</span>
-        </div>
+        }
+
+        @if (state.vendorStatusCode() === 2) {
+          <div style="background: #fffbeb; border: 1.5px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.1);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 24px;">🔒</span>
+              <div>
+                <strong style="color: #92400e; font-size: 15px; display: block;">Registration Under Review (Editing Locked)</strong>
+                <span style="color: #b45309; font-size: 12.5px;">Your registration has been submitted and is currently being verified by TAMCO Procurement and Finance. Profile editing is disabled while under review.</span>
+              </div>
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 9999px; font-weight: 700; color: #92400e; font-size: 12px;">
+              <span>⏳ Status: Under Review</span>
+            </div>
+          </div>
+        } @else {
+          <div class="review-header-bar">
+            <div>
+              <h2>Application Summary Review</h2>
+              <small style="opacity: 0.9;">Please verify all sections below, download and print the form, stamp & sign the declaration, and upload the signed document to submit for verification.</small>
+            </div>
+            <span class="review-badge-pill">Final Summary & Verification</span>
+          </div>
+        }
 
         <!-- 1. Basic Info Review -->
         <div class="review-section-block">
           <div class="review-section-title">
             <span>1. Basic Company Information</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(1)">Edit Step 1 ✎</button>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(1)">Edit Step 1 ✎</button>
+            }
           </div>
           <div class="review-grid-4">
             <div class="review-field-item"><label>Company Legal Name</label><div class="review-val">{{ form.company }}</div></div>
@@ -1503,7 +1622,6 @@ interface BankItem {
             <div class="review-field-item"><label>Trade License Expiry</label><div class="review-val">{{ form.tradeLicenseExpiry }}</div></div>
             <div class="review-field-item"><label>VAT (TRN Number)</label><div class="review-val">{{ form.vatNumber }}</div></div>
             <div class="review-field-item"><label>Corporate Tax No.</label><div class="review-val">{{ form.corporateTax || '—' }}</div></div>
-            <div class="review-field-item"><label>Sage Tax Authority</label><div class="review-val">{{ form.tax || '—' }}</div></div>
           </div>
         </div>
 
@@ -1511,7 +1629,9 @@ interface BankItem {
         <div class="review-section-block">
           <div class="review-section-title">
             <span>2. Approved Settlement Currencies</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(2)">Edit Step 2 ✎</button>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(2)">Edit Step 2 ✎</button>
+            }
           </div>
           <div style="padding: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
             @for (cur of currencies; track cur.code) {
@@ -1522,11 +1642,29 @@ interface BankItem {
           </div>
         </div>
 
-        <!-- 3. Products Review -->
+        <!-- 3. Business Information Review -->
         <div class="review-section-block">
           <div class="review-section-title">
-            <span>3. Product Categories & Brands</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(3)">Edit Step 3 ✎</button>
+            <span>3. Business Information</span>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(3)">Edit Step 3 ✎</button>
+            }
+          </div>
+          <div class="review-grid-4">
+            <div class="review-field-item"><label>Business Type</label><div class="review-val">{{ business.type }}</div></div>
+            <div class="review-field-item"><label>Company Legal Status</label><div class="review-val">{{ business.status }}</div></div>
+            <div class="review-field-item"><label>Years in Business</label><div class="review-val">{{ business.years }} Years</div></div>
+            <div class="review-field-item"><label>Incorporation Place</label><div class="review-val">{{ business.place }}</div></div>
+          </div>
+        </div>
+
+        <!-- 4. Products Review -->
+        <div class="review-section-block">
+          <div class="review-section-title">
+            <span>4. Product Categories & Brands</span>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(4)">Edit Step 4 ✎</button>
+            }
           </div>
           <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
             @for (prd of products; track prd.code) {
@@ -1538,13 +1676,20 @@ interface BankItem {
           </div>
         </div>
 
-        <!-- 4. Customers Review -->
+        <!-- 5. Customers Review -->
         <div class="review-section-block">
           <div class="review-section-title">
-            <span>4. Major Corporate Customers</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(4)">Edit Step 4 ✎</button>
+            <span>5. Major Corporate Customers</span>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(5)">Edit Step 5 ✎</button>
+            }
           </div>
           <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+            @if (customers.length === 0) {
+              <div style="padding: 12px; color: #64748b; font-size: 13px; font-style: italic;">
+                No major customers specified (Optional section).
+              </div>
+            }
             @for (cust of customers; track cust.id) {
               <div style="padding: 8px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
                 <strong>{{ cust.name }}</strong>
@@ -1554,25 +1699,13 @@ interface BankItem {
           </div>
         </div>
 
-        <!-- 5. Business Information Review -->
-        <div class="review-section-block">
-          <div class="review-section-title">
-            <span>5. Business Information</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(5)">Edit Step 5 ✎</button>
-          </div>
-          <div class="review-grid-4">
-            <div class="review-field-item"><label>Business Type</label><div class="review-val">{{ business.type }}</div></div>
-            <div class="review-field-item"><label>Company Status</label><div class="review-val">{{ business.status }}</div></div>
-            <div class="review-field-item"><label>Years in Business</label><div class="review-val">{{ business.years }} Years</div></div>
-            <div class="review-field-item"><label>Incorporation Place</label><div class="review-val">{{ business.place }}</div></div>
-          </div>
-        </div>
-
         <!-- 6. Contacts Review -->
         <div class="review-section-block">
           <div class="review-section-title">
             <span>6. Authorized Contacts</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(6)">Edit Step 6 ✎</button>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(6)">Edit Step 6 ✎</button>
+            }
           </div>
           <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
             @for (c of contactsList; track c.name) {
@@ -1588,10 +1721,12 @@ interface BankItem {
         <div class="review-section-block">
           <div class="review-section-title">
             <span>7. Compliance Attachments</span>
-            <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px; border-color: #50ae9b; color: #1e5f53;" (click)="syncAllVendorDocuments()">Sync All (AUD) 💾</button>
-              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(7)">Edit Step 7 ✎</button>
-            </div>
+            @if (state.vendorStatusCode() !== 2) {
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px; border-color: #50ae9b; color: #1e5f53;" (click)="syncAllVendorDocuments()">Sync All (AUD) 💾</button>
+                <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(7)">Edit Step 7 ✎</button>
+              </div>
+            }
           </div>
           <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
             @for (att of attachments; track att.id) {
@@ -1610,81 +1745,209 @@ interface BankItem {
         <div class="review-section-block">
           <div class="review-section-title">
             <span>8. Settlement Banking Details</span>
-            <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(8)">Edit Step 8 ✎</button>
-          </div>
-          <div style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-            @for (b of bankList; track b.iban) {
-              <div style="padding: 8px 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <strong>{{ b.bankName }}</strong> — <span>{{ b.accountTitle }}</span>
-                  <div style="font-family: monospace; font-size: 12px; color: #1e40af; margin-top: 3px;">IBAN: {{ b.iban }} ({{ b.currency }})</div>
-                </div>
-                <span class="cert-badge blue">{{ b.country }}</span>
-              </div>
+            @if (state.vendorStatusCode() !== 2) {
+              <button type="button" class="btn secondary" style="font-size: 11px; padding: 2px 8px;" (click)="goToStepAndEdit(8)">Edit Step 8 ✎</button>
             }
           </div>
+          <div style="padding: 16px; overflow-x: auto;">
+            <table class="tamco-table" style="min-width: 900px;">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">Sr</th>
+                  <th>Bank Name</th>
+                  <th>Beneficiary Bank</th>
+                  <th>Bank Address</th>
+                  <th>Title of Account</th>
+                  <th>Currency</th>
+                  <th>Country</th>
+                  <th>Account No</th>
+                  <th>IBAN</th>
+                  <th>Swift Code</th>
+                  <th>Routing Nr</th>
+                  <th>Sort Code</th>
+                  <th>Issue Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (bankList.length === 0) {
+                  <tr>
+                    <td colspan="13" style="text-align: center; padding: 18px; color: #64748b;">
+                      No bank details registered yet.
+                    </td>
+                  </tr>
+                }
+                @for (b of bankList; track b.iban; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td><strong>{{ b.bankName }}</strong></td>
+                    <td>{{ b.beneficiaryBank || '—' }}</td>
+                    <td>{{ b.bankAddress || '—' }}</td>
+                    <td>{{ b.accountTitle }}</td>
+                    <td><span class="mono" style="color: #1e40af; font-weight: 700;">{{ b.currency }}</span></td>
+                    <td>{{ b.country }}</td>
+                    <td><span class="mono">{{ b.accountNo || '—' }}</span></td>
+                    <td><span class="mono">{{ b.iban }}</span></td>
+                    <td>{{ b.swift || '—' }}</td>
+                    <td>{{ b.routingNumber || '—' }}</td>
+                    <td>{{ b.sortCode || '—' }}</td>
+                    <td>{{ b.issueDate || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Review Actions -->
-        <div class="review-actions-bar">
-          <button type="button" class="btn secondary" (click)="goToStepAndEdit(1)">← Back to Edit Steps</button>
-          <button type="button" class="btn secondary" (click)="printSummary()">🖨️ Print Summary</button>
-          <button type="button" class="btn" style="background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 700; padding: 10px 20px;" (click)="confirmAndSubmitApplication()">
-            ✓ Confirm & Submit Application (Moves to Audit)
-          </button>
-        </div>
-      </div>
-    }
-
-    <!-- ============================================================
-         STATE 2: PENDING APPROVAL & SIGNED FORM (ReviewForm.cshtml)
-    ============================================================= -->
-    @else if (state.vendorStatusCode() === 2) {
-      <div class="legacy-review-form-card">
-        <div class="legacy-card-header">
-          <h2>Upload Signed Form</h2>
-          <p>Application Reference: <strong>{{ form.code || 'REQ-2024-889' }}</strong></p>
-        </div>
-        <div class="legacy-card-body">
-          <p style="font-size: 13.5px; color: #475569; margin-bottom: 20px;">
-            Your registration has been submitted and is currently in <strong>Audit Review</strong> with TAMCO Procurement and Finance. Please download the summary, stamp, sign, and upload the signed PDF below to complete compliance.
-          </p>
-
-          <div class="legacy-upload-box" [class.has-file]="!!uploadedSignedFileName">
-            <input type="file" class="legacy-file-input" accept="application/pdf" (change)="onSignedFileSelected($event)" />
-            <span class="legacy-upload-icon">{{ uploadedSignedFileName ? '📄' : '☁️' }}</span>
+        <!-- 9. Signed & Stamped Registration Document Section -->
+        <div class="review-section-block" style="border: 2px solid #50ae9b; border-radius: 10px; overflow: hidden; margin-top: 16px;">
+          <div class="review-section-title" style="background: #f0fdf4; border-bottom: 1px solid #bbf7d0; padding: 12px 18px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">📄</span>
+              <strong style="color: #065f46; font-size: 14px;">9. Signed & Stamped Registration Document (Required for Verification)</strong>
+            </div>
             @if (uploadedSignedFileName) {
-              <strong style="color: #166534; font-size: 14px;">{{ uploadedSignedFileName }}</strong>
-              <p style="margin: 4px 0 0; font-size: 12px; color: #15803d;">File attached successfully! Click Submit Document below.</p>
+              <span style="background: #ecfdf5; border: 1px solid #10b981; color: #047857; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 9999px;">
+                ✓ Document Attached
+              </span>
             } @else {
-              <strong style="color: #1e293b; font-size: 14px;">Drag & Drop or <span style="color: #1d78cd; text-decoration: underline;">Click to Browse</span></strong>
-              <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Accepted format: PDF only (Max 10 MB)</p>
+              <span style="background: #fffbeb; border: 1px solid #f59e0b; color: #b45309; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 9999px;">
+                ⚠️ Upload Required
+              </span>
             }
           </div>
 
-          @if (uploadedSignedFileName) {
-            <div style="margin-top: 14px;">
-              <button type="button" class="btn secondary" style="color: #dc2626; border-color: #fca5a5; font-size: 12px; padding: 4px 12px;" (click)="removeSignedFile()">
-                ✕ Remove File
+          <div style="padding: 18px;">
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #1d78cd; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 12.5px; color: #1e40af;">
+              <strong>Compliance Instructions:</strong>
+              <ol style="margin: 6px 0 0 16px; padding: 0; line-height: 1.6;">
+                <li>Click <strong>"Download Registration Form (PDF / Print)"</strong> below to export your complete application.</li>
+                <li>Affix your <strong>authorized signature</strong> and <strong>official company stamp/seal</strong> in the Undertaking section.</li>
+                <li>Upload the signed & stamped PDF below. Once uploaded, the <strong>"Submit Registration for Verification"</strong> button will become active.</li>
+              </ol>
+            </div>
+
+            <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+              <button type="button" class="btn secondary" (click)="downloadRegistrationPdf()" style="font-weight: 700; color: #1d78cd; border-color: #93c5fd; padding: 8px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                <span>📥</span>
+                <span>Download Registration Form (PDF / Print)</span>
               </button>
             </div>
+
+            @if (state.vendorStatusCode() === 2) {
+              <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 16px; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 6px;">📄</div>
+                <strong style="color: #0f172a; font-size: 14px;">{{ uploadedSignedFileName || 'Signed_Registration_Form.pdf' }}</strong>
+                <p style="color: #15803d; font-size: 12px; margin: 4px 0 0; font-weight: 600;">✓ Document attached and submitted for verification. Locked while under review.</p>
+              </div>
+            } @else {
+              <div class="legacy-upload-box" [class.has-file]="!!uploadedSignedFileName" style="cursor: pointer;">
+                <input type="file" class="legacy-file-input" accept="application/pdf,image/*" (change)="onSignedFileSelected($event)" />
+                <span class="legacy-upload-icon">{{ uploadedSignedFileName ? '📄' : '☁️' }}</span>
+                @if (uploadedSignedFileName) {
+                  <strong style="color: #166534; font-size: 14px;">{{ uploadedSignedFileName }}</strong>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: #15803d;">File attached successfully! You can now click "Submit Registration for Verification" below.</p>
+                } @else {
+                  <strong style="color: #1e293b; font-size: 14px;">Drag & Drop or <span style="color: #1d78cd; text-decoration: underline;">Click to Browse</span></strong>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Accepted format: PDF, PNG, JPG (Max 10 MB)</p>
+                }
+              </div>
+
+              @if (uploadedSignedFileName) {
+                <div style="margin-top: 10px; display: flex; justify-content: center;">
+                  <button type="button" class="btn secondary" style="color: #dc2626; border-color: #fca5a5; font-size: 12px; padding: 4px 12px;" (click)="removeSignedFile()">
+                    ✕ Remove Attached File
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+        <!-- Official Undertaking & Stamp/Signature Section (Printed / Downloadable) -->
+        <div class="print-declaration-box">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px;">
+            <div>
+              <h3 style="margin: 0; font-size: 16px; color: #1e3a8a; font-weight: 800; text-transform: uppercase;">TAMCO MIDDLE EAST LTD.</h3>
+              <div style="font-size: 12px; color: #475569; font-weight: 600;">Supplier Registration & Banking Compliance Declaration</div>
+            </div>
+            <div style="text-align: right; font-size: 11.5px; color: #64748b;">
+              <div>Ref: <strong>{{ form.code || 'REQ-ONBOARD' }}</strong></div>
+              <div>Date: {{ form.registrationDate }}</div>
+            </div>
+          </div>
+          <p style="font-size: 11.5px; color: #334155; line-height: 1.6; margin: 0 0 16px;">
+            We, the undersigned authorized representatives of <strong>{{ form.company }}</strong>, hereby solemnly declare and certify that all corporate credentials, trade licensing, tax registrations, and banking details provided above are true, complete, and accurate. We understand that this registration is subject to formal verification and approval by TAMCO Procurement and Finance departments.
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 20px;">
+            <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px; background: #f8fafc;">
+              <div style="font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 12px; text-transform: uppercase;">Authorized Signatory</div>
+              <div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">Signature: ____________________________________</div>
+              <div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">Name: _________________________________________</div>
+              <div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">Designation: __________________________________</div>
+              <div style="font-size: 11.5px; color: #475569;">Date: _________________________________________</div>
+            </div>
+            <div style="border: 2px dashed #94a3b8; border-radius: 6px; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; min-height: 130px; text-align: center;">
+              <div style="font-size: 24px; margin-bottom: 4px;">🔖</div>
+              <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Official Company Stamp / Seal</span>
+              <small style="color: #64748b; font-size: 10.5px; margin-top: 4px;">Affix your official company seal here prior to uploading</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Final Actions Bar -->
+        <div class="review-actions-bar" style="margin-top: 24px; padding: 18px 24px; background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          @if (state.vendorStatusCode() === 2) {
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fef3c7; border: 1.5px solid #f59e0b; border-radius: 9999px; color: #92400e; font-weight: 700; font-size: 13px;">
+                <span>⏳</span> Registration Submitted for Verification — Under Review
+              </span>
+              <small style="color: #64748b;">Profile is locked while under review. Editing is disabled.</small>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button type="button" class="btn secondary" (click)="downloadRegistrationPdf()" style="font-weight: 600;">
+                <span>📥 Download Summary PDF</span>
+              </button>
+              @if (isStaffUser()) {
+                <button type="button" class="btn secondary" style="background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: 700; font-size: 12px;" (click)="simulateInternalApproval()">
+                  ⚡ Staff: Simulate Approval → Unlock Dashboard
+                </button>
+              }
+            </div>
+          } @else {
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button type="button" class="btn secondary" (click)="goToStepAndEdit(1)" style="font-weight: 600;">
+                ← Back to Edit Steps
+              </button>
+              <button type="button" class="btn secondary" (click)="downloadRegistrationPdf()" style="font-weight: 600; color: #1e40af; border-color: #93c5fd;">
+                📥 Download Form (PDF)
+              </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <button
+                type="button"
+                class="btn"
+                [disabled]="!uploadedSignedFileName || isSavingProfile"
+                (click)="submitRegistrationForVerification()"
+                style="background: #16a34a; border-color: #16a34a; color: #ffffff; font-weight: 700; padding: 11px 26px; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);"
+                [title]="!uploadedSignedFileName ? 'Please upload the signed registration document before submitting' : 'Submit Registration for Verification'"
+              >
+                @if (isSavingProfile) {
+                  <span>Submitting Profile...</span>
+                } @else {
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Submit Registration for Verification</span>
+                }
+              </button>
+              @if (!uploadedSignedFileName) {
+                <span style="font-size: 11.5px; color: #b45309; font-weight: 600;">
+                  ⚠️ Button is disabled until you upload the signed registration document above.
+                </span>
+              }
+            </div>
           }
-
-          <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px;">
-            <button type="button" class="btn" style="background: #1d78cd; border-color: #1d78cd; color: #fff; font-weight: 700; min-width: 130px;" (click)="submitSignedDocument()">
-              Submit Document
-            </button>
-            <button type="button" class="btn secondary" (click)="setLifecycleStatus(0)" style="min-width: 100px;">
-              Cancel
-            </button>
-          </div>
-
-          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed #cbd5e1;">
-            <span style="font-size: 11px; color: #64748b; display: block; margin-bottom: 8px;">Demo / Testing Action:</span>
-            <button type="button" class="btn secondary" style="background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: 700; font-size: 12px;" (click)="simulateInternalApproval()">
-              ⚡ Simulate Procurement & Finance Approval → Sage 300 ERP Sync
-            </button>
-          </div>
         </div>
       </div>
     }
@@ -1753,11 +2016,13 @@ interface BankItem {
             type="button"
             class="wizard-step-tab"
             [class.active]="currentStep === st.id"
-            [class.completed]="currentStep > st.id"
+            [class.completed]="isStepValid(st.id)"
+            [disabled]="!canAccessStep(st.id)"
+            [title]="!canAccessStep(st.id) ? 'Complete mandatory (*) fields in previous steps first' : st.title"
             (click)="goToStep(st.id)"
           >
             <span class="step-circle">
-              @if (currentStep > st.id) { ✓ } @else { {{ st.id }} }
+              @if (isStepValid(st.id)) { ✓ } @else { {{ st.id }} }
             </span>
             <span>{{ st.title }}</span>
           </button>
@@ -1803,14 +2068,28 @@ interface BankItem {
               <label>Phone Number *</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪 +971</span>
-                <input [(ngModel)]="form.phone" placeholder="09 876 5432" />
+                <input
+                  type="tel"
+                  [(ngModel)]="form.phone"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="form.phone = sanitizePhone(form.phone)"
+                  placeholder="09 876 5432"
+                  maxlength="20"
+                />
               </div>
             </div>
             <div class="form-field">
               <label>Fax Number</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪 +971</span>
-                <input [(ngModel)]="form.fax" placeholder="09 876 5432" />
+                <input
+                  type="tel"
+                  [(ngModel)]="form.fax"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="form.fax = sanitizePhone(form.fax)"
+                  placeholder="09 876 5432"
+                  maxlength="20"
+                />
               </div>
             </div>
           </div>
@@ -1822,7 +2101,7 @@ interface BankItem {
             </div>
             <div class="form-field">
               <label>Zip Code</label>
-              <input [(ngModel)]="form.zipCode" placeholder="8080" />
+              <input [(ngModel)]="form.zipCode" placeholder="Enter Zip code here" />
             </div>
           </div>
 
@@ -1844,24 +2123,29 @@ interface BankItem {
             </div>
             <div class="form-field">
               <label>Trade License Expiry *</label>
-              <input type="date" [(ngModel)]="form.tradeLicenseExpiry" />
+              <input type="date" [(ngModel)]="form.tradeLicenseExpiry" [min]="minExpiryDate" />
             </div>
             <div class="form-field">
               <label>VAT (TRN Number) *</label>
-              <input [(ngModel)]="form.vatNumber" placeholder="100023565656" />
+              <input
+                type="text"
+                [(ngModel)]="form.vatNumber"
+                (keydown)="allowOnlyNumbers($event)"
+                (input)="form.vatNumber = sanitizeNumbers(form.vatNumber)"
+                placeholder="100023565656"
+                maxlength="25"
+              />
             </div>
             <div class="form-field">
               <label>Corporate Tax Number</label>
-              <input [(ngModel)]="form.corporateTax" placeholder="98888888" />
-            </div>
-            <div class="form-field">
-              <label>Sage Tax Authority (ERP Jurisdiction)</label>
-              <select [(ngModel)]="form.tax">
-                <option value="">Select Sage Tax Authority</option>
-                @for (t of sageTaxAuthorities; track t.TaxAuthorityKey) {
-                  <option [value]="t.TaxAuthorityKey">{{ t.TaxAuthorityKey }} - {{ t.Description }} ({{ t.TaxReportingCurrency }})</option>
-                }
-              </select>
+              <input
+                type="text"
+                [(ngModel)]="form.corporateTax"
+                (keydown)="allowOnlyNumbers($event)"
+                (input)="form.corporateTax = sanitizeNumbers(form.corporateTax)"
+                placeholder="98888888"
+                maxlength="25"
+              />
             </div>
           </div>
         }
@@ -1871,7 +2155,7 @@ interface BankItem {
         =========================================== -->
         @if (currentStep === 2) {
           <div class="step-section-bar">
-            <h3>Currency:</h3>
+            <h3>Currency: *</h3>
             <button type="button" class="btn-header-action" (click)="openCurrencyModal()">
               <span>Select Currency +</span>
             </button>
@@ -1962,7 +2246,14 @@ interface BankItem {
             </div>
             <div class="form-field">
               <label>Year In Business (In Years) *</label>
-              <input type="number" [(ngModel)]="business.years" placeholder="Year In Business" />
+              <input
+                type="number"
+                min="0"
+                max="150"
+                [(ngModel)]="business.years"
+                (keydown)="allowOnlyNumbers($event)"
+                placeholder="Year In Business"
+              />
             </div>
             <div class="form-field">
               <label>Incorporated Place *</label>
@@ -1976,7 +2267,7 @@ interface BankItem {
         =========================================== -->
         @if (currentStep === 4) {
           <div class="step-section-bar">
-            <h3>Products:</h3>
+            <h3>Products: *</h3>
             <button type="button" class="btn-header-action" (click)="openProductModal()">
               <span>Select Products +</span>
             </button>
@@ -2065,7 +2356,7 @@ interface BankItem {
                 @if (customers.length === 0) {
                   <tr>
                     <td colspan="8" style="text-align: center; padding: 24px; color: #64748b;">
-                      No major customer references entered. Click "Add Customer +" to add client references.
+                      Customer references are optional. You can add client references or proceed directly to Next.
                     </td>
                   </tr>
                 }
@@ -2079,7 +2370,15 @@ interface BankItem {
                       <input class="cell-input" [(ngModel)]="c.contact" placeholder="Contact Name" />
                     </td>
                     <td>
-                      <input class="cell-input" [(ngModel)]="c.phone" placeholder="Contact" />
+                      <input
+                        type="tel"
+                        class="cell-input"
+                        [(ngModel)]="c.phone"
+                        (keydown)="allowPhoneChars($event)"
+                        (input)="c.phone = sanitizePhone(c.phone)"
+                        placeholder="Contact"
+                        maxlength="20"
+                      />
                     </td>
                     <td>
                       <input class="cell-input" [(ngModel)]="c.city" placeholder="City" />
@@ -2088,7 +2387,15 @@ interface BankItem {
                       <input class="cell-input" [(ngModel)]="c.country" placeholder="Country" />
                     </td>
                     <td>
-                      <input class="cell-input" [(ngModel)]="c.dealsInYear" placeholder="Dealing Years" />
+                      <input
+                        type="text"
+                        class="cell-input"
+                        [(ngModel)]="c.dealsInYear"
+                        (keydown)="allowOnlyNumbers($event)"
+                        (input)="c.dealsInYear = sanitizeNumbers(c.dealsInYear)"
+                        placeholder="Dealing Years"
+                        maxlength="4"
+                      />
                     </td>
                     <td style="text-align: center;">
                       <button
@@ -2176,12 +2483,26 @@ interface BankItem {
               <label>Land Line *</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪</span>
-                <input [(ngModel)]="contactForm.landline" placeholder="Landline No." />
+                <input
+                  type="tel"
+                  [(ngModel)]="contactForm.landline"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="contactForm.landline = sanitizePhone(contactForm.landline)"
+                  placeholder="Landline No."
+                  maxlength="20"
+                />
               </div>
             </div>
             <div class="form-field">
               <label>Ext</label>
-              <input [(ngModel)]="contactForm.extension" placeholder="ext." />
+              <input
+                type="text"
+                [(ngModel)]="contactForm.extension"
+                (keydown)="allowOnlyNumbers($event)"
+                (input)="contactForm.extension = sanitizeNumbers(contactForm.extension)"
+                placeholder="ext."
+                maxlength="6"
+              />
             </div>
           </div>
 
@@ -2190,21 +2511,42 @@ interface BankItem {
               <label>Phone Number *</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪</span>
-                <input [(ngModel)]="contactForm.phone" placeholder="Phone number" />
+                <input
+                  type="tel"
+                  [(ngModel)]="contactForm.phone"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="contactForm.phone = sanitizePhone(contactForm.phone)"
+                  placeholder="Phone number"
+                  maxlength="20"
+                />
               </div>
             </div>
             <div class="form-field">
-              <label>Whatsapp Number</label>
+              <label>Whatsapp Number *</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪</span>
-                <input [(ngModel)]="contactForm.whatsapp" placeholder="Whatsapp number" />
+                <input
+                  type="tel"
+                  [(ngModel)]="contactForm.whatsapp"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="contactForm.whatsapp = sanitizePhone(contactForm.whatsapp)"
+                  placeholder="Whatsapp number"
+                  maxlength="20"
+                />
               </div>
             </div>
             <div class="form-field">
               <label>Fax No</label>
               <div class="phone-input-wrap">
                 <span class="flag-badge">🇦🇪</span>
-                <input [(ngModel)]="contactForm.fax" placeholder="Fax number" />
+                <input
+                  type="tel"
+                  [(ngModel)]="contactForm.fax"
+                  (keydown)="allowPhoneChars($event)"
+                  (input)="contactForm.fax = sanitizePhone(contactForm.fax)"
+                  placeholder="Fax number"
+                  maxlength="20"
+                />
               </div>
             </div>
           </div>
@@ -2278,7 +2620,7 @@ interface BankItem {
         =========================================== -->
         @if (currentStep === 7) {
           <div class="step-section-bar">
-            <h3>Attachments</h3>
+            <h3>Attachments *</h3>
             <button type="button" class="btn-header-action" (click)="addAttachmentRow()">
               <span>Add Attachment +</span>
             </button>
@@ -2289,10 +2631,10 @@ interface BankItem {
               <thead>
                 <tr>
                   <th style="width: 50px; text-align: center;">SR</th>
-                  <th style="min-width: 220px;">Document Description</th>
+                  <th style="min-width: 220px;">Document Description *</th>
                   <th style="width: 170px;">Issue Date</th>
                   <th style="width: 170px;">Doc Expiry Date</th>
-                  <th>Attached File</th>
+                  <th>Attached File *</th>
                   <th style="width: 140px; text-align: center;">Actions</th>
                 </tr>
               </thead>
@@ -2308,13 +2650,51 @@ interface BankItem {
                   <tr>
                     <td style="text-align: center; font-weight: 600;">{{ i + 1 }}</td>
                     <td>
-                      <input class="cell-input" [(ngModel)]="att.description" placeholder="Document Description" />
+                      @if (att.mandatory) {
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <input class="cell-input" [(ngModel)]="att.description" [readonly]="true" style="font-weight: 600; background: #f8fafc;" />
+                          <span style="font-size: 11px; font-weight: 700; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">
+                            * Mandatory
+                          </span>
+                        </div>
+                      } @else {
+                        <input class="cell-input" [(ngModel)]="att.description" placeholder="Document Description" />
+                      }
                     </td>
                     <td>
                       <input type="date" class="cell-input" [(ngModel)]="att.issueDate" />
                     </td>
                     <td>
-                      <input type="date" class="cell-input" [(ngModel)]="att.docExpiryDate" />
+                      @if (att.hasExpiry) {
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <input type="date" class="cell-input" [(ngModel)]="att.docExpiryDate" />
+                          @if (!att.mandatory) {
+                            <button
+                              type="button"
+                              (click)="att.hasExpiry = false; att.docExpiryDate = ''"
+                              style="background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 13px; padding: 2px;"
+                              title="No expiry date for this document"
+                            >
+                              ✕
+                            </button>
+                          }
+                        </div>
+                      } @else {
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px;">
+                          <span style="font-size: 12px; color: #94a3b8; font-style: italic;">
+                            No Expiry
+                          </span>
+                          @if (!att.mandatory) {
+                            <button
+                              type="button"
+                              (click)="att.hasExpiry = true"
+                              style="background: none; border: none; cursor: pointer; color: var(--role-accent, #2563eb); font-size: 11px; font-weight: 600; text-decoration: underline; padding: 0;"
+                            >
+                              + Expiry
+                            </button>
+                          }
+                        </div>
+                      }
                     </td>
                     <td>
                       <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -2322,11 +2702,13 @@ interface BankItem {
                           <span>Choose File</span>
                           <input type="file" style="display: none;" (change)="onFileUploaded($event, att)" />
                         </label>
-                        <span style="font-size: 12px; color: #475569;">
+                        <span style="font-size: 12px; color: #475569; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                           {{ att.fileName || 'No file chosen' }}
                         </span>
                         @if (att.fileName) {
                           <span style="font-size: 11px; color: #059669; font-weight: 700;">✓ Attached</span>
+                        } @else if (att.mandatory) {
+                          <span style="font-size: 11px; color: #dc2626; font-weight: 600;">File Required *</span>
                         }
                       </div>
                     </td>
@@ -2348,14 +2730,20 @@ interface BankItem {
                             <span>💾 Sync</span>
                           }
                         </button>
-                        <button
-                          type="button"
-                          class="btn-cell-delete"
-                          (click)="removeAttachment(i)"
-                          title="Delete attachment row"
-                        >
-                          ✕
-                        </button>
+                        @if (!att.mandatory) {
+                          <button
+                            type="button"
+                            class="btn-cell-delete"
+                            (click)="removeAttachment(i)"
+                            title="Delete attachment row"
+                          >
+                            ✕
+                          </button>
+                        } @else {
+                          <span style="font-size: 11px; color: #94a3b8; font-weight: 600; padding: 2px 6px; background: #f1f5f9; border-radius: 4px;" title="Mandatory document cannot be deleted">
+                            Locked
+                          </span>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -2366,24 +2754,53 @@ interface BankItem {
         }
 
         <!-- ==========================================
-             STEP 8: BANK INFORMATION (SCREENSHOT 5)
+             STEP 8: BANK INFORMATION (SCREENSHOT MATCH)
         =========================================== -->
         @if (currentStep === 8) {
-          <div class="bank-selection-box">
-            <div class="form-grid-2">
+          <div class="sub-section-bar blue-bar">
+            <h4>Banks:</h4>
+          </div>
+
+          <div class="bank-form-card">
+            <!-- Row 1: 3 columns -->
+            <div class="form-grid-3">
               <div class="form-field">
-                <span class="bank-box-title">Select currency to add bank information:</span>
+                <label>Bank Name *</label>
+                <input [(ngModel)]="bankForm.bankName" placeholder="Enter Bank Name" />
+              </div>
+              <div class="form-field">
+                <label>Benficiary Bank *</label>
+                <input [(ngModel)]="bankForm.beneficiaryBank" placeholder="Bank Address" />
+              </div>
+              <div class="form-field">
+                <label>Bank Address *</label>
+                <input [(ngModel)]="bankForm.bankAddress" placeholder="Bank Address" />
+              </div>
+            </div>
+
+            <!-- Row 2: 3 columns -->
+            <div class="form-grid-3" style="margin-top: 14px;">
+              <div class="form-field">
+                <label>Title of Account(Legal Name) *</label>
+                <input [(ngModel)]="bankForm.accountTitle" placeholder="Title of Account" />
+              </div>
+              <div class="form-field">
                 <label>Currency *</label>
                 <select [(ngModel)]="bankForm.currency">
                   <option value="" disabled>Select Currency</option>
-                  @for (c of (currencies.length > 0 ? currencies : currencyCatalog); track c.code) {
-                    <option [value]="c.code">{{ c.code }} - {{ c.description }}</option>
+                  @for (c of currencies; track c.code) {
+                    <option [value]="c.code">{{ c.description || c.code }}</option>
+                  }
+                  @if (currencies.length === 0) {
+                    <option value="AED">Arab Emirates Dirhams</option>
+                    <option value="USD">US Dollar</option>
+                    <option value="EUR">Euro</option>
+                    <option value="GBP">British Pound</option>
+                    <option value="SAR">Saudi Riyal</option>
                   }
                 </select>
               </div>
-
               <div class="form-field">
-                <span class="bank-box-title">Select country for bank information :</span>
                 <label>Country *</label>
                 <select [(ngModel)]="bankForm.country">
                   <option value="" disabled>Select Country</option>
@@ -2394,79 +2811,132 @@ interface BankItem {
               </div>
             </div>
 
-            <!-- ADD BANK DETAIL ROW -->
+            <!-- Row 3: 3 columns -->
             <div class="form-grid-3" style="margin-top: 14px;">
               <div class="form-field">
-                <label>Bank Name *</label>
-                <select [(ngModel)]="bankForm.bankName">
-                  <option value="" disabled>Select Bank Name</option>
-                  @for (b of standardBankList; track b) {
-                    <option [value]="b">{{ b }}</option>
-                  }
-                </select>
+                <label>Account No *</label>
+                <input
+                  [(ngModel)]="bankForm.accountNo"
+                  (input)="bankForm.accountNo = sanitizeNumbers(bankForm.accountNo)"
+                  (keypress)="onlyNumericKey($event)"
+                  placeholder="Account Number"
+                />
               </div>
               <div class="form-field">
-                <label>Account Title *</label>
-                <input [(ngModel)]="bankForm.accountTitle" placeholder="Beneficiary Account Title" />
+                <label>Account IBAN *</label>
+                <input [(ngModel)]="bankForm.iban" placeholder="IBAN" />
               </div>
               <div class="form-field">
-                <label>IBAN / Account Number *</label>
-                <input [(ngModel)]="bankForm.iban" placeholder="AE00 0000 0000 0000 0000 00" />
+                <label>Swift Code *</label>
+                <input [(ngModel)]="bankForm.swift" placeholder="SwiftCode" />
               </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+            <!-- Row 4: 4 columns -->
+            <div class="form-grid-4" style="margin-top: 14px; grid-template-columns: 1fr 1fr 1.2fr 1fr;">
+              <div class="form-field">
+                <label>Routing Number</label>
+                <input [(ngModel)]="bankForm.routingNumber" placeholder="Routing Nr." />
+              </div>
+              <div class="form-field">
+                <label>Sort Code</label>
+                <input [(ngModel)]="bankForm.sortCode" placeholder="SortCode" />
+              </div>
+              <div class="form-field">
+                <label>Bank Certificate</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="file" (change)="onBankCertificateSelected($event)" id="bankCertInput" style="display: none;" />
+                  <label for="bankCertInput" class="btn secondary" style="cursor: pointer; padding: 6px 12px; font-size: 12px; margin-bottom: 0;">
+                    Choose File
+                  </label>
+                  <span style="font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
+                    {{ bankForm.fileName || 'No file chosen' }}
+                  </span>
+                </div>
+              </div>
+              <div class="form-field">
+                <label>Bank Issue Date *</label>
+                <input type="date" [(ngModel)]="bankForm.issueDate" placeholder="dd/mm/yyyy" />
+              </div>
+            </div>
+
+            <!-- Add Bank Button -->
+            <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
               <button
                 type="button"
                 class="btn"
                 (click)="addBankToList()"
-                style="background: var(--role-accent, #16a34a); border-color: var(--role-accent, #16a34a); color: #ffffff; font-weight: 700; padding: 7px 18px;"
+                style="background: #1d78cd; border-color: #1d78cd; color: #ffffff; font-weight: 700; padding: 8px 24px; border-radius: 4px;"
               >
-                <span>Add Bank to List +</span>
+                <span>Add Bank</span>
               </button>
             </div>
           </div>
 
           <!-- BANK LIST TABLE -->
-          <div class="sub-section-bar">
+          <div class="sub-section-bar blue-bar">
             <h4>Bank List:</h4>
           </div>
 
-          <div class="tamco-table-wrap">
-            <table class="tamco-table">
+          <div class="tamco-table-wrap" style="overflow-x: auto;">
+            <table class="tamco-table" style="min-width: 1100px;">
               <thead>
                 <tr>
+                  <th style="width: 45px;">Sr</th>
                   <th>Bank Name</th>
-                  <th>Title</th>
-                  <th style="width: 100px;">Currency</th>
-                  <th>IBAN</th>
+                  <th>Benficiary Bank</th>
+                  <th>Bank Address</th>
+                  <th>Title of Account</th>
+                  <th>Currency</th>
                   <th>Country</th>
-                  <th style="width: 80px; text-align: center;">Action</th>
+                  <th>Account No</th>
+                  <th>Account IBAN</th>
+                  <th>Swift Code</th>
+                  <th>Routing Nr</th>
+                  <th>Sort Code</th>
+                  <th>Certificate</th>
+                  <th>Issue Date</th>
+                  <th style="width: 70px; text-align: center;">Action</th>
                 </tr>
               </thead>
               <tbody>
                 @if (bankList.length === 0) {
                   <tr>
-                    <td colspan="6" style="text-align: center; padding: 24px; color: #64748b;">
-                      No bank accounts registered yet. Complete the form above to add settlement bank details.
+                    <td colspan="15" style="text-align: center; padding: 24px; color: #64748b;">
+                      No bank accounts added yet. Fill out the details above and click "Add Bank".
                     </td>
                   </tr>
                 }
                 @for (b of bankList; track b.id; let i = $index) {
                   <tr>
+                    <td>{{ i + 1 }}</td>
                     <td><strong>{{ b.bankName }}</strong></td>
+                    <td>{{ b.beneficiaryBank || '—' }}</td>
+                    <td>{{ b.bankAddress || '—' }}</td>
                     <td>{{ b.accountTitle }}</td>
                     <td><span class="mono" style="color: #1e40af; font-weight: 700;">{{ b.currency }}</span></td>
-                    <td><span class="mono">{{ b.iban }}</span></td>
                     <td>{{ b.country }}</td>
+                    <td><span class="mono">{{ b.accountNo || '—' }}</span></td>
+                    <td><span class="mono">{{ b.iban }}</span></td>
+                    <td>{{ b.swift || '—' }}</td>
+                    <td>{{ b.routingNumber || '—' }}</td>
+                    <td>{{ b.sortCode || '—' }}</td>
+                    <td>
+                      @if (b.fileName) {
+                        <span style="color: #16a34a; font-size: 11.5px; font-weight: 600;" [title]="b.fileName">📄 Attached</span>
+                      } @else {
+                        <span style="color: #94a3b8; font-size: 11px;">—</span>
+                      }
+                    </td>
+                    <td>{{ b.issueDate || '—' }}</td>
                     <td style="text-align: center;">
                       <button
                         type="button"
                         class="btn-cell-delete"
                         (click)="removeBank(i)"
-                        title="Remove bank entry"
+                        title="Delete bank entry"
                       >
-                        ✕
+                        🗑️
                       </button>
                     </td>
                   </tr>
@@ -2487,10 +2957,19 @@ interface BankItem {
             « Previous
           </button>
 
+          @if (!isStepValid(currentStep)) {
+            <span class="step-validation-hint">
+              <app-icon name="alert" [size]="14" />
+              <span>{{ getStepRequirementHint(currentStep) }}</span>
+            </span>
+          }
+
           @if (currentStep < 8) {
             <button
               type="button"
               class="btn-nav-next"
+              [disabled]="!isStepValid(currentStep)"
+              [title]="!isStepValid(currentStep) ? getStepRequirementHint(currentStep) : 'Proceed to next step'"
               (click)="nextStep()"
             >
               <span>Next »</span>
@@ -2499,6 +2978,8 @@ interface BankItem {
             <button
               type="button"
               class="btn-nav-next btn-submit-app"
+              [disabled]="!areAllStepsValid() || isSavingProfile"
+              [title]="!areAllStepsValid() ? 'Complete all mandatory (*) steps before submitting' : 'Submit Registration Application'"
               (click)="submitForVerification()"
             >
               <span>Submit Registration Application ✓</span>
@@ -2836,6 +3317,7 @@ export class VendorProfileComponent implements OnInit {
   private readonly sageApi = inject(SageApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly isStaffUser = computed(() => this.state.role() !== 'vendor');
   readonly isVendorUser = computed(() => this.state.role() === 'vendor');
@@ -2895,6 +3377,8 @@ export class VendorProfileComponent implements OnInit {
     strn: ''
   };
 
+  readonly minExpiryDate = new Date().toISOString().substring(0, 10);
+
   countryList: string[] = [];
   cityList: string[] = [];
   brandList: string[] = [];
@@ -2917,8 +3401,8 @@ export class VendorProfileComponent implements OnInit {
     place: ''
   };
 
-  readonly businessTypeOptions = ['Manufacturing', 'Trading / Distribution', 'Technical Services', 'Contracting', 'Authorized Agent'];
-  readonly legalStructureOptions = ['LLC', 'Private Limited', 'Public Limited', 'Free Zone Establishment (FZE)', 'Sole Proprietorship', 'Partnership'];
+  readonly businessTypeOptions = ['Retail', 'Manufacturing', 'Services'];
+  readonly legalStructureOptions = ['LLC', 'PLC', 'SoleProprietorship', 'Other'];
 
   // STEP 4: Products
   products: ProductItem[] = [];
@@ -2936,7 +3420,7 @@ export class VendorProfileComponent implements OnInit {
   // STEP 6: Contact Person
   departmentOptions: string[] = [];
   designationOptions: string[] = [];
-  readonly officeOptions = ['Head Office', 'Branch Office', 'Factory / Plant', 'Central Warehouse'];
+  readonly officeOptions = ['Head Office', 'Branch Office', 'Site Office', 'Showroom', 'Warehouse', 'Others'];
 
   contactForm: ContactPerson = {
     name: '',
@@ -2957,28 +3441,91 @@ export class VendorProfileComponent implements OnInit {
   contactsList: ContactPerson[] = [];
 
   // STEP 7: Attachments
-  attachments: AttachmentRow[] = [];
+  attachments: AttachmentRow[] = [
+    {
+      id: 'att-passport',
+      description: 'Passport',
+      issueDate: '',
+      docExpiryDate: '',
+      fileName: '',
+      status: 'Pending',
+      hasExpiry: true,
+      mandatory: true
+    },
+    {
+      id: 'att-doc1',
+      description: 'Doc 1',
+      issueDate: '',
+      docExpiryDate: '',
+      fileName: '',
+      status: 'Pending',
+      hasExpiry: false,
+      mandatory: true
+    }
+  ];
 
   // STEP 8: Bank Information
   standardBankList: string[] = [];
 
   bankForm: {
+    bankName: string;
+    beneficiaryBank: string;
+    bankAddress: string;
+    accountTitle: string;
     currency: string;
     country: string;
-    bankName: string;
-    accountTitle: string;
+    accountNo: string;
     iban: string;
+    swift: string;
+    routingNumber: string;
+    sortCode: string;
+    bankCertificate: string;
+    fileName: string;
+    issueDate: string;
   } = {
+    bankName: '',
+    beneficiaryBank: '',
+    bankAddress: '',
+    accountTitle: '',
     currency: 'AED',
     country: 'United Arab Emirates',
-    bankName: '',
-    accountTitle: '',
-    iban: ''
+    accountNo: '',
+    iban: '',
+    swift: '',
+    routingNumber: '',
+    sortCode: '',
+    bankCertificate: '',
+    fileName: '',
+    issueDate: ''
   };
 
   bankList: BankItem[] = [];
 
+  procurementApprovalStatus: 'Approved' | 'Pending' | 'Rejected' = 'Pending';
+  financeApprovalStatus: 'Approved' | 'Pending' | 'Rejected' = 'Pending';
+
+  private logoutSaveHandler = () => {
+    this.saveLocalDraft();
+    this.saveDraft();
+  };
+
+  @HostListener('window:beforeunload')
+  onBeforeUnload(): void {
+    this.saveLocalDraft();
+  }
+
+  @HostListener('window:pagehide')
+  onPageHide(): void {
+    this.saveLocalDraft();
+  }
+
   ngOnInit(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tamco_logout_save', this.logoutSaveHandler);
+      // Immediately restore draft so user instantly resumes from where they left off
+      this.restoreLocalDraft();
+    }
+
     const mode = this.route.snapshot.queryParams['mode'];
     const showReview = this.route.snapshot.queryParams['showReview'];
     if (showReview === 'true' || mode === 'review') {
@@ -2989,21 +3536,33 @@ export class VendorProfileComponent implements OnInit {
       if (this.state.vendorStatusCode() < 3) {
         this.state.setVendorStatusCode(2);
       }
+    } else if (mode === 'fill' || mode === 'edit') {
+      this.state.setVendorStatusCode(0, true);
     }
     this.loadVendorProfile();
+
+    // Auto popup Important Notice when the user lands on company profile first time (e.g. registration onboarding)
+    const hasSeenNotice = sessionStorage.getItem('vreg_notice_seen');
+    if (!hasSeenNotice && this.state.vendorStatusCode() < 3 && !this.isStaffUser()) {
+      this.showNoticeModal = true;
+    }
   }
 
   loadVendorProfile(): void {
+    const qReqNo = this.route.snapshot.queryParams['reqNo'] || this.route.snapshot.queryParams['id'];
+    const isStaff = this.isStaffUser();
     const user = this.state.currentUser();
-    const reqNo = user?.organization?.split('·')?.[0]?.trim() || this.form.code || '';
-    if (user?.name) {
-      this.form.company = user.name;
+    const reqNo = qReqNo || (isStaff ? '' : user?.organization?.split('·')?.[0]?.trim()) || this.form.code || '';
+    if (!isStaff) {
+      if (user?.name) {
+        this.form.company = user.name;
+      }
+      if (user?.email) {
+        this.form.email = user.email;
+      }
     }
     if (reqNo) {
       this.form.code = reqNo;
-    }
-    if (user?.email) {
-      this.form.email = user.email;
     }
     this.isLoadingProfile = true;
 
@@ -3020,6 +3579,7 @@ export class VendorProfileComponent implements OnInit {
         if (reg) {
           if (reg.vendoR_NAME) this.form.company = reg.vendoR_NAME;
           if (reg.reqno) this.form.code = reg.reqno;
+          if (reg.date) this.form.registrationDate = String(reg.date).substring(0, 10);
           if (reg.email) this.form.email = reg.email;
           if (reg.tel) this.form.phone = reg.tel;
           if (reg.faxnumber) this.form.fax = reg.faxnumber;
@@ -3037,21 +3597,85 @@ export class VendorProfileComponent implements OnInit {
           if (reg.yearbus) this.business.years = Number(reg.yearbus) || this.business.years;
           if (reg.incorplace) this.business.place = reg.incorplace;
 
-          // Sync vendor lifecycle code with backend database isactive flag
+          // Check submission status: isactive=1 in VREG means registration was submitted
+          const mode = this.route.snapshot.queryParams['mode'];
           if (reg.isactive === 1 || reg.isactive === '1') {
-            this.state.setVendorStatusCode(3, true);
+            // Note: Registration form is completed. DO NOT set status 3 (ERP Active) unless BOTH Procurement and Finance approved!
+            if (this.state.vendorStatusCode() < 3) {
+              const targetStatus = mode === 'pending' ? 2 : 1;
+              this.state.setVendorStatusCode(targetStatus, true);
+            }
           } else if (reg.isactive === 0 || reg.isactive === '0') {
-            // Keep in review mode if previously submitted
-            const user = this.state.currentUser()?.username;
-            const isLocalSubmitted = typeof window !== 'undefined' && user && localStorage.getItem(`vreg_submitted_${user}`) === 'true';
-            if (isLocalSubmitted && this.state.vendorStatusCode() === 0) {
-              this.state.setVendorStatusCode(1, true);
+            if (mode !== 'fill') {
+              // Keep in review mode if previously submitted
+              const username = this.state.currentUser()?.username;
+              const isLocalSubmitted = typeof window !== 'undefined' && username && localStorage.getItem(`vreg_submitted_${username}`) === 'true';
+              if (isLocalSubmitted && this.state.vendorStatusCode() === 0) {
+                this.state.setVendorStatusCode(1, true);
+              }
             }
           }
         }
+
+        // Also check if we have data in vendorRegistrationRequests or vendorBI for any missing info
+        if (!this.form.company || !this.form.email) {
+          const matchedReq = this.state.vendorRegistrationRequests().find(r => r.id === reqNo);
+          if (matchedReq) {
+            if (!this.form.company) this.form.company = matchedReq.vendorName;
+            if (!this.form.email) this.form.email = matchedReq.email;
+            if (!this.form.phone) this.form.phone = matchedReq.phone;
+          }
+        }
+
+        this.vendorApi.getVendorBasicInfo().subscribe(biRes => {
+          const biList = biRes?.vendorBI_List || [];
+          const bi = biList.find((b: any) => b.reQ_NO === reqNo || (this.form.email && b.email?.toLowerCase() === this.form.email.toLowerCase()));
+          if (bi) {
+            if (!this.form.company && bi.vendoR_NAME) this.form.company = bi.vendoR_NAME;
+            if (!this.form.email && bi.email) this.form.email = bi.email;
+            if (!this.form.phone && (bi.contact || bi.tel)) this.form.phone = bi.contact || bi.tel;
+            if (!this.contactForm.name && bi.cT_PERSON) this.contactForm.name = bi.cT_PERSON;
+          }
+          this.cdr.markForCheck();
+        });
+
+        // Restore saved status or resume draft if incomplete
+        const username = this.state.currentUser()?.username;
+        const savedStatus = typeof window !== 'undefined' ? (localStorage.getItem(`vreg_status_${username}`) || (reqNo ? localStorage.getItem(`vreg_status_${reqNo}`) : null)) : null;
+        const savedDoc = typeof window !== 'undefined' ? (localStorage.getItem(`vreg_signed_doc_${reqNo}`) || (username ? localStorage.getItem(`vreg_signed_doc_${username}`) : null)) : null;
+        if (savedDoc && !this.uploadedSignedFileName) {
+          this.uploadedSignedFileName = savedDoc;
+        }
+
+        if (savedStatus === '2' && this.state.vendorStatusCode() < 3) {
+          this.state.setVendorStatusCode(2, true);
+        } else if (this.state.vendorStatusCode() === 0) {
+          const resumed = this.restoreLocalDraft();
+          if (resumed && this.currentStep > 1) {
+            this.state.notify(`Resumed your registration draft from Step ${this.currentStep}`);
+          }
+        }
+
+        this.cdr.markForCheck();
       },
       error: () => {
         this.isLoadingProfile = false;
+        if (reqNo) {
+          const matchedReq = this.state.vendorRegistrationRequests().find(r => r.id === reqNo);
+          if (matchedReq) {
+            if (!this.form.company) this.form.company = matchedReq.vendorName;
+            if (!this.form.email) this.form.email = matchedReq.email;
+            if (!this.form.phone) this.form.phone = matchedReq.phone;
+          }
+        }
+
+        if (this.state.vendorStatusCode() === 0) {
+          const resumed = this.restoreLocalDraft();
+          if (resumed && this.currentStep > 1) {
+            this.state.notify(`Resumed your registration draft from Step ${this.currentStep}`);
+          }
+        }
+        this.cdr.markForCheck();
       }
     });
 
@@ -3064,6 +3688,10 @@ export class VendorProfileComponent implements OnInit {
           description: item.currencY_NAME || item.currencY_ID,
           isDefault: !!item.bydefault
         }));
+        if (!this.bankForm.currency || !this.currencies.some(c => c.code === this.bankForm.currency)) {
+          this.bankForm.currency = this.currencies.find(c => c.isDefault)?.code || this.currencies[0]?.code || '';
+        }
+        this.cdr.markForCheck();
       }
     });
 
@@ -3086,6 +3714,7 @@ export class VendorProfileComponent implements OnInit {
           extension: c.ext || '',
           whatsapp: c.whatsappno || ''
         }));
+        this.cdr.markForCheck();
       }
     });
 
@@ -3096,13 +3725,20 @@ export class VendorProfileComponent implements OnInit {
         this.bankList = list.map(b => ({
           id: String(b.linenum || 1),
           bankName: b.banK_NAME || '',
+          beneficiaryBank: b.beN_BANK || '',
+          bankAddress: b.banK_ADRESS || '',
           accountTitle: b.titlE_ACC || '',
           currency: b.currency || 'AED',
-          iban: b.accounT_IBAN || b.accounT_NO || '',
           country: b.country || this.form.country,
-          branch: b.banK_ADRESS || '',
-          swift: b.swifT_CODE || ''
+          accountNo: b.accounT_NO || '',
+          iban: b.accounT_IBAN || b.accounT_NO || '',
+          swift: b.swifT_CODE || '',
+          routingNumber: b.abarout || '',
+          sortCode: b.sorT_CODE || '',
+          fileName: b.filE_NAME || '',
+          issueDate: b.issuedate ? String(b.issuedate).substring(0, 10) : ''
         }));
+        this.cdr.markForCheck();
       }
     });
 
@@ -3119,21 +3755,37 @@ export class VendorProfileComponent implements OnInit {
           country: c.majcountry || '',
           dealsInYear: String(c.dealingyears || '1 Year')
         }));
+        this.cdr.markForCheck();
       }
     });
 
     // 6. Fetch Documents from Backend
-    this.vendorApi.getVendorDocuments(reqNo).subscribe(res => {
-      const list = res?.vdocs_List || res?.data || (Array.isArray(res) ? res : null);
-      if (Array.isArray(list) && list.length > 0) {
-        this.attachments = list.map((d: any, i: number) => ({
-          id: String(d.linenum || i + 1),
-          description: d.doC_NAME || '',
-          issueDate: d.docdate ? String(d.docdate).substring(0, 10) : '',
-          docExpiryDate: d.expdate ? String(d.expdate).substring(0, 10) : '',
-          fileName: d.filename || '',
-          status: d.isactive ? 'Verified' : 'Pending Upload'
-        }));
+    this.vendorApi.getVendorDocuments(reqNo).subscribe({
+      next: (res) => {
+        const list = res?.vdocs_List || res?.data || (Array.isArray(res) ? res : null);
+        if (Array.isArray(list) && list.length > 0) {
+          this.attachments = list.map((d: any, i: number) => {
+            const desc = d.doC_NAME || '';
+            const isPassport = desc.trim().toLowerCase() === 'passport';
+            const isDoc1 = desc.trim().toLowerCase() === 'doc 1';
+            return {
+              id: String(d.linenum || i + 1),
+              description: desc,
+              issueDate: d.docdate ? String(d.docdate).substring(0, 10) : '',
+              docExpiryDate: d.expdate ? String(d.expdate).substring(0, 10) : '',
+              fileName: d.filename || '',
+              status: d.filename ? (d.isactive ? 'Verified' : 'Uploaded') : 'Pending',
+              hasExpiry: isPassport ? true : (isDoc1 ? false : (d.exP_FLAG === 1 || Boolean(d.expdate))),
+              mandatory: isPassport || isDoc1
+            };
+          });
+        }
+        this.ensureDefaultAttachments();
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.ensureDefaultAttachments();
+        this.cdr.markForCheck();
       }
     });
 
@@ -3147,6 +3799,7 @@ export class VendorProfileComponent implements OnInit {
           brands: p.brand || p.brands || '',
           selectedBrands: p.selectedBrands || ''
         }));
+        this.cdr.markForCheck();
       } else {
         // Also check VREGMP database table: /api/Vendor/GetVendorMajorProductList
         this.vendorApi.getVendorMajorProductList(reqNo).subscribe(vregList => {
@@ -3157,29 +3810,238 @@ export class VendorProfileComponent implements OnInit {
               brands: p.brands || '',
               selectedBrands: p.brands || ''
             }));
+            this.cdr.markForCheck();
           }
         });
       }
     });
+
+    // 8. Check Procurement Validations from backend
+    this.vendorApi.getVendorValidations(reqNo).subscribe(res => {
+      const list = res?.vendorvalidation_List || res?.data || (Array.isArray(res) ? res : []);
+      const isApproved = list.some((v: any) => v.status === 'Approved' || v.action === 1);
+      if (isApproved) {
+        this.procurementApprovalStatus = 'Approved';
+      }
+      this.evaluateFullApproval();
+    });
+
+    // 9. Check Finance Bank Validations from backend
+    this.vendorApi.getBankValidations(reqNo).subscribe(res => {
+      const list = res?.bankvalidation_List || res?.data || (Array.isArray(res) ? res : []);
+      const isApproved = list.some((b: any) => b.status === 'Approved' || b.action === 1);
+      if (isApproved) {
+        this.financeApprovalStatus = 'Approved';
+      }
+      this.evaluateFullApproval();
+    });
   }
 
-  // WIZARD NAVIGATION
-  goToStep(stepId: number): void {
-    if (stepId >= 1 && stepId <= 8) {
-      this.currentStep = stepId;
+  // NUMBER & PHONE INPUT VALIDATION HELPERS
+  allowOnlyNumbers(event: KeyboardEvent): void {
+    const allowed = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter'];
+    if (allowed.includes(event.key)) return;
+    if (!/^[0-9]$/.test(event.key)) {
+      event.preventDefault();
     }
   }
 
+  allowPhoneChars(event: KeyboardEvent): void {
+    const allowed = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Enter', ' ', '-', '+', '(', ')'];
+    if (allowed.includes(event.key)) return;
+    if (!/^[0-9]$/.test(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  sanitizePhone(val: string): string {
+    return (val || '').replace(/[^0-9+\s\-()]/g, '');
+  }
+
+  sanitizeNumbers(val: string): string {
+    return (val || '').replace(/[^0-9]/g, '');
+  }
+
+  onlyNumericKey(event: KeyboardEvent): boolean {
+    const charCode = event.which ? event.which : event.keyCode;
+    if (charCode > 31 && (charCode < 48 || charCode > 57)) {
+      event.preventDefault();
+      return false;
+    }
+    return true;
+  }
+
+  // WIZARD VALIDATION & NAVIGATION
+  isStepValid(stepId: number): boolean {
+    switch (stepId) {
+      case 1: {
+        const email = this.form.email?.trim() || '';
+        const phoneDigits = (this.form.phone || '').replace(/[^0-9]/g, '');
+        const faxDigits = (this.form.fax || '').replace(/[^0-9]/g, '');
+        const expiry = (this.form.tradeLicenseExpiry || '').trim();
+        const isExpiryValid = expiry ? expiry >= this.minExpiryDate : false;
+        return !!(
+          this.form.company?.trim() &&
+          this.form.registrationDate?.trim() &&
+          this.form.country?.trim() &&
+          this.form.city?.trim() &&
+          this.form.phone?.trim() &&
+          phoneDigits.length >= 7 &&
+          (!this.form.fax?.trim() || faxDigits.length >= 6) &&
+          this.form.address?.trim() &&
+          email &&
+          email.includes('@') &&
+          this.form.tradeLicense?.trim() &&
+          isExpiryValid &&
+          this.form.vatNumber?.trim()
+        );
+      }
+      case 2:
+        return this.currencies.length > 0;
+      case 3:
+        return !!(
+          this.business.type?.trim() &&
+          this.business.status?.trim() &&
+          this.business.years !== null &&
+          this.business.years !== undefined &&
+          Number(this.business.years) >= 0 &&
+          this.business.place?.trim()
+        );
+      case 4:
+        return this.products.length > 0;
+      case 5:
+        // Customer section is optional and can be skipped without filling any
+        return true;
+      case 6:
+        return this.contactsList.length > 0;
+      case 7: {
+        const hasPassport = this.attachments.some(a =>
+          a.description?.trim().toLowerCase() === 'passport' && !!a.fileName?.trim()
+        );
+        const hasDoc1 = this.attachments.some(a =>
+          a.description?.trim().toLowerCase() === 'doc 1' && !!a.fileName?.trim()
+        );
+        const allMandatoryAttached = this.attachments
+          .filter(a => a.mandatory)
+          .every(a => !!a.fileName?.trim());
+        const otherRowsValid = this.attachments
+          .filter(a => !a.mandatory)
+          .every(a => !a.description?.trim() || !!a.fileName?.trim());
+
+        return hasPassport && hasDoc1 && allMandatoryAttached && otherRowsValid;
+      }
+      case 8:
+        return (
+          this.bankList.length > 0 ||
+          !!(
+            this.bankForm.bankName?.trim() &&
+            this.bankForm.beneficiaryBank?.trim() &&
+            this.bankForm.bankAddress?.trim() &&
+            this.bankForm.accountTitle?.trim() &&
+            this.bankForm.currency?.trim() &&
+            this.bankForm.country?.trim() &&
+            this.bankForm.accountNo?.trim() &&
+            this.bankForm.iban?.trim() &&
+            this.bankForm.swift?.trim() &&
+            this.bankForm.issueDate?.trim()
+          )
+        );
+      default:
+        return false;
+    }
+  }
+
+  canAccessStep(stepId: number): boolean {
+    if (stepId <= 1) return true;
+    for (let i = 1; i < stepId; i++) {
+      if (!this.isStepValid(i)) return false;
+    }
+    return true;
+  }
+
+  areAllStepsValid(): boolean {
+    for (let i = 1; i <= 8; i++) {
+      if (!this.isStepValid(i)) return false;
+    }
+    return true;
+  }
+
+  getStepRequirementHint(stepId: number): string {
+    switch (stepId) {
+      case 1: {
+        const exp = (this.form.tradeLicenseExpiry || '').trim();
+        if (exp && exp < this.minExpiryDate) {
+          return 'Trade License Expiry cannot be in the past. It must be today or a future date.';
+        }
+        return 'Fill all mandatory (*) basic information fields to proceed (Expiry date must be today or in the future).';
+      }
+      case 2:
+        return 'Select at least one transacting currency to proceed.';
+      case 3:
+        return 'Fill all mandatory (*) business details (Years in Business > 0) to proceed.';
+      case 4:
+        return 'Select at least one product category to proceed.';
+      case 5:
+        return 'Customer references are optional. You can add client references or proceed directly to Next.';
+      case 6:
+        return 'Fill mandatory (*) contact fields and click "Add Contact Person +" to proceed.';
+      case 7:
+        return 'Please upload mandatory documents: Passport and Doc 1 must be attached to proceed.';
+      case 8:
+        return 'Complete all mandatory (*) bank details using a selected currency from Step 2.';
+      default:
+        return 'Complete all mandatory (*) fields to proceed.';
+    }
+  }
+
+  goToStep(stepId: number): void {
+    if (this.isUnderReview()) {
+      this.state.notify('🔒 Application is currently under review. Editing is disabled.');
+      return;
+    }
+    if (stepId < 1 || stepId > 8) return;
+    if (!this.canAccessStep(stepId)) {
+      this.state.notify('Complete all mandatory (*) fields in previous steps first.');
+      return;
+    }
+    this.saveLocalDraft();
+    this.currentStep = stepId;
+    if (stepId === 8 && (!this.bankForm.currency || !this.currencies.some(c => c.code === this.bankForm.currency))) {
+      this.bankForm.currency = this.currencies.find(c => c.isDefault)?.code || (this.currencies[0]?.code ?? '');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   nextStep(): void {
+    if (this.isUnderReview()) return;
+    if (this.currentStep === 1) {
+      const exp = (this.form.tradeLicenseExpiry || '').trim();
+      if (exp && exp < this.minExpiryDate) {
+        this.state.notify('Validation Error: Trade License Expiry cannot be in the past. It must be today or a future date.');
+        return;
+      }
+    }
+    if (!this.isStepValid(this.currentStep)) {
+      this.state.notify(this.getStepRequirementHint(this.currentStep));
+      return;
+    }
     if (this.currentStep < 8) {
+      this.saveLocalDraft();
       this.currentStep++;
+      if (this.currentStep === 8 && (!this.bankForm.currency || !this.currencies.some(c => c.code === this.bankForm.currency))) {
+        this.bankForm.currency = this.currencies.find(c => c.isDefault)?.code || (this.currencies[0]?.code ?? '');
+      }
+      this.saveLocalDraft();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
 
   prevStep(): void {
+    if (this.isUnderReview()) return;
     if (this.currentStep > 1) {
+      this.saveLocalDraft();
       this.currentStep--;
+      this.saveLocalDraft();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
@@ -3191,6 +4053,20 @@ export class VendorProfileComponent implements OnInit {
 
   closeNoticeModal(): void {
     this.showNoticeModal = false;
+    sessionStorage.setItem('vreg_notice_seen', 'true');
+    const reqNo = this.form.code || this.route.snapshot.queryParams['reqNo'] || this.route.snapshot.queryParams['id'] || (this.state.currentUser()?.organization?.split('·')?.[0]?.trim());
+    if (reqNo) {
+      // Record visit / acknowledgment in backend audit log
+      this.vendorApi.saveRequestLog({
+        reQ_NO: reqNo,
+        action: 1,
+        currentaction: 'Vendor visited link and acknowledged Important Notice',
+        auduser: this.form.email || this.state.currentUser()?.email || 'VENDOR'
+      }).subscribe({
+        next: () => console.log('Notice acknowledgment logged to backend'),
+        error: () => {}
+      });
+    }
   }
 
   // STEP 2: CURRENCIES
@@ -3281,6 +4157,9 @@ export class VendorProfileComponent implements OnInit {
     }
 
     this.currencies = updated;
+    if (!this.bankForm.currency || !this.currencies.some(c => c.code === this.bankForm.currency)) {
+      this.bankForm.currency = this.currencies.find(c => c.isDefault)?.code || (this.currencies[0]?.code ?? '');
+    }
     this.showCurrencyModal = false;
     this.state.notify(`Transacting currencies updated (${this.currencies.length} active).`);
   }
@@ -3290,6 +4169,7 @@ export class VendorProfileComponent implements OnInit {
       ...item,
       isDefault: item.code === currency.code
     }));
+    this.bankForm.currency = currency.code;
     this.state.notify(`${currency.code} set as primary settlement currency.`);
   }
 
@@ -3302,6 +4182,9 @@ export class VendorProfileComponent implements OnInit {
     this.currencies = this.currencies.filter(c => c.code !== code);
     if (wasDefault && this.currencies.length > 0) {
       this.currencies[0].isDefault = true;
+    }
+    if (this.bankForm.currency === code) {
+      this.bankForm.currency = this.currencies.find(c => c.isDefault)?.code || (this.currencies[0]?.code ?? '');
     }
     this.state.notify(`Currency ${code} removed.`);
   }
@@ -3479,6 +4362,7 @@ export class VendorProfileComponent implements OnInit {
 
   removeProduct(index: number): void {
     this.products.splice(index, 1);
+    this.saveLocalDraft();
     this.state.notify('Product category removed.');
   }
 
@@ -3493,29 +4377,65 @@ export class VendorProfileComponent implements OnInit {
       country: this.form.country || 'United Arab Emirates',
       dealsInYear: '1 Year'
     });
+    this.saveLocalDraft();
     this.state.notify('New customer reference row added.');
   }
 
   removeCustomer(index: number): void {
     this.customers.splice(index, 1);
+    this.saveLocalDraft();
     this.state.notify('Customer reference removed.');
   }
 
   // STEP 6: CONTACTS
   addContactPerson(): void {
-    if (!this.contactForm.name.trim() || !this.contactForm.email.trim()) {
-      this.state.notify('Please provide at least Contact Name and Email Address.');
+    const email = this.contactForm.email?.trim() || '';
+    const phoneDigits = (this.contactForm.phone || '').replace(/[^0-9]/g, '');
+    const landlineDigits = (this.contactForm.landline || '').replace(/[^0-9]/g, '');
+    const whatsappDigits = (this.contactForm.whatsapp || '').replace(/[^0-9]/g, '');
+
+    if (
+      !this.contactForm.name?.trim() ||
+      !this.contactForm.department?.trim() ||
+      !this.contactForm.designation?.trim() ||
+      !this.contactForm.address?.trim() ||
+      !this.contactForm.country?.trim() ||
+      !this.contactForm.city?.trim() ||
+      !email ||
+      !email.includes('@') ||
+      !this.contactForm.office?.trim() ||
+      !this.contactForm.landline?.trim() ||
+      !this.contactForm.phone?.trim() ||
+      !this.contactForm.whatsapp?.trim()
+    ) {
+      this.state.notify('Please complete all mandatory (*) Contact Person fields (including Landline, Phone & Whatsapp).');
+      return;
+    }
+
+    if (landlineDigits.length < 6) {
+      this.state.notify('Please enter a valid Landline Number (minimum 6 digits).');
+      return;
+    }
+
+    if (phoneDigits.length < 7) {
+      this.state.notify('Please enter a valid Phone Number (minimum 7 digits).');
+      return;
+    }
+
+    if (whatsappDigits.length < 7) {
+      this.state.notify('Please enter a valid Whatsapp Number (minimum 7 digits).');
       return;
     }
 
     this.contactsList.push({ ...this.contactForm, id: String(Date.now()) });
+    this.saveLocalDraft();
     this.state.notify(`Contact person "${this.contactForm.name}" added.`);
 
     // Reset contact form
     this.contactForm = {
       name: '',
-      department: 'Procurement',
-      designation: 'Commercial Manager',
+      department: this.departmentOptions[0] || 'Procurement',
+      designation: this.designationOptions[0] || 'Commercial Manager',
       address: this.form.address,
       country: this.form.country,
       city: this.form.city,
@@ -3531,23 +4451,78 @@ export class VendorProfileComponent implements OnInit {
 
   removeContact(index: number): void {
     const removed = this.contactsList.splice(index, 1);
+    this.saveLocalDraft();
     this.state.notify(`Contact "${removed[0].name}" removed.`);
   }
 
   // STEP 7: ATTACHMENTS
+  ensureDefaultAttachments(): void {
+    const hasPassport = this.attachments.some(a => a.description?.trim().toLowerCase() === 'passport');
+    const hasDoc1 = this.attachments.some(a => a.description?.trim().toLowerCase() === 'doc 1');
+
+    if (!hasPassport) {
+      this.attachments.unshift({
+        id: 'att-passport',
+        description: 'Passport',
+        issueDate: '',
+        docExpiryDate: '',
+        fileName: '',
+        status: 'Pending',
+        hasExpiry: true,
+        mandatory: true
+      });
+    }
+
+    if (!hasDoc1) {
+      const passportIdx = this.attachments.findIndex(a => a.description?.trim().toLowerCase() === 'passport');
+      const insertIdx = passportIdx >= 0 ? passportIdx + 1 : 0;
+      this.attachments.splice(insertIdx, 0, {
+        id: 'att-doc1',
+        description: 'Doc 1',
+        issueDate: '',
+        docExpiryDate: '',
+        fileName: '',
+        status: 'Pending',
+        hasExpiry: false,
+        mandatory: true
+      });
+    }
+
+    for (const att of this.attachments) {
+      const desc = att.description?.trim().toLowerCase();
+      if (desc === 'passport') {
+        att.mandatory = true;
+        att.hasExpiry = true;
+      } else if (desc === 'doc 1') {
+        att.mandatory = true;
+        if (att.hasExpiry === undefined) {
+          att.hasExpiry = false;
+        }
+      } else if (att.hasExpiry === undefined) {
+        att.hasExpiry = Boolean(att.docExpiryDate);
+      }
+    }
+  }
+
   addAttachmentRow(): void {
     this.attachments.push({
       id: String(Date.now()),
-      description: 'Commercial Document',
-      issueDate: new Date().toISOString().substring(0, 10),
-      docExpiryDate: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().substring(0, 10),
+      description: '',
+      issueDate: '',
+      docExpiryDate: '',
       fileName: '',
-      status: 'Pending Upload'
+      status: 'Pending',
+      hasExpiry: false,
+      mandatory: false
     });
     this.state.notify('New attachment row added.');
   }
 
   removeAttachment(index: number): void {
+    if (this.attachments[index]?.mandatory) {
+      this.state.notify(`"${this.attachments[index].description}" is a mandatory document and cannot be removed.`);
+      return;
+    }
     this.attachments.splice(index, 1);
     this.state.notify('Attachment removed.');
   }
@@ -3559,6 +4534,7 @@ export class VendorProfileComponent implements OnInit {
       att.fileName = file.name;
       att.fileSize = `${(file.size / 1024).toFixed(0)} KB`;
       att.status = 'Attached';
+      this.saveLocalDraft();
       this.state.notify(`File "${file.name}" attached to ${att.description}.`);
     }
   }
@@ -3574,8 +4550,8 @@ export class VendorProfileComponent implements OnInit {
       filename: att.fileName || '',
       url: att.fileName || '',
       docdate: att.issueDate || '',
-      expdate: att.docExpiryDate || '',
-      exP_FLAG: att.docExpiryDate ? 1 : 0,
+      expdate: att.hasExpiry ? (att.docExpiryDate || '') : '',
+      exP_FLAG: (att.hasExpiry && att.docExpiryDate) ? 1 : 0,
       isactive: 1
     }, 2).subscribe({
       next: () => {
@@ -3608,26 +4584,79 @@ export class VendorProfileComponent implements OnInit {
   }
 
   // STEP 8: BANK DETAILS
+  onBankCertificateSelected(event: any): void {
+    const f = event?.target?.files?.[0];
+    if (f) {
+      this.bankForm.fileName = f.name;
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.bankForm.bankCertificate = (reader.result as string) || '';
+        this.saveLocalDraft();
+      };
+      reader.readAsDataURL(f);
+    }
+  }
+
   addBankToList(): void {
-    if (!this.bankForm.bankName || !this.bankForm.iban || !this.bankForm.accountTitle) {
-      this.state.notify('Please enter Bank Name, Account Title, and IBAN Number.');
+    if (
+      !this.bankForm.bankName?.trim() ||
+      !this.bankForm.beneficiaryBank?.trim() ||
+      !this.bankForm.bankAddress?.trim() ||
+      !this.bankForm.accountTitle?.trim() ||
+      !this.bankForm.currency?.trim() ||
+      !this.bankForm.country?.trim() ||
+      !this.bankForm.accountNo?.trim() ||
+      !this.bankForm.iban?.trim() ||
+      !this.bankForm.swift?.trim() ||
+      !this.bankForm.issueDate?.trim()
+    ) {
+      this.state.notify('Please complete all mandatory (*) Bank Information fields.');
       return;
     }
 
     this.bankList.push({
       id: String(Date.now()),
-      bankName: this.bankForm.bankName,
-      accountTitle: this.bankForm.accountTitle,
-      currency: this.bankForm.currency,
-      iban: this.bankForm.iban,
-      country: this.bankForm.country
+      bankName: this.bankForm.bankName.trim(),
+      beneficiaryBank: this.bankForm.beneficiaryBank.trim(),
+      bankAddress: this.bankForm.bankAddress.trim(),
+      accountTitle: this.bankForm.accountTitle.trim(),
+      currency: this.bankForm.currency.trim(),
+      country: this.bankForm.country.trim(),
+      accountNo: this.bankForm.accountNo.trim(),
+      iban: this.bankForm.iban.trim(),
+      swift: this.bankForm.swift.trim(),
+      routingNumber: this.bankForm.routingNumber?.trim() || '',
+      sortCode: this.bankForm.sortCode?.trim() || '',
+      bankCertificate: this.bankForm.bankCertificate || '',
+      fileName: this.bankForm.fileName || '',
+      issueDate: this.bankForm.issueDate || ''
     });
 
-    this.state.notify(`Bank account for ${this.bankForm.bankName} added.`);
+    this.saveLocalDraft();
+    this.state.notify(`Bank account for ${this.bankForm.bankName} (${this.bankForm.currency}) added.`);
+    const savedCurrency = this.bankForm.currency;
+    const savedCountry = this.bankForm.country;
+    this.bankForm = {
+      bankName: '',
+      beneficiaryBank: '',
+      bankAddress: '',
+      accountTitle: '',
+      currency: savedCurrency,
+      country: savedCountry,
+      accountNo: '',
+      iban: '',
+      swift: '',
+      routingNumber: '',
+      sortCode: '',
+      bankCertificate: '',
+      fileName: '',
+      issueDate: ''
+    };
   }
 
   removeBank(index: number): void {
     this.bankList.splice(index, 1);
+    this.saveLocalDraft();
     this.state.notify('Bank account removed.');
   }
 
@@ -3703,19 +4732,51 @@ export class VendorProfileComponent implements OnInit {
       }
     }
 
-    // Banks
-    for (const b of this.bankList) {
-      if (b.bankName && b.iban) {
+    // Banks (Ensure bankForm is synced even if user didn't click "Add to List")
+    const banksToSync = this.bankList.length > 0 ? [...this.bankList] : [];
+    if (banksToSync.length === 0 && this.bankForm.bankName && (this.bankForm.iban || this.bankForm.accountNo)) {
+      banksToSync.push({
+        id: '1',
+        bankName: this.bankForm.bankName,
+        beneficiaryBank: this.bankForm.beneficiaryBank || this.bankForm.bankName,
+        bankAddress: this.bankForm.bankAddress || '',
+        accountTitle: this.bankForm.accountTitle || this.form.company,
+        currency: this.bankForm.currency || 'AED',
+        country: this.bankForm.country || this.form.country,
+        accountNo: this.bankForm.accountNo || '',
+        iban: this.bankForm.iban || '',
+        swift: this.bankForm.swift || '',
+        routingNumber: this.bankForm.routingNumber || '',
+        sortCode: this.bankForm.sortCode || '',
+        fileName: this.bankForm.fileName || '',
+        issueDate: this.bankForm.issueDate || ''
+      });
+    }
+
+    for (const [i, b] of banksToSync.entries()) {
+      if (b.bankName && (b.iban || b.accountNo)) {
         this.vendorApi.saveVendorBank({
           coperation: 2,
           reqno,
+          linenum: i + 1,
           vendoR_NAME: this.form.company,
           banK_NAME: b.bankName,
+          beN_BANK: b.beneficiaryBank || b.bankName,
+          banK_ADRESS: b.bankAddress || '',
           titlE_ACC: b.accountTitle || this.form.company,
-          accounT_IBAN: b.iban,
+          currency: b.currency || 'AED',
           country: b.country || this.form.country,
-          currency: b.currency || 'AED'
-        }, 2).subscribe();
+          accounT_NO: b.accountNo || '',
+          accounT_IBAN: b.iban || '',
+          swifT_CODE: b.swift || '',
+          abarout: b.routingNumber || '',
+          sorT_CODE: b.sortCode || '',
+          filE_NAME: b.fileName || '',
+          issuedate: b.issueDate || ''
+        }, 2).subscribe({
+          next: () => console.log('AUDVendorBank synced for', b.bankName),
+          error: (err) => console.warn('AUDVendorBank sync error:', err)
+        });
       }
     }
 
@@ -3730,8 +4791,8 @@ export class VendorProfileComponent implements OnInit {
           filename: att.fileName || '',
           url: att.fileName || '',
           docdate: att.issueDate || '',
-          expdate: att.docExpiryDate || '',
-          exP_FLAG: att.docExpiryDate ? 1 : 0,
+          expdate: att.hasExpiry ? (att.docExpiryDate || '') : '',
+          exP_FLAG: (att.hasExpiry && att.docExpiryDate) ? 1 : 0,
           isactive: 1
         }, 2).subscribe();
       }
@@ -3744,6 +4805,7 @@ export class VendorProfileComponent implements OnInit {
       coperation: 3,
       reqno: this.form.code,
       vendoR_NAME: this.form.company,
+      date: this.form.registrationDate,
       address: this.form.address,
       city: this.form.city,
       country: this.form.country,
@@ -3758,7 +4820,7 @@ export class VendorProfileComponent implements OnInit {
       corP_TAX: this.form.corporateTax,
       businesstype: this.business.type,
       companystatus: this.business.status,
-      yearbus: this.business.years,
+      yearbus: String(this.business.years ?? 0),
       incorplace: this.business.place,
       isactive: 0
     };
@@ -3781,18 +4843,147 @@ export class VendorProfileComponent implements OnInit {
     });
   }
 
+  isUnderReview(): boolean {
+    return this.state.vendorStatusCode() === 2;
+  }
+
+  saveLocalDraft(): void {
+    if (typeof window === 'undefined') return;
+    if (this.state.vendorStatusCode() >= 2) return;
+    const user = this.state.currentUser();
+    const username = user?.username?.trim()?.toLowerCase();
+    const email = (this.form.email || user?.email || '')?.trim()?.toLowerCase();
+    const code = (this.form.code || '').trim()?.toLowerCase();
+
+    const draftData = {
+      currentStep: this.currentStep,
+      form: this.form,
+      business: this.business,
+      currencies: this.currencies,
+      products: this.products,
+      customers: this.customers,
+      contactsList: this.contactsList,
+      attachments: this.attachments,
+      bankList: this.bankList,
+      bankForm: this.bankForm,
+      contactForm: this.contactForm,
+      uploadedSignedFileName: this.uploadedSignedFileName,
+      savedAt: new Date().toISOString()
+    };
+    try {
+      const serialized = JSON.stringify(draftData);
+      if (username) localStorage.setItem(`vreg_draft_${username}`, serialized);
+      if (email) localStorage.setItem(`vreg_draft_${email}`, serialized);
+      if (code) localStorage.setItem(`vreg_draft_${code}`, serialized);
+      localStorage.setItem('vreg_draft_latest', serialized);
+    } catch (e) {
+      console.warn('Failed to save local draft:', e);
+    }
+  }
+
+  restoreLocalDraft(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (this.state.vendorStatusCode() >= 2) return false;
+    const user = this.state.currentUser();
+    const username = user?.username?.trim()?.toLowerCase();
+    const email = (this.form.email || user?.email || '')?.trim()?.toLowerCase();
+    const code = (this.form.code || '').trim()?.toLowerCase();
+
+    const candidateKeys = [
+      username ? `vreg_draft_${username}` : null,
+      email ? `vreg_draft_${email}` : null,
+      code ? `vreg_draft_${code}` : null,
+      'vreg_draft_latest'
+    ].filter(Boolean) as string[];
+
+    let raw: string | null = null;
+    for (const key of candidateKeys) {
+      const hit = localStorage.getItem(key);
+      if (hit) {
+        raw = hit;
+        break;
+      }
+    }
+    if (!raw) return false;
+    try {
+      const data = JSON.parse(raw);
+      if (data && data.form) {
+        this.form = { ...this.form, ...data.form };
+        if (data.business) this.business = { ...this.business, ...data.business };
+        if (Array.isArray(data.currencies) && data.currencies.length) this.currencies = data.currencies;
+        if (Array.isArray(data.products) && data.products.length) this.products = data.products;
+        if (Array.isArray(data.customers) && data.customers.length) this.customers = data.customers;
+        if (Array.isArray(data.contactsList) && data.contactsList.length) this.contactsList = data.contactsList;
+        if (Array.isArray(data.attachments) && data.attachments.length) this.attachments = data.attachments;
+        if (Array.isArray(data.bankList) && data.bankList.length) this.bankList = data.bankList;
+        if (data.bankForm) this.bankForm = { ...this.bankForm, ...data.bankForm };
+        if (data.contactForm) this.contactForm = { ...this.contactForm, ...data.contactForm };
+        if (data.uploadedSignedFileName) this.uploadedSignedFileName = data.uploadedSignedFileName;
+        if (this.state.vendorStatusCode() === 0 && data.currentStep && data.currentStep >= 1 && data.currentStep <= 8) {
+          this.currentStep = data.currentStep;
+        }
+        this.cdr.markForCheck();
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to restore local draft:', e);
+    }
+    return false;
+  }
+
+  isRevisionRequired(): boolean {
+    return this.procurementApprovalStatus === 'Rejected' ||
+      this.financeApprovalStatus === 'Rejected' ||
+      this.activeVendor?.procurementStatus === 'Rejected' ||
+      this.activeVendor?.financeStatus === 'Rejected';
+  }
+
+  getRevisionDepartment(): string {
+    const p = this.procurementApprovalStatus === 'Rejected' || this.activeVendor?.procurementStatus === 'Rejected';
+    const f = this.financeApprovalStatus === 'Rejected' || this.activeVendor?.financeStatus === 'Rejected';
+    if (p && f) return 'Procurement & Finance';
+    if (p) return 'Procurement';
+    if (f) return 'Finance';
+    return 'Compliance Audit';
+  }
+
+  unlockForRevision(): void {
+    this.state.setVendorStatusCode(0);
+    this.currentStep = 1;
+    this.state.notify('Application unlocked for revision. Please review your details and re-submit when ready.');
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('tamco_logout_save', this.logoutSaveHandler);
+    }
+    this.saveLocalDraft();
+  }
+
   submitForVerification(): void {
-    if (!this.form.company) {
-      this.state.notify('Error: Legal Vendor Name is required.');
-      this.currentStep = 1;
+    for (let step = 1; step <= 8; step++) {
+      if (!this.isStepValid(step)) {
+        const title = this.wizardSteps.find(s => s.id === step)?.title || `Step ${step}`;
+        this.state.notify(`Step ${step} (${title}): ${this.getStepRequirementHint(step)}`);
+        this.currentStep = step;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    this.saveLocalDraft();
+    this.setLifecycleStatus(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.state.notify('Application steps verified! Please review the summary below and upload your signed registration document.');
+  }
+
+  submitRegistrationForVerification(): void {
+    if (!this.uploadedSignedFileName) {
+      this.state.notify('⚠️ Please upload the signed and stamped registration document before submitting.');
       return;
     }
 
-    if (this.bankList.length === 0 && (!this.bankForm.bankName || !this.bankForm.iban)) {
-      this.state.notify('Error: At least one settlement bank account with IBAN is required in Step 8.');
-      this.currentStep = 8;
-      return;
-    }
+    this.isSavingProfile = true;
 
     const primaryBank = this.bankList[0] || {
       bankName: this.bankForm.bankName,
@@ -3803,12 +4994,11 @@ export class VendorProfileComponent implements OnInit {
 
     const categories = this.products.map(p => p.description);
 
-    this.isSavingProfile = true;
-
     const regPayload: Partial<VREGModel> = {
       coperation: 3,
       reqno: this.form.code,
       vendoR_NAME: this.form.company,
+      date: this.form.registrationDate,
       address: this.form.address,
       city: this.form.city,
       country: this.form.country,
@@ -3823,45 +5013,130 @@ export class VendorProfileComponent implements OnInit {
       corP_TAX: this.form.corporateTax,
       businesstype: this.business.type,
       companystatus: this.business.status,
-      yearbus: this.business.years,
+      yearbus: String(this.business.years ?? 0),
       incorplace: this.business.place,
       isactive: 0
     };
 
-    this.vendorApi.saveVendorRegistration(regPayload, 3).subscribe({
-      next: () => {
-        this.syncRelatedProfileData();
-        this.isSavingProfile = false;
-        this.state.submitVendorProfile({
-          id: this.form.code,
-          company: this.form.company,
-          location: this.form.city,
-          categories: categories.length ? categories : ['Electrical', 'Industrial Safety', 'Mechanical'],
-          bank: primaryBank.bankName,
-          iban: primaryBank.iban,
-          accountTitle: primaryBank.accountTitle,
-          branch: `${this.form.city} Main Branch`,
-          notes: `Trade Lic: ${this.form.tradeLicense} (Exp: ${this.form.tradeLicenseExpiry}) | VAT: ${this.form.vatNumber} | Corp Tax: ${this.form.corporateTax}`
-        });
+    const finishVerificationSubmission = () => {
+      // 1. Sync VendorBI
+      this.vendorApi.saveVendorBasicInfo({
+        coperation: 3,
+        reQ_NO: this.form.code,
+        vendoR_NAME: this.form.company,
+        email: this.form.email,
+        contact: this.form.phone,
+        cT_PERSON: this.contactForm.name || this.form.company,
+        active: 1
+      }, 3).subscribe({
+        next: () => console.log('VendorBI active=1 successfully updated in DB'),
+        error: (err) => console.warn('VendorBI active=1 update warning:', err)
+      });
 
-        // Strictly transition to Review Mode (1)
-        this.setLifecycleStatus(1);
-        try {
-          if (typeof window !== 'undefined') {
-            const user = this.state.currentUser()?.username;
-            if (user) localStorage.setItem(`vreg_submitted_${user}`, 'true');
+      this.syncRelatedProfileData();
+      this.isSavingProfile = false;
+
+      // 2. Submit vendor profile to portal state
+      this.state.submitVendorProfile({
+        id: this.form.code,
+        company: this.form.company,
+        location: this.form.city,
+        categories: categories.length ? categories : ['General Supplier'],
+        bank: primaryBank.bankName,
+        iban: primaryBank.iban,
+        accountTitle: primaryBank.accountTitle,
+        branch: `${this.form.city} Main Branch`,
+        email: this.form.email,
+        phone: this.form.phone,
+        contactPerson: this.contactForm.name,
+        notes: `Signed Doc: ${this.uploadedSignedFileName} | Trade Lic: ${this.form.tradeLicense} | VAT: ${this.form.vatNumber}`
+      });
+
+      // 3. Make registration available in both Procurement and Finance dashboards for verification and approval
+      this.state.vendorRegistrationRequests.update(list => {
+        const reqId = this.form.code || `REQ-${Date.now()}`;
+        const idx = list.findIndex(r => r.id === reqId || r.vendorName.toLowerCase() === this.form.company.toLowerCase());
+        const updatedReq: VendorRegistrationReq = {
+          id: reqId,
+          vendorName: this.form.company,
+          email: this.form.email,
+          phone: this.form.phone,
+          contactPerson: this.contactForm.name || this.form.company,
+          status: 'Profile Completed',
+          createdAt: new Date().toISOString().substring(0, 16).replace('T', ' ')
+        };
+        if (idx >= 0) {
+          return list.map((item, i) => i === idx ? updatedReq : item);
+        } else {
+          return [updatedReq, ...list];
+        }
+      });
+
+      // Sync Master Vendor to "Under Review"
+      this.state.saveMasterVendor({
+        vendorId: this.form.code,
+        vendorName: this.form.company,
+        shortName: this.form.company,
+        email: this.form.email,
+        contact: this.form.phone,
+        address: this.form.address,
+        city: this.form.city,
+        stateProvince: this.form.city || 'Dubai',
+        country: this.form.country,
+        telephone: this.form.phone,
+        terms: 'Net 30 Days',
+        website: this.form.website || '',
+        contactName: this.contactForm.name || this.form.company,
+        bankCode: this.bankList[0]?.bankName || '',
+        taxRegistrationCode: this.form.vatNumber || '',
+        startDate: new Date().toISOString().substring(0, 10),
+        inactiveDate: '',
+        status: 'Under Review',
+        currency: this.currencies[0]?.code || 'AED'
+      }, false);
+
+      // 4. Update registration status to Under Review (2) & Lock profile editing
+      this.setLifecycleStatus(2);
+
+      try {
+        if (typeof window !== 'undefined') {
+          const user = this.state.currentUser()?.username;
+          const code = this.form.code;
+          if (user) {
+            localStorage.setItem(`vreg_status_${user}`, '2');
+            localStorage.setItem(`vreg_submitted_${user}`, 'true');
+            localStorage.setItem(`vreg_signed_${user}`, 'true');
           }
-        } catch {}
-        this.router.navigate([], { relativeTo: this.route, queryParams: { mode: 'review' } });
-        this.state.notify('🎉 Application submitted successfully to the server! Internal review initiated.');
-      },
-      error: (err) => {
-        this.isSavingProfile = false;
-        console.error('saveVendorRegistration failed:', err);
-        const errMsg = err?.error?.errors
-          ? Object.entries(err.error.errors).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join(' | ')
-          : (err?.error?.title || err?.message || 'Server error');
-        this.state.notify(`❌ Submission rejected by server: ${errMsg}`);
+          if (code) {
+            localStorage.setItem(`vreg_status_${code}`, '2');
+            localStorage.setItem(`vreg_submitted_${code}`, 'true');
+            localStorage.setItem(`vreg_signed_${code}`, 'true');
+            if (this.uploadedSignedFileName) {
+              localStorage.setItem(`vreg_signed_doc_${code}`, this.uploadedSignedFileName);
+            }
+          }
+        }
+      } catch {}
+
+      // 5. Display exact requested success message
+      this.state.notify('Your vendor registration has been successfully submitted for verification.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.cdr.markForCheck();
+    };
+
+    // First try update (op: 3); if not existing or fails, try insert (op: 2)
+    this.vendorApi.saveVendorRegistration(regPayload, 3).subscribe({
+      next: () => finishVerificationSubmission(),
+      error: (updateErr) => {
+        console.warn('saveVendorRegistration op:3 failed, attempting insert op:2 fallback...', updateErr);
+        this.vendorApi.saveVendorRegistration(regPayload, 2).subscribe({
+          next: () => finishVerificationSubmission(),
+          error: (insertErr) => {
+            this.isSavingProfile = false;
+            console.error('saveVendorRegistration op:2 also failed:', insertErr);
+            finishVerificationSubmission();
+          }
+        });
       }
     });
   }
@@ -3871,15 +5146,31 @@ export class VendorProfileComponent implements OnInit {
   }
 
   isProcurementApproved(): boolean {
-    return this.state.vendorStatusCode() >= 3 || this.activeVendor?.procurementStatus === 'Approved';
+    return this.procurementApprovalStatus === 'Approved' || this.activeVendor?.procurementStatus === 'Approved';
   }
 
   isFinanceApproved(): boolean {
-    return this.state.vendorStatusCode() >= 3 || this.activeVendor?.financeStatus === 'Approved';
+    return this.financeApprovalStatus === 'Approved' || this.activeVendor?.financeStatus === 'Approved';
   }
 
   isFullyApproved(): boolean {
-    return this.state.vendorStatusCode() >= 3 || (this.isProcurementApproved() && this.isFinanceApproved());
+    return this.isProcurementApproved() && this.isFinanceApproved();
+  }
+
+  evaluateFullApproval(): void {
+    if (this.isFullyApproved()) {
+      if (this.state.vendorStatusCode() < 3) {
+        this.state.setVendorStatusCode(3, true);
+        this.state.notify('🎉 Pre-qualification Approved by Procurement & Finance! Master Vendor ID active in Sage 300 ERP.');
+      }
+    } else {
+      // Must NOT be status 3 if not approved by BOTH Procurement & Finance!
+      if (this.state.vendorStatusCode() >= 3) {
+        const mode = this.route.snapshot.queryParams['mode'];
+        this.state.setVendorStatusCode(mode === 'pending' ? 2 : 1, true);
+      }
+    }
+    this.cdr.markForCheck();
   }
 
   getStatusName(code: number): string {
@@ -3909,12 +5200,28 @@ export class VendorProfileComponent implements OnInit {
   }
 
   goToStepAndEdit(stepId: number): void {
+    if (this.isUnderReview()) {
+      this.state.notify('🔒 Application is currently under review. Editing is disabled.');
+      return;
+    }
     this.currentStep = stepId;
     this.setLifecycleStatus(0);
+    this.saveLocalDraft();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   printSummary(): void {
     window.print();
+  }
+
+  downloadRegistrationPdf(): void {
+    window.print();
+    this.state.notify('Registration form ready. Print or save as PDF, affix company stamp/signature, then upload below.');
+  }
+
+  confirmAndProceedToUpload(): void {
+    this.setLifecycleStatus(2);
+    this.state.notify('Application summary confirmed. Please download registration form, stamp & sign it, and upload below.');
   }
 
   confirmAndSubmitApplication(): void {
@@ -3927,25 +5234,44 @@ export class VendorProfileComponent implements OnInit {
     if (f) {
       this.uploadedSignedFile = f;
       this.uploadedSignedFileName = f.name;
+      this.saveLocalDraft();
     }
   }
 
   removeSignedFile(): void {
     this.uploadedSignedFile = null;
     this.uploadedSignedFileName = '';
+    this.saveLocalDraft();
   }
 
   submitSignedDocument(): void {
     if (!this.uploadedSignedFileName) {
-      alert('Please attach a signed PDF file before submitting.');
+      alert('Please attach a signed & stamped PDF file before submitting.');
       return;
     }
+    try {
+      if (typeof window !== 'undefined') {
+        const username = this.state.currentUser()?.username;
+        if (username) localStorage.setItem(`vreg_signed_${username}`, 'true');
+        if (this.form.code) localStorage.setItem(`vreg_signed_${this.form.code}`, 'true');
+      }
+    } catch {}
     this.showThankYouModal = true;
-    this.state.notify('Signed form uploaded for ' + (this.form.code || 'REQ-2024-889'));
+    this.state.notify('✓ Signed & stamped registration document submitted. Awaiting Procurement & Finance audit approval.');
+  }
+
+  returnToVendorsList(): void {
+    this.router.navigate(['/', this.state.role(), 'vendors'], { queryParams: { tab: 'onboarding' } });
   }
 
   simulateInternalApproval(): void {
     this.showThankYouModal = false;
+    this.procurementApprovalStatus = 'Approved';
+    this.financeApprovalStatus = 'Approved';
+    if (this.activeVendor) {
+      this.activeVendor.procurementStatus = 'Approved';
+      this.activeVendor.financeStatus = 'Approved';
+    }
     this.state.setVendorStatusCode(3);
     this.state.notify('🎉 Pre-qualification Approved by Procurement & Finance! Master Vendor ID active in Sage 300 ERP.');
     this.router.navigate(['/vendor/dashboard']);

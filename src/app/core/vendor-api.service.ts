@@ -16,7 +16,7 @@ export interface VREGModel {
   taxnum?: string;
   password?: string;
   businesstype?: string;
-  yearbus?: string | number;
+  yearbus?: string | number | null;
   incorplace?: string;
   companystatus?: string;
   zipcode?: string;
@@ -118,9 +118,11 @@ export interface VBANKModel {
   sorT_CODE?: string;
   banK_CERTIFICATE?: string;
   filE_NAME?: string;
-  issuedate?: string;
+  issuedate?: string | null;
+  auddate?: string | null;
   linenum?: number;
-  status?: string;
+  isactive?: number | null;
+  status?: number | null;
   [key: string]: any;
 }
 
@@ -616,23 +618,36 @@ export class VendorApiService {
     );
   }
 
-  saveVendorRegistration(data: Partial<VREGModel>, op: number = 2): Observable<any> {
-    const sanitizeDate = (val: any) => {
-      if (!val || typeof val !== 'string' || val.trim() === '') return null;
-      try {
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? null : d.toISOString();
-      } catch {
-        return null;
-      }
-    };
+  /** Normalize empty/invalid date values to null and valid dates to ISO-8601 strings for .NET DateTime? binding. */
+  private sanitizeDate(val: any): string | null {
+    if (!val || typeof val !== 'string' || val.trim() === '') return null;
+    try {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    } catch {
+      return null;
+    }
+  }
 
+  /** Coerce bank status labels or numeric strings into the nullable int32 expected by VBANKModel.status. */
+  private normalizeBankStatus(val: number | string | null | undefined): number | null {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number') return Number.isFinite(val) ? val : null;
+    const statusMap: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+    const normalized = val.trim().toLowerCase();
+    if (normalized in statusMap) return statusMap[normalized];
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  saveVendorRegistration(data: Partial<VREGModel>, op: number = 2): Observable<any> {
     const body: VREGModel = {
       coperation: op,
       ...data,
-      tL_EXPIRY: sanitizeDate(data.tL_EXPIRY),
-      date: sanitizeDate(data.date),
-      auddate: sanitizeDate(data.auddate)
+      yearbus: data.yearbus !== undefined && data.yearbus !== null ? String(data.yearbus) : null,
+      tL_EXPIRY: this.sanitizeDate(data.tL_EXPIRY),
+      date: this.sanitizeDate(data.date),
+      auddate: this.sanitizeDate(data.auddate)
     };
     return this.http.post(`${this.baseUrl}/AUDVendorRegistration`, body);
   }
@@ -758,22 +773,12 @@ export class VendorApiService {
   }
 
   saveVendorDocument(data: Partial<VDOCSModel>, op: number = 2): Observable<any> {
-    const sanitizeDate = (val: any) => {
-      if (!val || typeof val !== 'string' || val.trim() === '') return null;
-      try {
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? null : d.toISOString();
-      } catch {
-        return null;
-      }
-    };
-
     const body: VDOCSModel = {
       coperation: op,
       ...data,
-      expdate: sanitizeDate(data.expdate),
-      docdate: sanitizeDate(data.docdate),
-      auddate: sanitizeDate(data.auddate)
+      expdate: this.sanitizeDate(data.expdate),
+      docdate: this.sanitizeDate(data.docdate),
+      auddate: this.sanitizeDate(data.auddate)
     };
     return this.http.post(`${this.baseUrl}/AUDVendorDocument`, body);
   }
@@ -792,10 +797,15 @@ export class VendorApiService {
     );
   }
 
-  saveVendorBank(data: Partial<VBANKModel>, op: number = 2): Observable<any> {
+  saveVendorBank(data: Partial<VBANKModel> & { status?: number | string | null }, op: number = 2): Observable<any> {
     const body: VBANKModel = {
-      coperation: op,
-      ...data
+      ...data,
+      coperation: data.coperation ?? op,
+      linenum: Number(data.linenum) || 1,
+      issuedate: this.sanitizeDate(data.issuedate),
+      auddate: this.sanitizeDate(data.auddate),
+      isactive: data.isactive === undefined || data.isactive === null ? null : (Number.isFinite(Number(data.isactive)) ? Number(data.isactive) : null),
+      status: this.normalizeBankStatus(data.status)
     };
     return this.http.post(`${this.baseUrl}/AUDVendorBank`, body);
   }

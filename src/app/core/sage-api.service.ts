@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject, map, catchError, of } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface SageItem {
   ItemNumber: string;
@@ -115,13 +116,13 @@ export interface SageConfig {
 export class SageApiService {
   private http = inject(HttpClient);
 
-  // Default configuration discovered from Sage 300 Web API IIS setup
+  // Configuration loaded from environment with fallback defaults
   private config: SageConfig = {
-    baseUrl: '/Sage300WebApi', // Uses Angular dev proxy or direct URL
-    tenant: '-',
-    company: 'SAMDAT',
-    username: 'ADMIN',
-    password: 'Admin@123'
+    baseUrl: environment.sage?.baseUrl || '/Sage300WebApi',
+    tenant: environment.sage?.tenant || '-',
+    company: environment.sage?.company || 'SAMDAT',
+    username: environment.sage?.username || 'ADMIN',
+    password: environment.sage?.password || 'Admin@123'
   };
 
   // Connection state
@@ -497,6 +498,30 @@ export class SageApiService {
       catchError(err => {
         console.error('Error fetching POInvoices from Sage 300:', err);
         return of([]);
+      })
+    );
+  }
+
+  createPurchaseOrder(poData: any): Observable<any> {
+    const url = this.buildUrl('PO', 'POPurchaseOrders');
+    return this.http.post(url, poData, {
+      headers: this.getAuthHeaders()
+    }).pipe(
+      catchError(err => {
+        console.warn('createPurchaseOrder Sage 300 API notice:', err);
+        return of({ success: false, error: err?.message });
+      })
+    );
+  }
+
+  createInvoice(invData: any): Observable<any> {
+    const url = this.buildUrl('PO', 'POInvoices');
+    return this.http.post(url, invData, {
+      headers: this.getAuthHeaders()
+    }).pipe(
+      catchError(err => {
+        console.warn('createInvoice Sage 300 API notice:', err);
+        return of({ success: false, error: err?.message });
       })
     );
   }

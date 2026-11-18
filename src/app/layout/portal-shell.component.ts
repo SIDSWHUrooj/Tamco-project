@@ -62,7 +62,7 @@ const ROLE_LABEL: Record<Role, string> = {
         </nav>
 
         <div class="sidebar-footer">
-          <a class="support-link" [routerLink]="['/', role(), 'dashboard']"
+          <a class="support-link" [routerLink]="['/', role(), roleHome()]"
              (click)="mobileOpen.set(false)" [attr.aria-label]="'Help & Support'">
             <span class="support-icon"><app-icon name="help" [size]="16" /></span>
             <span class="nav-label">Help & Support</span>
@@ -164,41 +164,6 @@ const ROLE_LABEL: Record<Role, string> = {
                     </div>
                   </div>
 
-                  <!-- PORTAL SWITCHER / WORKSPACE SELECTION -->
-                  <div class="ud-section" role="group" aria-label="Portal Selection">
-                    <div class="ud-section-title">
-                      <span>{{ isMasterUser() ? 'Switch Portal / Workspace' : 'Assigned Workspace' }}</span>
-                      @if (isMasterUser()) {
-                        <span class="portal-badge-count">4 Available</span>
-                      }
-                    </div>
-                    <div class="portals-list">
-                      @for (p of availablePortals(); track p.key) {
-                        <button
-                          type="button"
-                          class="portal-switch-item"
-                          [class.active]="role() === p.key"
-                          [disabled]="!isMasterUser() && role() === p.key"
-                          (click)="switchPortal(p.key)"
-                        >
-                          <span class="portal-icon-wrap" [class.active]="role() === p.key">
-                            <app-icon [name]="p.icon" [size]="14" />
-                          </span>
-                          <div class="portal-info">
-                            <div class="portal-name">
-                              {{ p.label }}
-                            </div>
-                            <div class="portal-desc">{{ p.desc }}</div>
-                          </div>
-                          @if (role() === p.key) {
-                            <span class="portal-check">
-                              <app-icon name="check" [size]="14" />
-                            </span>
-                          }
-                        </button>
-                      }
-                    </div>
-                  </div>
 
                   <div class="ud-section" role="group" aria-label="Theme">
                     <small>Appearance</small>
@@ -778,93 +743,7 @@ const ROLE_LABEL: Record<Role, string> = {
           margin-bottom: 8px;
         }
       }
-      .ud-section-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        color: var(--muted, #64748b);
-        margin-bottom: 6px;
-        padding: 0 2px;
-      }
-      .portal-badge-count {
-        font-size: 9.5px;
-        font-weight: 700;
-        padding: 1px 6px;
-        border-radius: 999px;
-        background: var(--surface-3, #f1f5f9);
-        color: var(--text-2, #475569);
-      }
-      .portals-list {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        margin-bottom: 2px;
-      }
-      .portal-switch-item {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        width: 100%;
-        padding: 6px 8px;
-        border: 1px solid transparent;
-        background: none;
-        border-radius: 8px;
-        cursor: pointer;
-        text-align: left;
-        transition: all 0.15s ease;
-        &:hover:not(:disabled) {
-          background: var(--surface-2, #f8fafc);
-          border-color: var(--line, #e2e8f0);
-        }
-        &.active {
-          background: var(--role-soft, #eff6ff);
-          border-color: var(--role-border, #bfdbfe);
-        }
-        &:disabled {
-          cursor: default;
-        }
-        .portal-icon-wrap {
-          width: 26px;
-          height: 26px;
-          border-radius: 6px;
-          display: grid;
-          place-items: center;
-          flex: none;
-          background: var(--surface-3, #f1f5f9);
-          color: var(--text-2, #475569);
-          transition: all 0.15s ease;
-          &.active {
-            background: var(--role-accent, #2563eb);
-            color: #ffffff;
-          }
-        }
-        .portal-info {
-          flex: 1;
-          min-width: 0;
-          .portal-name {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text, #0f172a);
-          }
-          .portal-desc {
-            font-size: 10px;
-            color: var(--muted, #64748b);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-        }
-        .portal-check {
-          color: var(--role-accent, #2563eb);
-          display: flex;
-          align-items: center;
-          flex: none;
-        }
-      }
+
       .ud-item {
         display: flex;
         align-items: center;
@@ -1369,55 +1248,6 @@ export class PortalShellComponent {
   readonly userEmail = computed(() => this.state.currentUser()?.email || '');
   readonly roleInitial = computed(() => this.state.currentUser()?.initials || this.roleLabel().slice(0, 2).toUpperCase());
 
-  readonly userSecurityGroup = computed(() => {
-    return this.state.currentUser()?.securityGroup || '';
-  });
-
-  readonly isMasterUser = computed(() => {
-    const sg = this.userSecurityGroup().trim();
-    // If assigned to Viewer (3 = Finance) or Editor (2 = Procurement), strictly restrict them
-    if (sg === '2' || sg === '3') return false;
-    if (sg === '1' || sg === '4') return true;
-    const currRole = this.state.currentUser()?.role;
-    if (currRole === 'finance' || currRole === 'procurement' || currRole === 'vendor') return false;
-    return currRole === 'admin';
-  });
-
-  readonly availablePortals = computed(() => {
-    if (this.isMasterUser()) {
-      return [
-        { key: 'admin' as Role, label: 'Administration', icon: 'management', desc: 'Users & security governance' },
-        { key: 'procurement' as Role, label: 'Procurement', icon: 'requisition', desc: 'Requisitions, RFQs & purchase orders' },
-        { key: 'finance' as Role, label: 'Finance & AP', icon: 'invoices', desc: 'Vendor invoices & 3-way matching' },
-        { key: 'vendor' as Role, label: 'Vendor Portal', icon: 'vendors', desc: 'Supplier partner self-service' }
-      ];
-    }
-    const sg = this.userSecurityGroup();
-    const currRole = this.state.currentUser()?.role;
-    if (sg === '2' || currRole === 'procurement') {
-      return [
-        { key: 'procurement' as Role, label: 'Procurement Portal', icon: 'requisition', desc: 'Authorized Department Portal' }
-      ];
-    }
-    if (sg === '3' || currRole === 'finance') {
-      return [
-        { key: 'finance' as Role, label: 'Finance Portal', icon: 'invoices', desc: 'Authorized Department Portal' }
-      ];
-    }
-    return [
-      { key: 'vendor' as Role, label: 'Vendor Portal', icon: 'vendors', desc: 'Authorized Supplier Portal' }
-    ];
-  });
-
-  switchPortal(targetRole: Role): void {
-    if (!this.isMasterUser() && targetRole !== this.role()) return;
-    this.state.setRole(targetRole);
-    this.userOpen.set(false);
-    const dest = targetRole === 'vendor'
-      ? (this.state.vendorStatusCode() >= 3 ? '/vendor/dashboard' : '/vendor/profile')
-      : `/${targetRole}/dashboard`;
-    this.router.navigate([dest]);
-  }
 
   toggleTheme(): void { this.theme.toggle(); }
 
@@ -1508,6 +1338,11 @@ export class PortalShellComponent {
   }
 
   logout(): void {
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tamco_logout_save'));
+      }
+    } catch {}
     this.state.signOut();
     this.mobileOpen.set(false);
     this.router.navigate(['/login']);

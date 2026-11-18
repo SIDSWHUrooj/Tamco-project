@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { forkJoin, Subscription, timer } from 'rxjs';
 import { PortalStateService } from '../core/portal-state.service';
 import { VendorApiService } from '../core/vendor-api.service';
 import { StatusComponent } from '../shared/ui.component';
@@ -112,7 +113,7 @@ import { VendorRegistrationReq } from '../core/models';
               id="vendorEmail"
               type="email"
               [(ngModel)]="vendorEmail"
-              (input)="validateEmail()"
+              (input)="onFieldInput(); validateEmail()"
               placeholder="Enter Email"
               autocomplete="off"
               maxlength="60"
@@ -130,6 +131,7 @@ import { VendorRegistrationReq } from '../core/models';
               id="vendorContact"
               type="tel"
               [(ngModel)]="vendorContact"
+              (input)="onFieldInput()"
               placeholder="Enter Mobile No."
               class="form-control"
               maxlength="35"
@@ -142,6 +144,7 @@ import { VendorRegistrationReq } from '../core/models';
               id="contactPerson"
               type="text"
               [(ngModel)]="contactPerson"
+              (input)="onFieldInput()"
               placeholder="Enter Contact Person Name"
               maxlength="60"
               autocomplete="off"
@@ -157,17 +160,18 @@ import { VendorRegistrationReq } from '../core/models';
           type="button"
           class="btn btn-save"
           (click)="saveRecord()"
+          [disabled]="isSavingDraft"
           title="Save registration draft"
         >
-          Save
+          {{ isSavingDraft ? 'Saving Draft...' : 'Save Draft' }}
         </button>
 
         <button
           type="button"
           class="btn btn-send-email"
           (click)="initiateSendEmail()"
-          [disabled]="isSendingEmail"
-          title="Save and transmit invitation email with portal credentials"
+          [disabled]="!isSaved || isSendingEmail"
+          [title]="!isSaved ? 'Save draft first to enable sending email' : 'Save and transmit invitation email with portal credentials'"
         >
           {{ isSendingEmail ? 'Sending...' : 'Send Email To Vendor' }}
         </button>
@@ -176,7 +180,8 @@ import { VendorRegistrationReq } from '../core/models';
           type="button"
           class="btn secondary btn-skip-email"
           (click)="skipEmail()"
-          title="Skip sending email and mark vendor active"
+          [disabled]="!isSaved"
+          [title]="!isSaved ? 'Save draft first to enable skip & fill profile' : 'Skip email and fill vendor profile directly'"
         >
           Skip Email
         </button>
@@ -190,13 +195,26 @@ import { VendorRegistrationReq } from '../core/models';
           <h2>Recent Vendor Registration Requests</h2>
           <span class="badge-status">{{ requests().length }} records</span>
         </div>
-        <div class="table-search-box">
-          <app-icon name="search" [size]="14" />
-          <input
-            type="text"
-            [(ngModel)]="logSearchQuery"
-            placeholder="Filter requests..."
-          />
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button
+            type="button"
+            class="btn secondary"
+            style="padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border-color: #50ae9b; color: #1e5f53;"
+            (click)="loadBackendRequests()"
+            [disabled]="isLoadingRequests"
+            title="Refresh requests from database"
+          >
+            <app-icon name="refresh" [size]="14" />
+            <span>{{ isLoadingRequests ? 'Refreshing...' : 'Refresh Requests' }}</span>
+          </button>
+          <div class="table-search-box">
+            <app-icon name="search" [size]="14" />
+            <input
+              type="text"
+              [(ngModel)]="logSearchQuery"
+              placeholder="Filter requests..."
+            />
+          </div>
         </div>
       </div>
 
@@ -691,11 +709,31 @@ import { VendorRegistrationReq } from '../core/models';
     }
 
     .table-responsive {
+      width: 100%;
       overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--role-accent, #50ae9b) #f1f5f9;
+      -webkit-overflow-scrolling: touch;
+
+      &::-webkit-scrollbar {
+        height: 7px;
+      }
+      &::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: var(--role-accent, #50ae9b);
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: #3d8879;
+      }
     }
 
     .requests-table {
       width: 100%;
+      min-width: 980px;
       border-collapse: collapse;
       font-size: 13px;
 
@@ -862,9 +900,27 @@ import { VendorRegistrationReq } from '../core/models';
       }
 
       .modal-table-wrap {
-        padding: 0 20px;
+        padding: 0;
         overflow-y: auto;
+        max-height: 480px;
+        min-height: 200px;
         flex: 1;
+        scrollbar-width: thin;
+        scrollbar-color: var(--role-accent, #50ae9b) #f1f5f9;
+
+        &::-webkit-scrollbar {
+          width: 7px;
+        }
+        &::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        &::-webkit-scrollbar-thumb {
+          background: var(--role-accent, #50ae9b);
+          border-radius: 4px;
+        }
+        &::-webkit-scrollbar-thumb:hover {
+          background: #3d8879;
+        }
       }
 
       .modal-table {
@@ -872,29 +928,38 @@ import { VendorRegistrationReq } from '../core/models';
         border-collapse: collapse;
         font-size: 13px;
 
+        thead {
+          position: sticky;
+          top: 0;
+          z-index: 5;
+        }
+
         th {
           position: sticky;
           top: 0;
-          background: #ffffff;
-          padding: 10px 12px;
+          z-index: 5;
+          background: #f8fafc;
+          padding: 10px 16px;
           border-bottom: 2px solid var(--line, #e2e8f0);
-          color: var(--muted, #64748b);
-          font-weight: 600;
+          color: #475569;
+          font-weight: 700;
           text-align: left;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         }
 
         td {
-          padding: 10px 12px;
+          padding: 10px 16px;
           border-bottom: 1px solid var(--line, #e2e8f0);
           color: var(--text, #0f172a);
+          vertical-align: middle;
         }
 
         .clickable-row {
           cursor: pointer;
-          transition: background 0.12s ease;
+          transition: background 0.15s ease;
 
           &:hover {
-            background: #eff6ff;
+            background: #f0fdf9;
           }
         }
 
@@ -1110,14 +1175,49 @@ import { VendorRegistrationReq } from '../core/models';
     }
   `]
 })
-export class VendorRegistrationReqComponent {
+export class VendorRegistrationReqComponent implements OnInit, OnDestroy {
   private readonly state = inject(PortalStateService);
   private readonly router = inject(Router);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly vendorApi = inject(VendorApiService);
 
   readonly role = this.state.role;
   readonly requests = this.state.vendorRegistrationRequests;
   readonly directoryVendors = this.state.vendors;
+
+  isLoadingRequests = false;
+  private isFetchingRequests = false;
+  private lastFetchedAt = 0;
+  private readonly refreshCooldownMs = 30_000;
+  private autoRefreshSub?: Subscription;
+
+  private readonly onFocusOrVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      this.loadBackendRequests(true);
+    }
+  };
+
+  ngOnInit(): void {
+    this.loadBackendRequests();
+    // Background refresh every 60 seconds only when tab is visible and cooldown has elapsed
+    this.autoRefreshSub = timer(60_000, 60_000).subscribe(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        this.loadBackendRequests(true);
+      }
+    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', this.onFocusOrVisible);
+      document.addEventListener('visibilitychange', this.onFocusOrVisible);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.autoRefreshSub?.unsubscribe();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('focus', this.onFocusOrVisible);
+      document.removeEventListener('visibilitychange', this.onFocusOrVisible);
+    }
+  }
 
   // Form State
   vendorId = '*** NEW ***';
@@ -1127,6 +1227,7 @@ export class VendorRegistrationReqComponent {
   contactPerson = '';
 
   isSaved = false;
+  isSavingDraft = false;
   nameError = false;
   emailTouched = false;
   emailError = '';
@@ -1209,7 +1310,16 @@ export class VendorRegistrationReqComponent {
 
   onVendorNameInput(): void {
     this.nameError = false;
+    if (this.isSaved) {
+      this.isSaved = false;
+    }
     this.showSuggestions = this.vendorName.trim().length >= 2;
+  }
+
+  onFieldInput(): void {
+    if (this.isSaved) {
+      this.isSaved = false;
+    }
   }
 
   validateEmail(): void {
@@ -1259,18 +1369,149 @@ export class VendorRegistrationReqComponent {
     this.emailError = '';
   }
 
+  loadBackendRequests(silent = false): void {
+    if (this.isFetchingRequests) {
+      return;
+    }
+    if (silent && Date.now() - this.lastFetchedAt < this.refreshCooldownMs) {
+      return;
+    }
+
+    this.isFetchingRequests = true;
+    this.lastFetchedAt = Date.now();
+    if (!silent) {
+      this.isLoadingRequests = true;
+    }
+    forkJoin({
+      biRes: this.vendorApi.getVendorBasicInfo(),
+      vregRes: this.vendorApi.getAllVendorRegistrations(),
+      valRes: this.vendorApi.getVendorValidations()
+    }).subscribe({
+      next: ({ biRes, vregRes, valRes }) => {
+        this.isFetchingRequests = false;
+        this.isLoadingRequests = false;
+
+        const localCompleted = new Set<string>();
+        try {
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('vreg_completed_requests');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) parsed.forEach(id => localCompleted.add(String(id).toLowerCase().trim()));
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('vreg_submitted_') && localStorage.getItem(k) === 'true') {
+                const ident = k.replace('vreg_submitted_', '').toLowerCase().trim();
+                if (ident) localCompleted.add(ident);
+              }
+            }
+          }
+        } catch {}
+
+        const valMap = new Map<string, string>();
+        const valList = valRes?.vendorvalidation_List || valRes?.data || (Array.isArray(valRes) ? valRes : []);
+        if (Array.isArray(valList)) {
+          for (const val of valList) {
+            const reqNo = (val.reqno || '').toLowerCase().trim();
+            if (!reqNo) continue;
+            if (val.status === 'Approved' || val.action === 1) {
+              valMap.set(reqNo, 'Approved');
+              this.state.approveMasterVendor(val.reqno);
+            } else if (val.status === 'Rejected' || val.action === 2) {
+              valMap.set(reqNo, 'Rejected');
+              this.state.rejectMasterVendor(val.reqno);
+            }
+          }
+        }
+
+        const requestsMap = new Map<string, VendorRegistrationReq>();
+
+        const biList = biRes?.vendorBI_List || biRes?.data || (Array.isArray(biRes) ? biRes : []);
+        if (Array.isArray(biList)) {
+          for (const v of biList) {
+            const id = (v.reQ_NO || '').trim();
+            if (!id) continue;
+            const key = id.toLowerCase();
+            const emailKey = (v.email || '').toLowerCase().trim();
+            const nameKey = (v.vendoR_NAME || '').toLowerCase().trim();
+
+            const isSubmittedLocally = localCompleted.has(key) || (emailKey && localCompleted.has(emailKey)) || (nameKey && localCompleted.has(nameKey));
+
+            let status: VendorRegistrationReq['status'] = 'Email Sent';
+            if (valMap.get(key) === 'Approved') {
+              status = 'Approved';
+            } else if (v.active === 1 || Number(v.active) === 1 || isSubmittedLocally) {
+              status = 'Profile Completed';
+            } else if (v.active === 0 || Number(v.active) === 0) {
+              status = 'Email Sent';
+            }
+
+            requestsMap.set(key, {
+              id: id,
+              vendorName: v.vendoR_NAME || 'Unknown Vendor',
+              email: v.email || '',
+              phone: v.contact || '',
+              contactPerson: v.cT_PERSON || '',
+              status: status,
+              createdAt: v.auddate ? String(v.auddate).substring(0, 16).replace('T', ' ') : ''
+            });
+          }
+        }
+
+        const vregList = vregRes?.vreg_List || vregRes?.data || (Array.isArray(vregRes) ? vregRes : []);
+        if (Array.isArray(vregList)) {
+          for (const reg of vregList) {
+            const reqNo = (reg.reqno || reg.reQ_NO || '').trim();
+            if (!reqNo) continue;
+            const key = reqNo.toLowerCase();
+            const existing = requestsMap.get(key);
+
+            let status: VendorRegistrationReq['status'] = 'Profile Completed';
+            if (valMap.get(key) === 'Approved' || reg.isactive === 1 || Number(reg.isactive) === 1) {
+              status = 'Approved';
+            }
+
+            requestsMap.set(key, {
+              id: reqNo,
+              vendorName: reg.vendoR_NAME || existing?.vendorName || reqNo,
+              email: reg.email || existing?.email || '',
+              phone: reg.tel || existing?.phone || '',
+              contactPerson: reg.cT_PERSON || existing?.contactPerson || '',
+              status: status,
+              createdAt: reg.date ? String(reg.date).substring(0, 16).replace('T', ' ') : (reg.auddate ? String(reg.auddate).substring(0, 16).replace('T', ' ') : (existing?.createdAt || ''))
+            });
+          }
+        }
+
+        for (const existingReq of this.state.vendorRegistrationRequests()) {
+          const key = existingReq.id.toLowerCase();
+          if (existingReq.status === 'Profile Completed' && requestsMap.has(key)) {
+            const current = requestsMap.get(key)!;
+            if (current.status !== 'Approved') {
+              requestsMap.set(key, { ...current, status: 'Profile Completed' });
+            }
+          }
+        }
+
+        const combined = Array.from(requestsMap.values());
+        if (combined.length > 0) {
+          this.state.vendorRegistrationRequests.set(combined);
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.isFetchingRequests = false;
+        this.isLoadingRequests = false;
+        this.cdr.markForCheck();
+        console.warn('loadBackendRequests error:', err);
+      }
+    });
+  }
+
   private refreshRequestsFromApi(list: any[]): void {
     if (Array.isArray(list) && list.length > 0) {
-      const mapped: VendorRegistrationReq[] = list.map((v: any) => ({
-        id: v.reQ_NO || '',
-        vendorName: v.vendoR_NAME || 'Unknown Vendor',
-        email: v.email || '',
-        phone: v.contact || '',
-        contactPerson: v.cT_PERSON || '',
-        status: v.active === 0 ? 'Email Sent' : 'Profile Completed',
-        createdAt: v.auddate ? String(v.auddate).substring(0, 16).replace('T', ' ') : ''
-      }));
-      this.state.vendorRegistrationRequests.set(mapped);
+      this.loadBackendRequests();
     }
   }
 
@@ -1286,6 +1527,8 @@ export class VendorRegistrationReqComponent {
       this.state.notify('Validation Error: Valid email address is required.');
       return;
     }
+
+    this.isSavingDraft = true;
 
     const isNew = !this.vendorId || this.vendorId === '*** NEW ***' || this.vendorId.startsWith('REQ-');
     const existingVendor = this.requests().find(r =>
@@ -1321,23 +1564,39 @@ export class VendorRegistrationReqComponent {
         }).subscribe();
 
         // Refresh live vendor records from API
-        this.vendorApi.getVendorBasicInfo().subscribe(res => {
-          const list = res?.vendorBI_List || [];
-          const match = list.find((v: any) => v.email?.toLowerCase() === this.vendorEmail.trim().toLowerCase());
-          const assignedId = match?.reQ_NO || reqNo || this.vendorId;
-          this.vendorId = assignedId;
-          this.isSaved = true;
-          this.refreshRequestsFromApi(list);
-          this.state.notify(`Vendor draft saved successfully! ID: ${assignedId}`);
+        this.vendorApi.getVendorBasicInfo().subscribe({
+          next: (res) => {
+            this.isSavingDraft = false;
+            const list = res?.vendorBI_List || [];
+            const match = list.find((v: any) => v.email?.toLowerCase() === this.vendorEmail.trim().toLowerCase());
+            const assignedId = match?.reQ_NO || reqNo || this.vendorId;
+            this.vendorId = assignedId;
+            this.isSaved = true;
+            this.refreshRequestsFromApi(list);
+            this.state.notify(`Vendor draft saved successfully! ID: ${assignedId}. Send Email and Skip Email are now enabled.`);
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            this.isSavingDraft = false;
+            this.isSaved = true;
+            this.cdr.markForCheck();
+          }
         });
       },
       error: (err) => {
+        this.isSavingDraft = false;
+        this.cdr.markForCheck();
         this.state.notify('Error saving vendor: ' + (err?.error?.message || err?.message || 'Server error'));
       }
     });
   }
 
   initiateSendEmail(): void {
+    if (!this.isSaved) {
+      this.state.notify('Please save the draft first before sending email.');
+      return;
+    }
+
     if (!this.vendorName.trim()) {
       this.nameError = true;
       this.state.notify('Validation Error: Vendor Name is required.');
@@ -1414,6 +1673,11 @@ export class VendorRegistrationReqComponent {
   }
 
   skipEmail(): void {
+    if (!this.isSaved) {
+      this.state.notify('Please save the draft first before proceeding to fill the vendor profile.');
+      return;
+    }
+
     if (!this.vendorName.trim()) {
       this.nameError = true;
       this.state.notify('Validation Error: Vendor Name is required.');
@@ -1426,8 +1690,20 @@ export class VendorRegistrationReqComponent {
       return;
     }
 
-    this.saveRecord();
-    this.resetForm();
+    const reqNo = this.vendorId && this.vendorId !== '*** NEW ***' ? this.vendorId : '';
+    if (reqNo) {
+      this.state.skipVendorInvitation(reqNo);
+    }
+
+    this.state.notify(`Email skipped. Opening Vendor Profile for ${this.vendorName} to fill details...`);
+
+    const targetRole = this.role() || 'admin';
+    this.router.navigate(['/', targetRole, 'profile'], {
+      queryParams: {
+        reqNo: reqNo,
+        mode: 'fill'
+      }
+    });
   }
 
   loadRequestIntoForm(req: VendorRegistrationReq): void {

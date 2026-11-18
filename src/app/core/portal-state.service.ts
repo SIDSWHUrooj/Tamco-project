@@ -150,9 +150,68 @@ export class PortalStateService {
     ccAddress: ''
   });
 
+  private getInitialBankRecords(): BankRecord[] {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('portal_bank_records');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch {}
+
+    return [
+      {
+        id: 'BNK-2026-001',
+        vendorId: '2026000006',
+        vendorName: 'vendor2',
+        bankName: 'Emirates NBD',
+        iban: 'AE29 0260 0000 0020 2600 0006',
+        accountTitle: 'vendor2 Legal Account',
+        branchCode: 'Dubai Main Branch · 026',
+        verificationStatus: 'Pending',
+        verifiedDate: '',
+        notes: 'Submitted via Vendor Registration Wizard (Step 8)'
+      },
+      {
+        id: 'BNK-2026-002',
+        vendorId: 'VEN-10028',
+        vendorName: 'Horizon Power Systems',
+        bankName: 'First Abu Dhabi Bank (FAB)',
+        iban: 'AE12 0330 0000 4455 6677 8899',
+        accountTitle: 'Horizon Power Systems LLC',
+        branchCode: 'Abu Dhabi Corniche · 033',
+        verificationStatus: 'Pending',
+        verifiedDate: '',
+        notes: 'Awaiting original bank letter scan'
+      },
+      {
+        id: 'BNK-2026-003',
+        vendorId: 'VEN-001',
+        vendorName: 'Al Futtaim Industrial Solutions',
+        bankName: 'Abu Dhabi Commercial Bank (ADCB)',
+        iban: 'AE44 0030 0000 9876 5432 1001',
+        accountTitle: 'Al Futtaim Industrial Solutions',
+        branchCode: 'Deira Branch · 003',
+        verificationStatus: 'Approved',
+        verifiedDate: '01 Nov 2026',
+        notes: 'Verified via Sage 300 ERP Vendor Master'
+      }
+    ];
+  }
+
+  private persistBankRecords(): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('portal_bank_records', JSON.stringify(this.bankRecords()));
+      }
+    } catch {}
+  }
+
   readonly itemBidComparisons = signal<ItemBidComparison[]>([]);
   readonly vendors = signal<Vendor[]>([]);
-  readonly bankRecords = signal<BankRecord[]>([]);
+  readonly bankRecords = signal<BankRecord[]>(this.getInitialBankRecords());
   readonly vendorRegistrationRequests = signal<VendorRegistrationReq[]>([]);
   readonly requisitions = signal<Requisition[]>([]);
   readonly rfqs = signal<Rfq[]>([]);
@@ -191,7 +250,7 @@ export class PortalStateService {
     this.authenticated.set(true);
 
     if (account.role === 'vendor') {
-      const code = account.vendorStatus !== undefined ? account.vendorStatus : 3;
+      const code = account.vendorStatus !== undefined ? account.vendorStatus : 1;
       this.setVendorStatusCode(code, true);
     }
 
@@ -458,6 +517,9 @@ export class PortalStateService {
     iban: string;
     accountTitle: string;
     branch: string;
+    email?: string;
+    phone?: string;
+    contactPerson?: string;
     notes?: string;
   }): void {
     // 1. Update vendor in vendors list
@@ -474,13 +536,43 @@ export class PortalStateService {
       return v;
     }));
 
-    // 2. Mark vendor registration request as 'Profile Completed'
-    this.vendorRegistrationRequests.update(list => list.map(req => {
-      if (req.vendorName.toLowerCase() === data.company.toLowerCase() || req.id === data.id) {
-        return { ...req, status: 'Profile Completed' };
+    // 2. Mark or prepend vendor registration request as 'Profile Completed'
+    this.vendorRegistrationRequests.update(list => {
+      const idx = list.findIndex(req => req.vendorName.toLowerCase() === data.company.toLowerCase() || req.id === data.id);
+      if (idx >= 0) {
+        return list.map((req, i) => i === idx ? {
+          ...req,
+          vendorName: data.company,
+          email: data.email || req.email,
+          phone: data.phone || req.phone,
+          contactPerson: data.contactPerson || req.contactPerson,
+          status: 'Profile Completed'
+        } : req);
+      } else {
+        const newReq: VendorRegistrationReq = {
+          id: data.id,
+          vendorName: data.company,
+          email: data.email || '',
+          phone: data.phone || '',
+          contactPerson: data.contactPerson || '',
+          status: 'Profile Completed',
+          createdAt: new Date().toISOString().substring(0, 16).replace('T', ' ')
+        };
+        return [newReq, ...list];
       }
-      return req;
-    }));
+    });
+
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('vreg_completed_requests');
+        const set = new Set<string>(stored ? JSON.parse(stored) : []);
+        if (data.id) set.add(data.id.toLowerCase().trim());
+        if (data.company) set.add(data.company.toLowerCase().trim());
+        if (data.email) set.add(data.email.toLowerCase().trim());
+        localStorage.setItem('vreg_completed_requests', JSON.stringify(Array.from(set)));
+        if (data.id) localStorage.setItem(`vreg_submitted_${data.id}`, 'true');
+      }
+    } catch {}
 
     // 3. Push or update bank details in the Finance Bank Verification queue
     if (data.bank && data.iban) {
@@ -511,6 +603,7 @@ export class PortalStateService {
         };
         this.bankRecords.update(list => [newBankRec, ...list]);
       }
+      this.persistBankRecords();
     }
 
     this.notify(`Profile submitted successfully! Banking details routed to Finance for verification.`);
@@ -531,6 +624,7 @@ export class PortalStateService {
       }
       return rec;
     }));
+    this.persistBankRecords();
 
     if (targetRec) {
       // Update vendor financeStatus
@@ -557,12 +651,19 @@ export class PortalStateService {
 
   addBankRecord(record: BankRecord): void {
     this.bankRecords.update(list => [record, ...list]);
+    this.persistBankRecords();
     this.notify(`Bank record registered for ${record.vendorName}.`);
+  }
+
+  updateBankRecord(record: BankRecord): void {
+    this.bankRecords.update(list => list.map(r => r.id === record.id ? { ...record } : r));
+    this.persistBankRecords();
   }
 
   deleteBankRecord(id: string): void {
     const item = this.bankRecords().find(r => r.id === id);
     this.bankRecords.update(list => list.filter(r => r.id !== id));
+    this.persistBankRecords();
     this.notify(`Bank record for ${item ? item.vendorName : id} deleted.`);
   }
 
@@ -690,7 +791,7 @@ export class PortalStateService {
     this.notify(`Sourcing plan for ${reqDocNo} returned to Draft for re-selection.`);
   }
 
-  saveMasterVendor(mv: MasterVendor): void {
+  saveMasterVendor(mv: MasterVendor, notifyUser: boolean = true): void {
     if (!mv.vendorId || mv.vendorId === '*** NEW ***' || mv.vendorId.trim() === '') {
       const nextId = `VEN-${Math.floor(10000 + Math.random() * 90000)}`;
       mv.vendorId = nextId;
@@ -722,7 +823,9 @@ export class PortalStateService {
       this.vendors.update(list => [dirVendor, ...list]);
     }
 
-    this.notify(`Master Vendor "${mv.vendorName}" (${mv.vendorId}) saved successfully.`);
+    if (notifyUser) {
+      this.notify(`Master Vendor "${mv.vendorName}" (${mv.vendorId}) saved successfully.`);
+    }
   }
 
   approveMasterVendor(vendorId: string): void {

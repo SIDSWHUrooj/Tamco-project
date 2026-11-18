@@ -2917,6 +2917,7 @@ export class ManagementComponent implements OnInit {
     ccAddress: 'cfo@tamco.ae'
   };
   testEmailAddress = '';
+  hasExistingEmailConfig = false;
 
   // Filter methods for Lookup Modals
   filteredDocModal(): DocumentTypeItem[] {
@@ -3363,19 +3364,30 @@ export class ManagementComponent implements OnInit {
     // 9. Email SMTP Configuration: POST /api/Management/GetEMAILList
     this.vendorApi.getEmailList().subscribe({
       next: (res) => {
-        const list = this.extractApiList(res, ['emaiL_LIST', 'emaiL_DETAILS', 'emailList', 'data']);
+        const list = Array.isArray(res)
+          ? res
+          : (res && typeof res === 'object' && (res.emailhost || res.EMAILHOST))
+            ? [res]
+            : this.extractApiList(res, ['emaiL_LIST', 'emaiL_DETAILS', 'emailList', 'data']);
         if (Array.isArray(list) && list.length > 0) {
-          const cfg = list[0];
+          this.hasExistingEmailConfig = true;
+          // Prefer the latest complete, non-truncated SMTP config (ignore partial rows without domain suffix)
+          const validConfigs = list.filter((c: any) => {
+            const h = String(c.emailhost || c.EMAILHOST || '').trim();
+            const u = String(c.emailusername || c.EMAILUSERNAME || '').trim();
+            return h.includes('.') && u.includes('@') && u.split('@')[1]?.includes('.');
+          });
+          const cfg = validConfigs.length > 0 ? validConfigs[validConfigs.length - 1] : list[list.length - 1];
           this.emailForm = {
-            host: cfg.emailhost || '',
-            port: Number(cfg.emailport) || 587,
-            username: cfg.emailusername || '',
-            password: cfg.emailpass || '',
-            fromAddress: cfg.emailfromaddress || cfg.emailusername || '',
-            ccAddress: cfg.emailccaddress || ''
+            host: String(cfg.emailhost || cfg.EMAILHOST || '').trim(),
+            port: Number(cfg.emailport || cfg.EMAILPORT) || 587,
+            username: String(cfg.emailusername || cfg.EMAILUSERNAME || '').trim(),
+            password: cfg.emailpass || cfg.EMAILPASS || '',
+            fromAddress: String(cfg.emailfromaddress || cfg.EMAILFROMADDRESS || cfg.emailusername || '').trim(),
+            ccAddress: String(cfg.emailccaddress || cfg.EMAILCCADDRESS || '').trim()
           };
-          if (cfg.testemail) {
-            this.testEmailAddress = cfg.testemail;
+          if (cfg.testemail || cfg.TESTEMAIL) {
+            this.testEmailAddress = String(cfg.testemail || cfg.TESTEMAIL).trim();
           }
           this.state.saveEmailConfig({
             host: this.emailForm.host,
@@ -4180,66 +4192,105 @@ export class ManagementComponent implements OnInit {
 
   // --- TAB 9: EMAIL METHODS (SendEmailForReminder.cshtml) ---
   saveEmailSettings(): void {
-    if (!this.emailForm.host || !this.emailForm.username) {
+    const host = this.emailForm.host?.trim() || '';
+    const username = this.emailForm.username?.trim() || '';
+    if (!host || !username) {
       this.state.notify('Error: Host and username are required.');
       return;
     }
+    this.emailForm.host = host;
+    this.emailForm.username = username;
+    this.emailForm.fromAddress = (this.emailForm.fromAddress || username).trim();
+    this.emailForm.ccAddress = (this.emailForm.ccAddress || '').trim();
 
+    const op = this.hasExistingEmailConfig ? 3 : 2;
     const payload = {
-      coperation: 2,
-      emailhost: this.emailForm.host,
-      emailport: String(this.emailForm.port || '587'),
-      emailusername: this.emailForm.username,
+      coperation: op,
+      emailhost: host,
+      emailport: String(this.emailForm.port || '587').trim(),
+      emailusername: username,
       emailpass: this.emailForm.password,
-      emailfromaddress: this.emailForm.fromAddress || this.emailForm.username,
-      emailccaddress: this.emailForm.ccAddress || '',
-      testemail: this.testEmailAddress || ''
+      emailfromaddress: this.emailForm.fromAddress,
+      emailccaddress: this.emailForm.ccAddress,
+      testemail: this.testEmailAddress?.trim() || ''
+    };
+
+    const onSaveSuccess = (res: any) => {
+      this.hasExistingEmailConfig = true;
+      this.state.saveEmailConfig({
+        host,
+        port: Number(this.emailForm.port) || 587,
+        username,
+        password: this.emailForm.password,
+        fromAddress: this.emailForm.fromAddress,
+        ccAddress: this.emailForm.ccAddress
+      });
+      this.state.notify(`Email SMTP configuration saved to database successfully! (${res?.message || 'OK'})`);
     };
 
     // Save to Database: POST /api/Management/AUDEMAIL
-    this.vendorApi.saveEmailConfig(payload).subscribe({
+    this.vendorApi.saveEmailConfig(payload, op).subscribe({
       next: (res) => {
-        this.state.saveEmailConfig({
-          host: this.emailForm.host,
-          port: Number(this.emailForm.port) || 587,
-          username: this.emailForm.username,
-          password: this.emailForm.password,
-          fromAddress: this.emailForm.fromAddress,
-          ccAddress: this.emailForm.ccAddress
-        });
-        this.state.notify(`Email SMTP configuration saved to database successfully! (${res?.message || 'OK'})`);
+        if (res && (res.status === '0' || res.status === 0)) {
+          const msg = String(res.message || '');
+          if (op === 2 && msg.toLowerCase().includes('exist')) {
+            this.vendorApi.saveEmailConfig({ ...payload, coperation: 3 }, 3).subscribe({
+              next: (updRes) => {
+                if (updRes && (updRes.status === '0' || updRes.status === 0)) {
+                  this.state.notify(`❌ Email configuration save failed: ${updRes.message || 'Rejected by server'}`);
+                  return;
+                }
+                onSaveSuccess(updRes);
+              },
+              error: (err) => {
+                this.state.notify(`Error updating email configuration: ${err?.error?.message || err?.message || 'Server error'}`);
+              }
+            });
+            return;
+          }
+          this.state.notify(`❌ Email configuration save failed: ${res.message || 'Rejected by server'}`);
+          return;
+        }
+        onSaveSuccess(res);
       },
       error: (err) => {
         console.warn('saveEmailConfig error:', err);
-        this.state.notify('Error saving email configuration to database.');
+        this.state.notify(`Error saving email configuration: ${err?.error?.message || err?.message || 'Server error'}`);
       }
     });
   }
 
   sendTestEmail(): void {
-    if (!this.testEmailAddress.trim()) {
+    const recipient = this.testEmailAddress?.trim() || '';
+    if (!recipient) {
       this.state.notify('Error: Enter a test email recipient first.');
       return;
     }
 
+    const host = this.emailForm.host?.trim() || '';
+    const username = this.emailForm.username?.trim() || '';
     const payload = {
       coperation: 1,
-      emailhost: this.emailForm.host,
-      emailport: String(this.emailForm.port || '587'),
-      emailusername: this.emailForm.username,
+      emailhost: host,
+      emailport: String(this.emailForm.port || '587').trim(),
+      emailusername: username,
       emailpass: this.emailForm.password,
-      emailfromaddress: this.emailForm.fromAddress || this.emailForm.username,
-      emailccaddress: this.emailForm.ccAddress || '',
-      testemail: this.testEmailAddress.trim()
+      emailfromaddress: (this.emailForm.fromAddress || username).trim(),
+      emailccaddress: (this.emailForm.ccAddress || '').trim(),
+      testemail: recipient
     };
 
     // Dispatch Live Test Email via Backend: POST /api/Management/AUDEMAIL
     this.vendorApi.saveEmailConfig(payload).subscribe({
       next: (res) => {
-        this.state.notify(`Test email request dispatched to ${this.testEmailAddress}! (${res?.message || 'Handshake OK'})`);
+        if (res && (res.status === '0' || res.status === 0)) {
+          this.state.notify(`❌ Test email failed: ${res.message || 'SMTP handshake rejected'}`);
+          return;
+        }
+        this.state.notify(`Test email request dispatched to ${recipient}! (${res?.message || 'OK'})`);
       },
       error: (err) => {
-        this.state.notify(`Test email dispatch error: ${err?.message || 'SMTP Connection failed'}`);
+        this.state.notify(`Test email dispatch error: ${err?.error?.message || err?.message || 'SMTP Connection failed'}`);
       }
     });
   }

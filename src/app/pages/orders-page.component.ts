@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { VendorApiService } from '../core/vendor-api.service';
@@ -981,6 +981,7 @@ export class OrdersPageComponent implements OnInit {
   readonly state = inject(PortalStateService);
   readonly vendorApi = inject(VendorApiService);
   readonly sageApi = inject(SageApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly role = computed(() => this.state.role());
 
   // Active Tab:
@@ -1120,6 +1121,7 @@ export class OrdersPageComponent implements OnInit {
         if (!this.currentPoNumber && detailed.length > 0) {
           this.selectDetailedPo(detailed[0]);
         }
+        this.cdr.markForCheck();
       }
     });
   }
@@ -1275,6 +1277,19 @@ export class OrdersPageComponent implements OnInit {
     this.poList = [createdPo, ...this.poList];
     this.detailedPos = [newDetailedPo, ...this.detailedPos];
     this.state.purchaseOrders.update(list => [createdPo, ...list]);
+
+    // Persist to Sage 300 ERP POPurchaseOrders
+    const sagePoPayload = {
+      PurchaseOrderNumber: nextPoNum,
+      Vendor: this.createVendorId,
+      Name: this.createVendorName,
+      PurchaseOrderDate: this.createPoDate,
+      Description: `${this.createPoCategory} — ${this.createPoItems[0]?.itemNumber || 'Procurement Batch'}`
+    };
+    this.sageApi.createPurchaseOrder(sagePoPayload).subscribe({
+      next: (res) => console.log('PO saved to Sage 300 ERP:', res),
+      error: (err) => console.warn('Sage 300 PO creation notice:', err)
+    });
 
     // Switch to Viewer tab to inspect newly created PO
     this.selectDetailedPo(newDetailedPo);

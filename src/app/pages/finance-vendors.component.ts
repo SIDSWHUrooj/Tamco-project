@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
@@ -99,6 +99,16 @@ export interface FinanceVendorProfile {
         [options]="filterTermsOptions"
         minWidth="180px"
       />
+      <button
+        type="button"
+        class="btn secondary"
+        style="padding: 7px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border-color: #50ae9b; color: #1e5f53;"
+        (click)="loadBackendVendors()"
+        title="Refresh live vendor finance records"
+      >
+        <app-icon name="refresh" [size]="14" />
+        <span>Refresh</span>
+      </button>
     </div>
 
     <!-- Live Table -->
@@ -263,6 +273,7 @@ export class FinanceVendorsComponent implements OnInit {
   readonly state = inject(PortalStateService);
   readonly vendorApi = inject(VendorApiService);
   readonly sageApi = inject(SageApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
     this.loadBackendVendors();
@@ -329,6 +340,17 @@ export class FinanceVendorsComponent implements OnInit {
               }
             }
           }
+
+          // Also enrich with local bank records state (e.g. vendor2)
+          for (const bRec of this.state.bankRecords()) {
+            const prof = this.profiles.find(p => p.vendorId === bRec.vendorId || p.vendorName.toLowerCase() === bRec.vendorName.toLowerCase());
+            if (prof) {
+              if (bRec.bankName) prof.bank = bRec.bankName;
+              if (bRec.iban) prof.iban = bRec.iban;
+              if (bRec.verificationStatus === 'Approved') prof.financeStatus = 'Approved';
+            }
+          }
+          this.cdr.markForCheck();
         });
       }
 
@@ -351,8 +373,10 @@ export class FinanceVendorsComponent implements OnInit {
               });
             }
           }
+          this.cdr.markForCheck();
         }
       });
+      this.cdr.markForCheck();
     });
   }
 

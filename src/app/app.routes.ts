@@ -26,6 +26,7 @@ export const routes: Routes = [
     path: 'vendor',
     component: PortalShellComponent,
     canActivate: [authGuard],
+    canActivateChild: [authGuard],
     children: [
       { path: 'dashboard', component: DashboardComponent },
       { path: 'orders', component: OrdersPageComponent },
@@ -40,6 +41,7 @@ export const routes: Routes = [
     path: ':role',
     component: PortalShellComponent,
     canActivate: [authGuard],
+    canActivateChild: [authGuard],
     children: [
       { path: 'dashboard', component: DashboardComponent },
       { path: 'vendors', component: VendorsComponent },

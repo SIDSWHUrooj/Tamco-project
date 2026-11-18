@@ -1,7 +1,7 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
-import { VendorApiService } from '../core/vendor-api.service';
+import { VBANKModel, VendorApiService } from '../core/vendor-api.service';
 import { StatusComponent } from '../shared/ui.component';
 import { IconComponent } from '../shared/icon.component';
 import { CustomSelectComponent } from '../shared/custom-select.component';
@@ -17,6 +17,30 @@ export interface BankRecord {
   verificationStatus: 'Approved' | 'Pending' | 'Rejected';
   verifiedDate: string;
   notes: string;
+}
+
+const BANK_STATUS_CODES: Record<BankRecord['verificationStatus'], number> = {
+  Pending: 0,
+  Approved: 1,
+  Rejected: 2
+};
+
+function buildVendorBankPayload(
+  rec: BankRecord,
+  status: BankRecord['verificationStatus'] = rec.verificationStatus,
+  isactive?: number
+): Partial<VBANKModel> {
+  return {
+    coperation: 2,
+    reqno: rec.vendorId,
+    linenum: 1,
+    vendoR_NAME: rec.vendorName,
+    banK_NAME: rec.bankName,
+    accounT_IBAN: rec.iban,
+    titlE_ACC: rec.accountTitle,
+    status: BANK_STATUS_CODES[status] ?? 0,
+    ...(isactive !== undefined ? { isactive } : {})
+  };
 }
 
 @Component({
@@ -90,6 +114,17 @@ export interface BankRecord {
         [options]="statusFilterOptions"
         minWidth="160px"
       />
+      <button
+        type="button"
+        class="btn secondary"
+        style="padding: 7px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border-color: #50ae9b; color: #1e5f53;"
+        (click)="loadBackendBankData()"
+        [disabled]="isLoading"
+        title="Refresh live bank accounts from database"
+      >
+        <app-icon name="refresh" [size]="14" />
+        <span>{{ isLoading ? 'Refreshing...' : 'Refresh Bank Data' }}</span>
+      </button>
     </div>
 
     <!-- Live Bank Verification Queue Table -->
@@ -225,10 +260,12 @@ export interface BankRecord {
 export class BankVerificationComponent implements OnInit {
   readonly state = inject(PortalStateService);
   readonly vendorApi = inject(VendorApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   showAddForm = true;
   searchQuery = '';
   statusFilter = '';
+  isLoading = false;
 
   readonly statusFilterOptions = [
     { value: '', label: 'All Statuses' },
@@ -255,35 +292,87 @@ export class BankVerificationComponent implements OnInit {
   }
 
   loadBackendBankData(): void {
+    this.isLoading = true;
+
     // 1. Fetch live bank accounts submitted by vendors
-    this.vendorApi.getAllVendorBanks().subscribe(res => {
-      const list = res?.vbank_List || res?.data || (Array.isArray(res) ? res : null);
-      if (Array.isArray(list) && list.length > 0) {
-        for (const b of list) {
-          const reqNo = b.reqno || b.reQ_NO || '';
-          if (!reqNo) continue;
-          const status: 'Approved' | 'Pending' | 'Rejected' =
-            (b.status === 'Approved' || b.isactive === 1) ? 'Approved' : (b.status === 'Rejected' ? 'Rejected' : 'Pending');
-          const existing = this.state.bankRecords().find(r => r.vendorId === reqNo || r.iban === (b.accounT_IBAN || b.accounT_NO));
-          if (!existing) {
-            this.state.addBankRecord({
-              id: `BNK-${reqNo}-${b.linenum || 1}`,
-              vendorId: reqNo,
-              vendorName: b.vendoR_NAME || reqNo,
-              bankName: b.banK_NAME || 'Commercial Bank',
-              iban: b.accounT_IBAN || b.accounT_NO || '',
-              accountTitle: b.titlE_ACC || b.vendoR_NAME || '',
-              branchCode: b.banK_ADRESS || b.swifT_CODE || 'Main Branch',
-              verificationStatus: status,
-              verifiedDate: status === 'Approved' ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-              notes: `Registered via portal Step 8 (Currency: ${b.currency || 'AED'})`
-            });
+    this.vendorApi.getAllVendorBanks().subscribe({
+      next: (res) => {
+        this.isLoading = false;
+        const list = res?.vbank_List || res?.data || (Array.isArray(res) ? res : null);
+        if (Array.isArray(list) && list.length > 0) {
+          for (const b of list) {
+            const reqNo = b.reqno || b.reQ_NO || '';
+            if (!reqNo) continue;
+            const status: 'Approved' | 'Pending' | 'Rejected' =
+              (b.status === 'Approved' || b.isactive === 1) ? 'Approved' : (b.status === 'Rejected' ? 'Rejected' : 'Pending');
+            const existing = this.state.bankRecords().find(r => r.vendorId === reqNo || r.iban === (b.accounT_IBAN || b.accounT_NO));
+            if (!existing) {
+              this.state.addBankRecord({
+                id: `BNK-${reqNo}-${b.linenum || 1}`,
+                vendorId: reqNo,
+                vendorName: b.vendoR_NAME || reqNo,
+                bankName: b.banK_NAME || 'Commercial Bank',
+                iban: b.accounT_IBAN || b.accounT_NO || '',
+                accountTitle: b.titlE_ACC || b.vendoR_NAME || '',
+                branchCode: b.banK_ADRESS || b.swifT_CODE || 'Main Branch',
+                verificationStatus: status,
+                verifiedDate: status === 'Approved' ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+                notes: `Registered via portal Step 8 (Currency: ${b.currency || 'AED'})`
+              });
+            } else {
+              if (b.banK_NAME) existing.bankName = b.banK_NAME;
+              if (b.accounT_IBAN || b.accounT_NO) existing.iban = b.accounT_IBAN || b.accounT_NO;
+              if (b.titlE_ACC) existing.accountTitle = b.titlE_ACC;
+              if (b.banK_ADRESS || b.swifT_CODE) existing.branchCode = b.banK_ADRESS || b.swifT_CODE;
+              this.state.updateBankRecord(existing);
+            }
           }
         }
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.isLoading = false;
+        this.cdr.markForCheck();
       }
     });
 
-    // 2. Fetch live bank validation audit records
+    // 2. Fetch specific banks for active/known registration IDs (e.g. 2026000006)
+    const checkIds = ['2026000006', ...this.state.vendorRegistrationRequests().map(r => r.id)];
+    const uniqueIds = Array.from(new Set(checkIds.filter(Boolean)));
+    for (const vId of uniqueIds) {
+      this.vendorApi.getVendorBanks(vId).subscribe(res => {
+        const bList = res?.vbank_List || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(bList) && bList.length > 0) {
+          for (const b of bList) {
+            const existing = this.state.bankRecords().find(r => r.vendorId === vId || r.iban === (b.accounT_IBAN || b.accounT_NO));
+            if (!existing) {
+              this.state.addBankRecord({
+                id: `BNK-${vId}-${b.linenum || 1}`,
+                vendorId: vId,
+                vendorName: b.vendoR_NAME || 'vendor2',
+                bankName: b.banK_NAME || 'Emirates NBD',
+                iban: b.accounT_IBAN || b.accounT_NO || '',
+                accountTitle: b.titlE_ACC || 'vendor2',
+                branchCode: b.banK_ADRESS || b.swifT_CODE || 'Main Branch',
+                verificationStatus: (b.status === 'Approved' || b.isactive === 1) ? 'Approved' : 'Pending',
+                verifiedDate: '',
+                notes: `Live bank account from database for ${vId}`
+              });
+            } else {
+              if (b.banK_NAME) existing.bankName = b.banK_NAME;
+              if (b.accounT_IBAN || b.accounT_NO) existing.iban = b.accounT_IBAN || b.accounT_NO;
+              if (b.titlE_ACC) existing.accountTitle = b.titlE_ACC;
+              if (b.banK_ADRESS || b.swifT_CODE) existing.branchCode = b.banK_ADRESS || b.swifT_CODE;
+              if (b.status === 'Approved' || b.isactive === 1) existing.verificationStatus = 'Approved';
+              this.state.updateBankRecord(existing);
+            }
+          }
+          this.cdr.markForCheck();
+        }
+      });
+    }
+
+    // 3. Fetch live bank validation audit records
     this.vendorApi.getBankValidations().subscribe(res => {
       const list = res?.bankvalidation_List || res?.data || (Array.isArray(res) ? res : null);
       if (Array.isArray(list) && list.length > 0) {
@@ -296,6 +385,7 @@ export class BankVerificationComponent implements OnInit {
             this.state.setBankVerificationStatus(rec.id, status as any);
           }
         }
+        this.cdr.markForCheck();
       }
     });
   }
@@ -323,15 +413,7 @@ export class BankVerificationComponent implements OnInit {
     this.state.addBankRecord(added);
 
     // Sync to live backend APIs
-    this.vendorApi.saveVendorBank({
-      coperation: 2,
-      reqno: added.vendorId,
-      vendoR_NAME: added.vendorName,
-      banK_NAME: added.bankName,
-      accounT_IBAN: added.iban,
-      titlE_ACC: added.accountTitle,
-      status: added.verificationStatus
-    }).subscribe();
+    this.vendorApi.saveVendorBank(buildVendorBankPayload(added)).subscribe();
 
     this.vendorApi.saveBankValidation({
       coperation: 2,
@@ -381,16 +463,7 @@ export class BankVerificationComponent implements OnInit {
     });
 
     // Also sync AUDVendorBank
-    this.vendorApi.saveVendorBank({
-      coperation: 2,
-      reqno: rec.vendorId,
-      vendoR_NAME: rec.vendorName,
-      banK_NAME: rec.bankName,
-      accounT_IBAN: rec.iban,
-      titlE_ACC: rec.accountTitle,
-      status: status,
-      isactive: status === 'Approved' ? 1 : 0
-    }).subscribe();
+    this.vendorApi.saveVendorBank(buildVendorBankPayload(rec, status, status === 'Approved' ? 1 : 0)).subscribe();
   }
 
   toggleStatus(rec: BankRecord): void {
@@ -424,15 +497,7 @@ export class BankVerificationComponent implements OnInit {
       letteR_DATE: new Date().toISOString()
     }).subscribe();
 
-    this.vendorApi.saveVendorBank({
-      coperation: 2,
-      reqno: rec.vendorId,
-      vendoR_NAME: rec.vendorName,
-      banK_NAME: rec.bankName,
-      accounT_IBAN: rec.iban,
-      titlE_ACC: rec.accountTitle,
-      status: rec.verificationStatus
-    }).subscribe();
+    this.vendorApi.saveVendorBank(buildVendorBankPayload(rec)).subscribe();
 
     this.state.notify(`Bank details for ${rec.vendorName || rec.vendorId} saved.`);
   }

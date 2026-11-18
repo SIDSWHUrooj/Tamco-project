@@ -70,7 +70,7 @@ export interface VendorRegistrationReq {
   email: string;
   phone: string;
   contactPerson: string;
-  status: 'Draft' | 'Email Sent' | 'Profile Completed';
+  status: 'Draft' | 'Email Sent' | 'Profile Completed' | 'Approved';
   createdAt: string;
   tempPassword?: string;
 }

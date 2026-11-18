@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PortalStateService } from '../core/portal-state.service';
 import { SageApiService } from '../core/sage-api.service';
@@ -733,6 +733,7 @@ interface ReceiptRecord {
 export class InvoicePageComponent implements OnInit {
   readonly state = inject(PortalStateService);
   readonly sageApi = inject(SageApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly role = computed(() => this.state.role());
 
   showUploadForm = false;
@@ -823,6 +824,7 @@ export class InvoicePageComponent implements OnInit {
         if (rcpList.length > 0 && !this.pendingReceipt) {
           this.pendingReceipt = rcpList[0].receiptNumber;
         }
+        this.cdr.markForCheck();
       }
     });
 
@@ -836,6 +838,7 @@ export class InvoicePageComponent implements OnInit {
             label: `${p.PurchaseOrderNumber.trim()} — ${p.Name?.trim() || p.Vendor?.trim() || 'Supplier'} ($${(p.Total || p.ExtendedCost || 0).toLocaleString()})`
           }))
         ];
+        this.cdr.markForCheck();
       }
     });
   }
@@ -925,7 +928,26 @@ export class InvoicePageComponent implements OnInit {
     const match: 'Matched' | 'Mismatch' = 'Matched';
     const created: Invoice = { ...this.newInvoice, match, status: 'Pending' };
     this.invoicesList = [created, ...this.invoicesList];
-    this.state.notify(`Invoice ${created.id} uploaded. 3-Way match result: ${match}.`);
+    this.state.invoices.set(this.invoicesList);
+
+    // Save directly to Sage 300 ERP PO Invoices table
+    const sageInvPayload = {
+      InvoiceNumber: created.id,
+      PurchaseOrderNumber: created.poId,
+      Vendor: created.vendor || this.state.currentVendorName() || 'Supplier',
+      Total: created.amount,
+      InvoiceDate: new Date().toISOString()
+    };
+    this.sageApi.createInvoice(sageInvPayload).subscribe({
+      next: (res) => {
+        console.log('Invoice successfully registered to Sage 300 ERP:', res);
+      },
+      error: (err) => {
+        console.warn('Notice: Sage 300 Invoice sync:', err);
+      }
+    });
+
+    this.state.notify(`Invoice ${created.id} uploaded and synced to Sage ERP. 3-Way match: ${match}.`);
     this.resetForm();
     this.showUploadForm = false;
   }

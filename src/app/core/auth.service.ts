@@ -267,25 +267,39 @@ export class AuthService {
     const vendorData = res.vendorBI_Data || res.vendorBI_List?.[0] || {};
     const userData = res.useR_Details || res.useR_List?.[0] || res.user || res.data?.user || {};
 
-    // Determine Vendor Lifecycle Mode (0: Draft Wizard, 1: Under Review, 3: Approved Partner)
-    let vendorStatus = 3;
+    // Determine Vendor Lifecycle Mode (0: Draft Wizard, 1: Under Review, 2: Uploaded/Pending Audit, 3: Approved Partner)
+    // IMPORTANT: Vendors are strictly prevented from accessing the Dashboard (status 3) until BOTH Procurement and Finance approve!
+    let vendorStatus = 1;
     if (role === 'vendor') {
-      const activeFlag = vendorData.isactive !== undefined
-        ? vendorData.isactive
-        : (vendorData.active !== undefined ? vendorData.active : vendorData.Active);
-      const isApproved = activeFlag === 1 || activeFlag === '1' || activeFlag === true;
+      const procurementApproved = vendorData.procurementStatus === 'Approved'
+        || vendorData.vendorValidation === 'Approved'
+        || vendorData.procurementApproved === true;
+      const financeApproved = vendorData.financeStatus === 'Approved'
+        || vendorData.bankVerified === true
+        || vendorData.financeApproved === true;
 
-      if (isApproved) {
+      const isBothApproved = (procurementApproved && financeApproved) || vendorData.fullyApproved === true;
+
+      if (isBothApproved) {
         vendorStatus = 3;
       } else {
         // Check if registration was previously submitted for TAMCO review
         const isSubmitted = vendorData.submitted === true
           || vendorData.status === 'Submitted'
           || vendorData.status === 'Under Review'
+          || vendorData.status === 'Profile Completed'
           || vendorData.isactivE1 === 1
           || vendorData.isactivE1 === '1'
-          || (typeof window !== 'undefined' && localStorage.getItem(`vreg_submitted_${usernameOrEmail}`) === 'true');
-        vendorStatus = isSubmitted ? 1 : 0;
+          || vendorData.active === 1
+          || vendorData.isactive === 1
+          || (typeof window !== 'undefined' && (
+              localStorage.getItem(`vreg_submitted_${usernameOrEmail}`) === 'true' ||
+              localStorage.getItem(`vreg_completed_requests`)?.includes(usernameOrEmail.toLowerCase())
+            ));
+
+        const isSignedUploaded = typeof window !== 'undefined' && localStorage.getItem(`vreg_signed_${usernameOrEmail}`) === 'true';
+
+        vendorStatus = isSignedUploaded ? 2 : (isSubmitted ? 1 : 0);
       }
     }
 

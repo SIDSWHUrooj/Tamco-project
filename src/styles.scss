@@ -688,6 +688,14 @@ input[type="radio"] {
     box-shadow: var(--shadow-sm);
   }
 
+  &:disabled,
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    pointer-events: none;
+    box-shadow: none !important;
+  }
+
   &.secondary, &.ghost {
     background: var(--panel);
     color: var(--text);

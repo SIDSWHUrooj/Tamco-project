@@ -12,17 +12,6 @@ import { LegacyUserItem, DepartmentItem } from '../core/models';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, CustomSelectComponent],
   template: `
-    <div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
-      <button
-        type="button"
-        class="btn"
-        style="background-color: var(--role-accent, #50ae9b); border-color: var(--role-accent, #50ae9b); display: inline-flex; align-items: center; gap: 6px;"
-        (click)="resetUserForm()"
-      >
-        + New User Record
-      </button>
-    </div>
-
     <!-- USERS DETAILS CARD (Matches Screenshot media_1790932261121.jpg & /Setup/Users) -->
     <article class="panel main-card">
       <div class="main-heading-banner">
